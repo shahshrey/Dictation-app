@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAudioSources: () => ipcRenderer.invoke('get-audio-sources'),
   saveRecording: (arrayBuffer) => ipcRenderer.invoke('save-recording', arrayBuffer),
   getRecordingPath: () => ipcRenderer.invoke('get-recording-path'),
+  startRecording: (sourceId) => ipcRenderer.invoke('start-recording', sourceId),
+  stopRecording: () => ipcRenderer.invoke('stop-recording'),
   
   // Groq API
   transcribeAudio: (filePath, options) => 

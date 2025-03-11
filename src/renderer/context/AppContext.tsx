@@ -165,9 +165,16 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   // Start recording
   const startRecording = async (): Promise<void> => {
     if (selectedSourceId) {
-      const result = await window.electronAPI.startRecording(selectedSourceId);
-      if (!result.success) {
-        console.error('Failed to start recording:', result.error);
+      try {
+        // Start the media recorder
+        await startMediaRecorder(selectedSourceId);
+        
+        // Notify the main process that recording has started
+        await window.electronAPI.startRecording(selectedSourceId);
+        
+        setIsRecording(true);
+      } catch (error) {
+        console.error('Failed to start recording:', error);
       }
     } else {
       console.error('No audio source selected');
@@ -176,12 +183,20 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   
   // Stop recording
   const stopRecording = async (): Promise<void> => {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-      mediaRecorder.stop();
-      setIsRecording(false);
+    try {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+        
+        // Stop all tracks in the stream
+        mediaRecorder.stream.getTracks().forEach(track => track.stop());
+      }
       
-      // Stop all tracks in the stream
-      mediaRecorder.stream.getTracks().forEach(track => track.stop());
+      // Notify the main process that recording has stopped
+      await window.electronAPI.stopRecording();
+      
+      setIsRecording(false);
+    } catch (error) {
+      console.error('Failed to stop recording:', error);
     }
   };
   

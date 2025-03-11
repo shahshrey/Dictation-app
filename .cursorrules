@@ -41,3 +41,14 @@
 
 # Packaging
 - Use electron-forge for packaging the app.
+
+
+# UI
+- Use shadcn with tailwind css
+- Use shadcn components for the UI
+- Use shadcn icons for the UI
+- Use shadcn colors for the UI
+- Use shadcn shadows for the UI
+- Use shadcn borders for the UI
+- Use shadcn text for the UI
+- Use shadcn buttons for the UI

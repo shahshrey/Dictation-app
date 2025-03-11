@@ -6,6 +6,7 @@ import RecordingControls from './RecordingControls';
 import TranscriptionDisplay from './TranscriptionDisplay';
 import RecentTranscriptions from './RecentTranscriptions';
 import SettingsPanel from './SettingsPanel';
+import DictationPopup from './DictationPopup';
 
 const App: React.FC = () => {
   return (
@@ -100,6 +101,8 @@ const App: React.FC = () => {
           </Paper>
         </Box>
       </Container>
+      
+      <DictationPopup />
     </Box>
   );
 };

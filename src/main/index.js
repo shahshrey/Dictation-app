@@ -24,9 +24,9 @@ let store = null;
 
 // Default settings
 const DEFAULT_SETTINGS = {
-  defaultLanguage: 'auto',
   apiKey: '',
-  transcriptionModel: 'whisper-large-v3',
+  defaultLanguage: 'auto',
+  transcriptionModel: GROQ_MODELS.TRANSCRIPTION.MULTILINGUAL,
   showNotifications: true,
   saveTranscriptionsAutomatically: false
 };
@@ -69,6 +69,11 @@ if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
 
 // Global reference to the main window
 let mainWindow = null;
+// Global reference to the popup window
+let popupWindow = null;
+
+// Track recording state
+let isRecording = false;
 
 // Initialize Groq client
 let groqClient = null;
@@ -105,6 +110,56 @@ const createWindow = () => {
   // Open DevTools in development mode
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools();
+  }
+};
+
+// Create a popup window for dictation
+const createPopupWindow = () => {
+  // Create the popup window
+  popupWindow = new BrowserWindow({
+    width: 250,
+    height: 250,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Load the popup HTML file
+  popupWindow.loadFile(path.join(__dirname, '../renderer/popup.html'));
+
+  // Center the popup window on the screen
+  popupWindow.center();
+
+  // Hide the popup window when it loses focus
+  popupWindow.on('blur', () => {
+    if (popupWindow && popupWindow.isVisible()) {
+      popupWindow.hide();
+    }
+  });
+};
+
+// Show the popup window
+const showPopupWindow = () => {
+  if (!popupWindow) {
+    createPopupWindow();
+  }
+  
+  if (popupWindow && !popupWindow.isVisible()) {
+    popupWindow.show();
+  }
+};
+
+// Hide the popup window
+const hidePopupWindow = () => {
+  if (popupWindow && popupWindow.isVisible()) {
+    popupWindow.hide();
   }
 };
 
@@ -164,18 +219,21 @@ const setupIpcHandlers = () => {
         model = GROQ_MODELS.TRANSCRIPTION.ENGLISH;
       }
       
-      console.log(`Using Groq model: ${model} for transcription`);
+      // Default to English if no language is specified or if 'auto' is specified
+      const language = (options?.language === 'auto' || !options?.language) ? 'en' : options?.language;
+      
+      console.log(`Using Groq model: ${model} for transcription with language: ${language}`);
       
       const transcription = await groqClient.audio.transcriptions.create({
         file: audioFile,
         model: model,
-        language: options?.language,
+        language: language,
       });
       
       return { 
         success: true, 
         text: transcription.text,
-        language: options?.language || 'auto',
+        language: language,
         model: model
       };
     } catch (error) {
@@ -328,6 +386,29 @@ const setupIpcHandlers = () => {
       return { success: false, error: String(error) };
     }
   });
+
+  // Add handlers for recording state
+  ipcMain.handle('start-recording', async (_, sourceId) => {
+    try {
+      isRecording = true;
+      showPopupWindow();
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+      return { success: false, error: String(error) };
+    }
+  });
+  
+  ipcMain.handle('stop-recording', async () => {
+    try {
+      isRecording = false;
+      hidePopupWindow();
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to stop recording:', error);
+      return { success: false, error: String(error) };
+    }
+  });
 };
 
 // This method will be called when Electron has finished
@@ -341,6 +422,15 @@ app.whenReady().then(async () => {
   globalShortcut.register('Home', () => {
     if (mainWindow) {
       mainWindow.webContents.send('toggle-recording');
+      
+      // Toggle recording state and popup
+      if (isRecording) {
+        isRecording = false;
+        hidePopupWindow();
+      } else {
+        isRecording = true;
+        showPopupWindow();
+      }
     }
   });
 
@@ -363,4 +453,10 @@ app.on('window-all-closed', () => {
 // Unregister all shortcuts when app is about to quit
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  
+  // Close the popup window if it exists
+  if (popupWindow) {
+    popupWindow.close();
+    popupWindow = null;
+  }
 }); 
