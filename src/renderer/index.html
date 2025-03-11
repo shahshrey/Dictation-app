@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'">
+  <title>Whisper Dictation</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Whisper Dictation</h1>
+    </header>
+    
+    <main>
+      <section class="settings-section">
+        <h2>Settings</h2>
+        <div class="settings-form">
+          <div class="form-group">
+            <label for="model-size">Whisper Model Size</label>
+            <select id="model-size">
+              <option value="tiny">Tiny (Fast, Lower Accuracy)</option>
+              <option value="base">Base (Default)</option>
+              <option value="small">Small (Better Accuracy)</option>
+              <option value="medium">Medium (High Accuracy)</option>
+              <option value="large">Large (Best Accuracy, Slowest)</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="shortcut-key">Activation Key</label>
+            <select id="shortcut-key">
+              <option value="home">Home Key</option>
+              <option value="end">End Key</option>
+              <option value="f12">F12 Key</option>
+            </select>
+          </div>
+          
+          <div class="form-group checkbox">
+            <input type="checkbox" id="start-at-login">
+            <label for="start-at-login">Start at Login</label>
+          </div>
+          
+          <div class="form-group checkbox">
+            <input type="checkbox" id="show-notifications">
+            <label for="show-notifications">Show Notifications</label>
+          </div>
+          
+          <div class="form-actions">
+            <button id="save-settings" class="primary">Save Settings</button>
+            <button id="reset-settings">Reset to Defaults</button>
+          </div>
+        </div>
+      </section>
+      
+      <section class="python-section">
+        <h2>Python Environment</h2>
+        <div id="python-status" class="status-box">
+          <p>Checking Python environment...</p>
+        </div>
+        <button id="check-python" class="secondary">Check Again</button>
+      </section>
+    </main>
+    
+    <footer>
+      <p>Whisper Dictation v0.1.0</p>
+    </footer>
+  </div>
+  
+  <script src="index.js"></script>
+</body>
+</html> 

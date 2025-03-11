@@ -1,0 +1,58 @@
+{
+  "name": "whisper-dictation-app",
+  "version": "0.1.0",
+  "description": "A minimalist, system-wide dictation tool for macOS that uses local processing through OpenAI Whisper",
+  "main": "src/main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "build": "electron-builder build",
+    "package": "electron-builder --dir",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "setup-python": "node scripts/setup_python.js"
+  },
+  "keywords": [
+    "dictation",
+    "whisper",
+    "speech-to-text",
+    "electron",
+    "macos"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "electron-log": "5.3.2",
+    "electron-positioner": "4.1.0",
+    "electron-squirrel-startup": "^1.0.1",
+    "electron-store": "8.1.0",
+    "node-microphone": "0.1.6",
+    "python-shell": "5.0.0",
+    "robotjs": "0.6.0",
+    "temp": "0.9.4"
+  },
+  "devDependencies": {
+    "electron": "35.0.1",
+    "electron-builder": "25.1.8",
+    "eslint": "9.22.0",
+    "jimp": "^1.6.0",
+    "pngjs": "^7.0.0",
+    "prettier": "3.5.3"
+  },
+  "build": {
+    "appId": "com.whisper.dictation",
+    "productName": "Whisper Dictation",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": "dmg"
+    },
+    "files": [
+      "src/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "resources"
+    }
+  }
+}
