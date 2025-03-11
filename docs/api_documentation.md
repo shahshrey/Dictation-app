@@ -1,321 +1,322 @@
-# API Documentation - Whisper Dictation App
+# API Documentation
 
-This document provides details about the APIs used in the Whisper Dictation App, focusing primarily on the integration with Python for local speech processing using the OpenAI Whisper model.
+This document provides detailed information about the API integrations used in the macOS Dictation App, focusing primarily on the Groq API for speech-to-text processing and any local endpoints implemented within the application.
 
-## Python-Node.js Integration
+## Groq API Integration
 
-The application bridges JavaScript (Electron) and Python through a combination of child process management and file-based data exchange.
+The application uses the `groq-sdk` npm package to interact with Groq's cloud-based AI services for speech-to-text processing.
 
-### Communication Methods
+### Authentication
 
-#### 1. Python Shell Package
+```typescript
+// Initialize the Groq client with API key
+const GROQ_API_KEY = process.env.GROQ_API_KEY || settings.get('apiKey');
+const groq = new Groq({ apiKey: GROQ_API_KEY });
+```
 
-The primary method of communication uses the `python-shell` npm package.
+### Transcription Endpoint
 
-```javascript
-const { PythonShell } = require('python-shell');
+#### Request
 
-// Function to transcribe audio using Whisper
-function transcribeAudio(audioFilePath, modelSize = 'medium') {
-  return new Promise((resolve, reject) => {
-    const options = {
-      mode: 'text',
-      pythonPath: 'python3', // Or specific path to Python executable
-      args: [
-        '--model', modelSize,
-        '--audio_path', audioFilePath,
-        '--language', 'auto'
-      ]
+The transcription endpoint converts spoken audio to text.
+
+```typescript
+/**
+ * Sends audio data to Groq API for transcription
+ * @param audioBuffer - Buffer containing audio data
+ * @param options - Configuration options for transcription
+ * @returns Promise with transcription result
+ */
+async function transcribeAudio(
+  audioBuffer: Buffer,
+  options: {
+    model?: string;
+    language?: string;
+    prompt?: string;
+    temperature?: number;
+  } = {}
+): Promise<TranscriptionResult> {
+  try {
+    // Create a temporary file from the buffer
+    const tempFilePath = await createTempAudioFile(audioBuffer);
+    
+    // Set default options if not provided
+    const model = options.model || 'whisper-large-v3-turbo';
+    const language = options.language || 'en';
+    const temperature = options.temperature || 0.0;
+    
+    // Create a transcription job
+    const transcription = await groq.audio.transcriptions.create({
+      file: fs.createReadStream(tempFilePath),
+      model: model,
+      language: language,
+      prompt: options.prompt,
+      response_format: 'verbose_json',
+      temperature: temperature,
+    });
+    
+    // Clean up temporary file
+    await fs.promises.unlink(tempFilePath);
+    
+    return {
+      text: transcription.text,
+      metadata: {
+        avgLogprob: transcription.avg_logprob,
+        noSpeechProb: transcription.no_speech_prob,
+        compressionRatio: transcription.compression_ratio
+      }
     };
-
-    PythonShell.run('src/python/transcribe.py', options, (err, results) => {
-      if (err) {
-        logger.exception('Python transcription error:', err);
-        reject(err);
-        return;
-      }
-      resolve(results[0]); // First line of output contains transcription
-    });
-  });
+  } catch (error) {
+    logger.exception('Error during transcription:', error);
+    throw new Error(`Transcription failed: ${error.message}`);
+  }
 }
 ```
 
-#### 2. Child Process (Alternative Method)
+#### Response
 
-An alternative approach using Node.js built-in child process module:
+The response from the transcription endpoint includes the transcribed text and quality metadata:
 
-```javascript
-const { spawn } = require('child_process');
-const path = require('path');
-
-// Function to transcribe audio using direct child process
-function transcribeAudioWithChildProcess(audioFilePath, modelSize = 'medium') {
-  return new Promise((resolve, reject) => {
-    const pythonScript = path.join(__dirname, '../python/transcribe.py');
-    const process = spawn('python3', [
-      pythonScript,
-      '--model', modelSize,
-      '--audio_path', audioFilePath
-    ]);
-
-    let stdoutData = '';
-    let stderrData = '';
-
-    process.stdout.on('data', (data) => {
-      stdoutData += data.toString();
-    });
-
-    process.stderr.on('data', (data) => {
-      stderrData += data.toString();
-    });
-
-    process.on('close', (code) => {
-      if (code !== 0) {
-        logger.exception(`Python process exited with code ${code}: ${stderrData}`);
-        reject(new Error(`Transcription failed: ${stderrData}`));
-        return;
-      }
-      resolve(stdoutData.trim());
-    });
-  });
+```typescript
+interface TranscriptionResult {
+  text: string;
+  metadata?: {
+    avgLogprob: number;
+    noSpeechProb: number;
+    compressionRatio: number;
+  };
 }
 ```
 
-## Python Whisper API
-
-The application uses a custom Python script that wraps the OpenAI Whisper API for transcription.
-
-### Main Python Script: `transcribe.py`
-
-```python
-#!/usr/bin/env python3
-import argparse
-import sys
-import whisper
-import logging
-import torch
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("whisper_transcriber")
-
-def setup_args():
-    parser = argparse.ArgumentParser(description="Transcribe audio using OpenAI Whisper")
-    parser.add_argument("--model", type=str, default="medium", 
-                       choices=["tiny", "base", "small", "medium", "large"],
-                       help="Model size to use for transcription")
-    parser.add_argument("--audio_path", type=str, required=True,
-                       help="Path to audio file to transcribe")
-    parser.add_argument("--language", type=str, default="auto",
-                       help="Language code (use 'auto' for auto-detection)")
-    parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu",
-                       help="Device to use for inference (cuda or cpu)")
-    return parser.parse_args()
-
-def transcribe_audio(args):
-    try:
-        logger.info(f"Loading model {args.model}")
-        model = whisper.load_model(args.model, device=args.device)
-        
-        logger.info(f"Transcribing audio file: {args.audio_path}")
-        language = None if args.language == "auto" else args.language
-        result = model.transcribe(args.audio_path, language=language)
-        
-        return result["text"]
-    except Exception as e:
-        logger.exception("Error transcribing audio")
-        raise e
-
-if __name__ == "__main__":
-    try:
-        args = setup_args()
-        text = transcribe_audio(args)
-        # Print the result to stdout for the Node.js process to capture
-        print(text)
-        sys.exit(0)
-    except Exception as e:
-        sys.stderr.write(f"Error: {str(e)}\n")
-        sys.exit(1)
+Example response:
+```json
+{
+  "text": "This is a sample transcription of spoken audio.",
+  "metadata": {
+    "avgLogprob": -0.097569615,
+    "noSpeechProb": 0.012814695,
+    "compressionRatio": 1.6637554
+  }
+}
 ```
 
-### API Parameters
+### Translation Endpoint
 
-| Parameter | Description | Default | Options |
-|-----------|-------------|---------|---------|
-| `model` | Whisper model size | `"medium"` | `"tiny"`, `"base"`, `"small"`, `"medium"`, `"large"` |
-| `audio_path` | Path to the audio file | Required | Any valid file path |
-| `language` | Language code | `"auto"` | `"auto"` or any valid language code (`"en"`, `"es"`, etc.) |
-| `device` | Computation device | `"cuda"` if available, else `"cpu"` | `"cuda"`, `"cpu"` |
+#### Request
 
-### Response Format
+The translation endpoint converts spoken audio in any language to English text.
 
-The Python script outputs the transcribed text to stdout, which is captured by the Node.js process. The text is returned as a simple string.
+```typescript
+/**
+ * Sends audio data to Groq API for translation to English
+ * @param audioBuffer - Buffer containing audio data
+ * @param options - Configuration options for translation
+ * @returns Promise with translation result
+ */
+async function translateAudio(
+  audioBuffer: Buffer,
+  options: {
+    model?: string;
+    prompt?: string;
+    temperature?: number;
+  } = {}
+): Promise<TranslationResult> {
+  try {
+    // Create a temporary file from the buffer
+    const tempFilePath = await createTempAudioFile(audioBuffer);
+    
+    // Set default options if not provided
+    const model = options.model || 'whisper-large-v3';
+    const temperature = options.temperature || 0.0;
+    
+    // Create a translation job
+    const translation = await groq.audio.translations.create({
+      file: fs.createReadStream(tempFilePath),
+      model: model,
+      prompt: options.prompt,
+      response_format: 'verbose_json',
+      temperature: temperature,
+    });
+    
+    // Clean up temporary file
+    await fs.promises.unlink(tempFilePath);
+    
+    return {
+      text: translation.text,
+      metadata: {
+        avgLogprob: translation.avg_logprob,
+        noSpeechProb: translation.no_speech_prob,
+        compressionRatio: translation.compression_ratio
+      }
+    };
+  } catch (error) {
+    logger.exception('Error during translation:', error);
+    throw new Error(`Translation failed: ${error.message}`);
+  }
+}
+```
 
-## Internal Application APIs
+#### Response
 
-The application itself uses several internal APIs for communication between processes:
+The response from the translation endpoint is similar to the transcription endpoint:
 
-### 1. IPC Channels (Main ↔ Renderer Communication)
+```typescript
+interface TranslationResult {
+  text: string;
+  metadata?: {
+    avgLogprob: number;
+    noSpeechProb: number;
+    compressionRatio: number;
+  };
+}
+```
 
-#### Main to Renderer
+## Local API Endpoints
 
-- **`dictation:start`**: Notifies the renderer process that dictation has started
-  ```javascript
-  mainWindow.webContents.send('dictation:start');
-  ```
+The application implements several local endpoints for communication between the main and renderer processes using Electron's IPC (Inter-Process Communication) system.
 
-- **`dictation:status`**: Updates the renderer with the current dictation status
-  ```javascript
-  mainWindow.webContents.send('dictation:status', { status: 'listening', volumeLevel: 0.75 });
-  ```
+### Audio Recording Endpoints
 
-- **`dictation:result`**: Sends the transcription result to the renderer
-  ```javascript
-  mainWindow.webContents.send('dictation:result', { text: 'Transcribed text', confidence: 0.95 });
-  ```
-
-- **`dictation:error`**: Sends error information to the renderer
-  ```javascript
-  mainWindow.webContents.send('dictation:error', { message: 'Failed to transcribe audio' });
-  ```
-
-#### Renderer to Main
-
-- **`settings:get`**: Requests current settings from the main process
-  ```javascript
-  ipcRenderer.invoke('settings:get');
-  ```
-
-- **`settings:set`**: Updates settings in the main process
-  ```javascript
-  ipcRenderer.invoke('settings:set', { key: 'shortcuts.activationKey', value: 'f13' });
-  ```
-
-- **`dictation:cancel`**: Cancels an ongoing dictation
-  ```javascript
-  ipcRenderer.send('dictation:cancel');
-  ```
-
-## Audio Processing APIs
-
-The application uses the following Node.js APIs for audio capture and processing:
-
-### 1. Node Microphone API
-
-Used to access the system microphone and record audio.
-
-```javascript
-const mic = require('node-microphone');
-const microphone = new mic({
-  rate: '16000',
-  channels: '1',
-  debug: false,
-  exitOnSilence: 6
+```typescript
+// IPC handlers in main process
+ipcMain.handle('audio:get-devices', async () => {
+  return await getAudioDevices();
 });
 
-const micStream = microphone.startRecording();
-micStream.on('data', (data) => {
-  // Process audio data
+ipcMain.handle('audio:start-recording', async (event, deviceId) => {
+  return await startRecording(deviceId);
 });
+
+ipcMain.handle('audio:stop-recording', async () => {
+  return await stopRecording();
+});
+
+// IPC invocations in renderer process
+export const getAudioDevices = async (): Promise<AudioDevice[]> => {
+  return await ipcRenderer.invoke('audio:get-devices');
+};
+
+export const startRecording = async (deviceId: string): Promise<boolean> => {
+  return await ipcRenderer.invoke('audio:start-recording', deviceId);
+};
+
+export const stopRecording = async (): Promise<Buffer> => {
+  return await ipcRenderer.invoke('audio:stop-recording');
+};
 ```
 
-### 2. Audio Processing Utility Functions
+### Transcription Endpoints
 
-```javascript
-/**
- * Saves audio buffer to a temporary file for processing by Whisper
- * @param {Buffer} audioBuffer - Raw audio buffer
- * @returns {Promise<string>} - Path to the temporary file
- */
-function saveAudioToTemp(audioBuffer) {
-  return new Promise((resolve, reject) => {
-    const tempFile = path.join(os.tmpdir(), `dictation_${Date.now()}.wav`);
-    fs.writeFile(tempFile, audioBuffer, (err) => {
-      if (err) {
-        reject(err);
-        return;
-      }
-      resolve(tempFile);
-    });
-  });
-}
+```typescript
+// IPC handlers in main process
+ipcMain.handle('transcription:process', async (event, audioBuffer, options) => {
+  return await transcribeAudio(audioBuffer, options);
+});
 
-/**
- * Analyzes audio data to determine volume level
- * @param {Buffer} audioData - Raw audio data buffer
- * @returns {number} - Volume level between 0 and 1
- */
-function getVolumeLevel(audioData) {
-  // Implementation to calculate RMS or peak amplitude
-}
+ipcMain.handle('translation:process', async (event, audioBuffer, options) => {
+  return await translateAudio(audioBuffer, options);
+});
+
+// IPC invocations in renderer process
+export const processTranscription = async (
+  audioBuffer: Buffer,
+  options?: TranscriptionOptions
+): Promise<TranscriptionResult> => {
+  return await ipcRenderer.invoke('transcription:process', audioBuffer, options);
+};
+
+export const processTranslation = async (
+  audioBuffer: Buffer,
+  options?: TranslationOptions
+): Promise<TranslationResult> => {
+  return await ipcRenderer.invoke('translation:process', audioBuffer, options);
+};
 ```
 
-## Text Insertion API
+### Text Insertion Endpoints
 
-The application uses the `robotjs` library to simulate keyboard input for inserting text at the cursor position.
+```typescript
+// IPC handlers in main process
+ipcMain.handle('text:insert', async (event, text) => {
+  return await insertTextIntoActiveApplication(text);
+});
 
-```javascript
-const robot = require('robotjs');
-
-/**
- * Types the transcribed text at the current cursor position
- * @param {string} text - Text to insert
- */
-function insertText(text) {
-  robot.typeString(text);
-}
+// IPC invocations in renderer process
+export const insertText = async (text: string): Promise<boolean> => {
+  return await ipcRenderer.invoke('text:insert', text);
+};
 ```
+
+## Understanding Metadata Fields
+
+The Groq API provides valuable metadata that helps assess the quality of transcriptions:
+
+### Average Log Probability (`avgLogprob`)
+
+This value indicates the model's confidence in the transcription:
+- Values closer to 0 indicate higher confidence
+- Values below -0.5 may indicate potential issues with transcription quality
+- Typical good values range from -0.1 to -0.3
+
+### No Speech Probability (`noSpeechProb`)
+
+This value indicates the probability that the audio contains no speech:
+- Values close to 0 indicate high confidence that speech is present
+- Values close to 1 indicate high confidence that no speech is present
+- Values above 0.5 may indicate sections of silence or non-speech audio
+
+### Compression Ratio (`compressionRatio`)
+
+This value relates to the information density of the transcription:
+- Typical values range from 1.0 to 2.0 for normal speech
+- Unusually high values may indicate repetitive speech or stuttering
+- Unusually low values may indicate very dense information or fast speech
 
 ## Error Handling
 
-All API interactions include robust error handling:
+All API calls include comprehensive error handling:
 
-```javascript
-// Error handling for Python script execution
+```typescript
 try {
-  const text = await transcribeAudio(audioFilePath);
-  return text;
+  // API call
 } catch (error) {
-  logger.exception('Transcription error:', error);
+  logger.exception('Error description:', error);
   
-  // Provide user-friendly error messages based on error type
-  if (error.message.includes('No such file or directory')) {
-    throw new Error('Python not found. Please ensure Python 3.7+ is installed.');
-  } else if (error.message.includes('ModuleNotFoundError')) {
-    throw new Error('Whisper module not found. Please install OpenAI Whisper.');
-  } else if (error.message.includes('CUDA')) {
-    // Fallback to CPU if CUDA error occurs
-    logger.info('CUDA error detected, falling back to CPU');
-    return transcribeAudio(audioFilePath, model, 'cpu');
+  // Categorize errors
+  if (error.status === 401) {
+    return { error: 'Authentication failed. Please check your API key.' };
+  } else if (error.status === 429) {
+    return { error: 'Rate limit exceeded. Please try again later.' };
+  } else if (error.status >= 500) {
+    return { error: 'Server error. Please try again later.' };
   } else {
-    throw new Error('Speech recognition failed. Please check the logs for details.');
+    return { error: `Unexpected error: ${error.message}` };
   }
 }
 ```
 
-## Configuration API
+## Rate Limiting and Quotas
 
-The application uses `electron-store` to manage persistent settings:
+The application implements basic rate limiting to prevent excessive API usage:
 
-```javascript
-const Store = require('electron-store');
-
-const schema = {
-  speech: {
-    whisperModel: {
-      type: 'string',
-      default: 'medium',
-      enum: ['tiny', 'base', 'small', 'medium', 'large']
-    },
-    // Additional settings...
-  }
+```typescript
+const API_CALLS = {
+  count: 0,
+  resetTime: Date.now() + 60000,
+  limit: 10 // 10 calls per minute
 };
 
-const store = new Store({ schema });
-
-// Get a setting
-const modelSize = store.get('speech.whisperModel');
-
-// Set a setting
-store.set('speech.whisperModel', 'small');
+function checkRateLimit() {
+  const now = Date.now();
+  if (now > API_CALLS.resetTime) {
+    API_CALLS.count = 0;
+    API_CALLS.resetTime = now + 60000;
+  }
+  
+  if (API_CALLS.count >= API_CALLS.limit) {
+    throw new Error('Rate limit exceeded. Please try again later.');
+  }
+  
+  API_CALLS.count++;
+}
 ``` 

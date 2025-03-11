@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dictation App</title>
+    <style>
+      :root {
+        --primary-color: #3f51b5;
+        --primary-light: #757de8;
+        --primary-dark: #002984;
+        --secondary-color: #f50057;
+        --secondary-light: #ff5983;
+        --secondary-dark: #bb002f;
+        --background-color: #f5f5f5;
+        --paper-color: #ffffff;
+        --text-primary: #212121;
+        --text-secondary: #757575;
+        --text-disabled: #9e9e9e;
+        --success-color: #4caf50;
+        --error-color: #f44336;
+        --warning-color: #ff9800;
+        --info-color: #2196f3;
+        --recording-active: #f44336;
+        --recording-inactive: #9e9e9e;
+        --divider-color: #e0e0e0;
+        --shadow-color: rgba(0, 0, 0, 0.2);
+      }
+      
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: var(--background-color);
+        color: var(--text-primary);
+      }
+      
+      .app-container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+      
+      .header {
+        background-color: var(--primary-color);
+        color: white;
+        padding: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      
+      .header h1 {
+        margin: 0;
+        font-size: 1.5rem;
+      }
+      
+      .recording-indicator {
+        display: flex;
+        align-items: center;
+      }
+      
+      .recording-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background-color: var(--recording-inactive);
+        margin-right: 8px;
+      }
+      
+      .recording-dot.active {
+        background-color: var(--recording-active);
+        animation: pulse 1.5s infinite;
+      }
+      
+      @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.4; }
+        100% { opacity: 1; }
+      }
+      
+      .main-content {
+        flex: 1;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        overflow: auto;
+      }
+      
+      .card {
+        background-color: var(--paper-color);
+        border-radius: 8px;
+        box-shadow: 0 2px 10px var(--shadow-color);
+        padding: 20px;
+      }
+      
+      .card h2 {
+        margin-top: 0;
+        color: var(--primary-color);
+        font-size: 1.2rem;
+        border-bottom: 1px solid var(--divider-color);
+        padding-bottom: 10px;
+      }
+      
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 20px 0;
+      }
+      
+      .button {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      
+      .button:hover {
+        background-color: var(--primary-dark);
+      }
+      
+      .button:disabled {
+        background-color: var(--text-disabled);
+        cursor: not-allowed;
+      }
+      
+      .button.secondary {
+        background-color: var(--secondary-color);
+      }
+      
+      .button.secondary:hover {
+        background-color: var(--secondary-dark);
+      }
+      
+      .button.error {
+        background-color: var(--error-color);
+      }
+      
+      .button.error:hover {
+        background-color: #d32f2f;
+      }
+      
+      .button.outline {
+        background-color: transparent;
+        color: var(--primary-color);
+        border: 1px solid var(--primary-color);
+      }
+      
+      .button.outline:hover {
+        background-color: rgba(63, 81, 181, 0.1);
+      }
+      
+      .form-group {
+        margin-bottom: 15px;
+      }
+      
+      .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 500;
+      }
+      
+      .form-control {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid var(--divider-color);
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      
+      .form-control:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 2px rgba(63, 81, 181, 0.2);
+      }
+      
+      .select-wrapper {
+        position: relative;
+      }
+      
+      .select-wrapper::after {
+        content: '▼';
+        font-size: 12px;
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        pointer-events: none;
+      }
+      
+      .transcription-area {
+        min-height: 200px;
+        padding: 15px;
+        background-color: var(--background-color);
+        border-radius: 4px;
+        border: 1px solid var(--divider-color);
+        margin-top: 10px;
+        white-space: pre-wrap;
+        overflow-y: auto;
+      }
+      
+      .transcription-info {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+      
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 8px;
+        border-radius: 16px;
+        font-size: 12px;
+        background-color: var(--primary-light);
+        color: white;
+      }
+      
+      .chip.outline {
+        background-color: transparent;
+        color: var(--text-secondary);
+        border: 1px solid var(--divider-color);
+      }
+      
+      .recent-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+      
+      .recent-item {
+        padding: 10px;
+        border-bottom: 1px solid var(--divider-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+      }
+      
+      .recent-item:hover {
+        background-color: rgba(0, 0, 0, 0.05);
+      }
+      
+      .recent-item-info {
+        flex: 1;
+      }
+      
+      .recent-item-name {
+        font-weight: 500;
+        margin-bottom: 4px;
+      }
+      
+      .recent-item-meta {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      
+      .switch {
+        position: relative;
+        display: inline-block;
+        width: 40px;
+        height: 20px;
+      }
+      
+      .switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--text-disabled);
+        transition: .4s;
+        border-radius: 20px;
+      }
+      
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 16px;
+        width: 16px;
+        left: 2px;
+        bottom: 2px;
+        background-color: white;
+        transition: .4s;
+        border-radius: 50%;
+      }
+      
+      input:checked + .slider {
+        background-color: var(--primary-color);
+      }
+      
+      input:checked + .slider:before {
+        transform: translateX(20px);
+      }
+      
+      .switch-label {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+      
+      .switch-label span {
+        flex: 1;
+      }
+      
+      .two-columns {
+        display: flex;
+        gap: 20px;
+      }
+      
+      .column {
+        flex: 1;
+      }
+      
+      @media (max-width: 768px) {
+        .two-columns {
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-container">
+      <header class="header">
+        <h1>Dictation App</h1>
+        <div class="recording-indicator">
+          <div id="recording-dot" class="recording-dot"></div>
+          <span id="recording-status">Not Recording</span>
+        </div>
+      </header>
+      
+      <main class="main-content">
+        <div class="card">
+          <h2>Recording Controls</h2>
+          
+          <div class="form-group">
+            <label for="audio-source">Audio Source</label>
+            <div class="select-wrapper">
+              <select id="audio-source" class="form-control">
+                <option value="">Loading audio sources...</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="controls">
+            <button id="start-recording" class="button">
+              <span>Start Recording</span>
+            </button>
+            <button id="stop-recording" class="button error" disabled>
+              <span>Stop Recording</span>
+            </button>
+            <button id="refresh-sources" class="button outline">
+              <span>Refresh Sources</span>
+            </button>
+          </div>
+          
+          <div class="controls">
+            <button id="transcribe" class="button outline" disabled>
+              <span>Transcribe</span>
+            </button>
+            <button id="translate" class="button secondary outline" disabled>
+              <span>Translate</span>
+            </button>
+          </div>
+          
+          <p>Press the <strong>Home</strong> key to start/stop recording at any time.</p>
+        </div>
+        
+        <div class="card">
+          <h2>Transcription</h2>
+          
+          <div id="transcription-info" class="transcription-info" style="display: none;">
+            <div class="chip" id="language-chip">Language: auto</div>
+            <div class="chip outline" id="timestamp-chip">No timestamp</div>
+          </div>
+          
+          <div id="transcription-area" class="transcription-area">
+            No transcription available. Record and transcribe audio to see results here.
+          </div>
+          
+          <div class="controls" id="save-controls" style="display: none;">
+            <button id="save" class="button outline">
+              <span>Save</span>
+            </button>
+            <button id="save-as" class="button outline">
+              <span>Save As...</span>
+            </button>
+          </div>
+        </div>
+        
+        <div class="two-columns">
+          <div class="column">
+            <div class="card">
+              <h2>Recent Transcriptions</h2>
+              <div id="recent-list-container">
+                <ul class="recent-list" id="recent-list">
+                  <li>Loading recent transcriptions...</li>
+                </ul>
+              </div>
+              <div class="controls">
+                <button id="refresh-recent" class="button outline">
+                  <span>Refresh</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="column">
+            <div class="card">
+              <h2>Settings</h2>
+              
+              <div class="form-group">
+                <label for="api-key">Groq API Key</label>
+                <input type="password" id="api-key" class="form-control" placeholder="Enter your Groq API key">
+              </div>
+              
+              <div class="form-group">
+                <label for="default-language">Default Language</label>
+                <div class="select-wrapper">
+                  <select id="default-language" class="form-control">
+                    <option value="auto">Auto Detect</option>
+                    <option value="en">English</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                    <option value="it">Italian</option>
+                    <option value="pt">Portuguese</option>
+                    <option value="ru">Russian</option>
+                    <option value="ja">Japanese</option>
+                    <option value="zh">Chinese</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div class="switch-label">
+                <span>Show Notifications</span>
+                <label class="switch">
+                  <input type="checkbox" id="show-notifications" checked>
+                  <span class="slider"></span>
+                </label>
+              </div>
+              
+              <div class="switch-label">
+                <span>Save Transcriptions Automatically</span>
+                <label class="switch">
+                  <input type="checkbox" id="save-auto">
+                  <span class="slider"></span>
+                </label>
+              </div>
+              
+              <div class="controls">
+                <button id="save-settings" class="button">
+                  <span>Save Settings</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+    
+    <script>
+      // DOM Elements
+      const audioSourceSelect = document.getElementById('audio-source');
+      const startRecordingBtn = document.getElementById('start-recording');
+      const stopRecordingBtn = document.getElementById('stop-recording');
+      const refreshSourcesBtn = document.getElementById('refresh-sources');
+      const transcribeBtn = document.getElementById('transcribe');
+      const translateBtn = document.getElementById('translate');
+      const transcriptionArea = document.getElementById('transcription-area');
+      const transcriptionInfo = document.getElementById('transcription-info');
+      const languageChip = document.getElementById('language-chip');
+      const timestampChip = document.getElementById('timestamp-chip');
+      const saveBtn = document.getElementById('save');
+      const saveAsBtn = document.getElementById('save-as');
+      const saveControls = document.getElementById('save-controls');
+      const recentList = document.getElementById('recent-list');
+      const refreshRecentBtn = document.getElementById('refresh-recent');
+      const recordingDot = document.getElementById('recording-dot');
+      const recordingStatus = document.getElementById('recording-status');
+      const apiKeyInput = document.getElementById('api-key');
+      const defaultLanguageSelect = document.getElementById('default-language');
+      const showNotificationsCheckbox = document.getElementById('show-notifications');
+      const saveAutoCheckbox = document.getElementById('save-auto');
+      const saveSettingsBtn = document.getElementById('save-settings');
+      
+      // State
+      let isRecording = false;
+      let mediaRecorder = null;
+      let audioChunks = [];
+      let currentTranscription = null;
+      
+      // Initialize
+      document.addEventListener('DOMContentLoaded', async () => {
+        await loadSettings();
+        await refreshAudioSources();
+        await refreshRecentTranscriptions();
+        
+        // Set up event listener for Home key
+        const unsubscribeToggleRecording = window.electronAPI.onToggleRecording(() => {
+          if (isRecording) {
+            stopRecording();
+          } else {
+            startRecording();
+          }
+        });
+      });
+      
+      // Load settings
+      async function loadSettings() {
+        try {
+          const settings = await window.electronAPI.getSettings();
+          apiKeyInput.value = settings.apiKey || '';
+          defaultLanguageSelect.value = settings.defaultLanguage || 'auto';
+          showNotificationsCheckbox.checked = settings.showNotifications;
+          saveAutoCheckbox.checked = settings.saveTranscriptionsAutomatically;
+        } catch (error) {
+          console.error('Failed to load settings:', error);
+        }
+      }
+      
+      // Save settings
+      saveSettingsBtn.addEventListener('click', async () => {
+        try {
+          const settings = {
+            apiKey: apiKeyInput.value,
+            defaultLanguage: defaultLanguageSelect.value,
+            showNotifications: showNotificationsCheckbox.checked,
+            saveTranscriptionsAutomatically: saveAutoCheckbox.checked
+          };
+          
+          const result = await window.electronAPI.saveSettings(settings);
+          
+          if (result.success) {
+            alert('Settings saved successfully');
+          } else {
+            alert('Failed to save settings: ' + result.error);
+          }
+        } catch (error) {
+          console.error('Failed to save settings:', error);
+          alert('Failed to save settings: ' + error.message);
+        }
+      });
+      
+      // Refresh audio sources
+      async function refreshAudioSources() {
+        try {
+          const sources = await window.electronAPI.getAudioSources();
+          
+          // Clear existing options
+          audioSourceSelect.innerHTML = '';
+          
+          if (sources.length === 0) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No audio sources found';
+            audioSourceSelect.appendChild(option);
+            startRecordingBtn.disabled = true;
+          } else {
+            sources.forEach(source => {
+              const option = document.createElement('option');
+              option.value = source.id;
+              option.textContent = source.name;
+              audioSourceSelect.appendChild(option);
+            });
+            startRecordingBtn.disabled = false;
+          }
+        } catch (error) {
+          console.error('Failed to get audio sources:', error);
+          audioSourceSelect.innerHTML = '<option value="">Error loading audio sources</option>';
+          startRecordingBtn.disabled = true;
+        }
+      }
+      
+      refreshSourcesBtn.addEventListener('click', refreshAudioSources);
+      
+      // Start recording
+      async function startRecording() {
+        const sourceId = audioSourceSelect.value;
+        
+        if (!sourceId) {
+          alert('Please select an audio source');
+          return;
+        }
+        
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              deviceId: { exact: sourceId }
+            }
+          });
+          
+          mediaRecorder = new MediaRecorder(stream);
+          audioChunks = [];
+          
+          mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+              audioChunks.push(event.data);
+            }
+          };
+          
+          mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            const arrayBuffer = await audioBlob.arrayBuffer();
+            
+            // Save the recording
+            const result = await window.electronAPI.saveRecording(arrayBuffer);
+            if (result.success) {
+              console.log('Recording saved:', result.filePath);
+              transcribeBtn.disabled = false;
+              translateBtn.disabled = false;
+            } else {
+              console.error('Failed to save recording:', result.error);
+              alert('Failed to save recording: ' + result.error);
+            }
+          };
+          
+          mediaRecorder.start();
+          isRecording = true;
+          
+          // Update UI
+          startRecordingBtn.disabled = true;
+          stopRecordingBtn.disabled = false;
+          recordingDot.classList.add('active');
+          recordingStatus.textContent = 'Recording';
+          
+          // Show notification if enabled
+          if (showNotificationsCheckbox.checked) {
+            new Notification('Dictation App', {
+              body: 'Recording started'
+            });
+          }
+        } catch (error) {
+          console.error('Failed to start recording:', error);
+          alert('Failed to start recording: ' + error.message);
+        }
+      }
+      
+      startRecordingBtn.addEventListener('click', startRecording);
+      
+      // Stop recording
+      async function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+          mediaRecorder.stop();
+          
+          // Stop all tracks in the stream
+          mediaRecorder.stream.getTracks().forEach(track => track.stop());
+          
+          isRecording = false;
+          
+          // Update UI
+          startRecordingBtn.disabled = false;
+          stopRecordingBtn.disabled = true;
+          recordingDot.classList.remove('active');
+          recordingStatus.textContent = 'Not Recording';
+          
+          // Show notification if enabled
+          if (showNotificationsCheckbox.checked) {
+            new Notification('Dictation App', {
+              body: 'Recording stopped'
+            });
+          }
+          
+          // Auto-transcribe if enabled
+          if (saveAutoCheckbox.checked) {
+            setTimeout(() => {
+              transcribeRecording();
+            }, 500);
+          }
+        }
+      }
+      
+      stopRecordingBtn.addEventListener('click', stopRecording);
+      
+      // Transcribe recording
+      async function transcribeRecording() {
+        try {
+          transcriptionArea.textContent = 'Transcribing...';
+          
+          const filePath = await window.electronAPI.getRecordingPath();
+          const result = await window.electronAPI.transcribeAudio(filePath, { 
+            language: defaultLanguageSelect.value 
+          });
+          
+          if (result.success) {
+            currentTranscription = {
+              text: result.text,
+              language: result.language,
+              timestamp: new Date()
+            };
+            
+            // Update UI
+            transcriptionArea.textContent = result.text;
+            transcriptionInfo.style.display = 'flex';
+            languageChip.textContent = `Language: ${result.language}`;
+            timestampChip.textContent = new Date().toLocaleString();
+            saveControls.style.display = 'flex';
+            
+            // Auto-save if enabled
+            if (saveAutoCheckbox.checked) {
+              saveTranscription();
+            }
+          } else {
+            transcriptionArea.textContent = 'Failed to transcribe audio: ' + result.error;
+            console.error('Failed to transcribe audio:', result.error);
+          }
+        } catch (error) {
+          console.error('Failed to transcribe recording:', error);
+          transcriptionArea.textContent = 'Failed to transcribe recording: ' + error.message;
+        }
+      }
+      
+      transcribeBtn.addEventListener('click', transcribeRecording);
+      
+      // Translate recording
+      async function translateRecording() {
+        try {
+          transcriptionArea.textContent = 'Translating...';
+          
+          const filePath = await window.electronAPI.getRecordingPath();
+          const result = await window.electronAPI.translateAudio(filePath);
+          
+          if (result.success) {
+            currentTranscription = {
+              text: result.text,
+              language: 'en', // Translation is always to English
+              timestamp: new Date()
+            };
+            
+            // Update UI
+            transcriptionArea.textContent = result.text;
+            transcriptionInfo.style.display = 'flex';
+            languageChip.textContent = 'Language: en (translated)';
+            timestampChip.textContent = new Date().toLocaleString();
+            saveControls.style.display = 'flex';
+            
+            // Auto-save if enabled
+            if (saveAutoCheckbox.checked) {
+              saveTranscription();
+            }
+          } else {
+            transcriptionArea.textContent = 'Failed to translate audio: ' + result.error;
+            console.error('Failed to translate audio:', result.error);
+          }
+        } catch (error) {
+          console.error('Failed to translate recording:', error);
+          transcriptionArea.textContent = 'Failed to translate recording: ' + error.message;
+        }
+      }
+      
+      translateBtn.addEventListener('click', translateRecording);
+      
+      // Save transcription
+      async function saveTranscription() {
+        if (!currentTranscription) return;
+        
+        try {
+          const result = await window.electronAPI.saveTranscription(
+            currentTranscription.text,
+            { filename: 'transcription', format: 'txt' }
+          );
+          
+          if (result.success) {
+            console.log('Transcription saved:', result.filePath);
+            
+            if (showNotificationsCheckbox.checked) {
+              new Notification('Dictation App', {
+                body: 'Transcription saved'
+              });
+            }
+            
+            refreshRecentTranscriptions();
+          } else {
+            console.error('Failed to save transcription:', result.error);
+            alert('Failed to save transcription: ' + result.error);
+          }
+        } catch (error) {
+          console.error('Failed to save transcription:', error);
+          alert('Failed to save transcription: ' + error.message);
+        }
+      }
+      
+      saveBtn.addEventListener('click', saveTranscription);
+      
+      // Save transcription as
+      async function saveTranscriptionAs() {
+        if (!currentTranscription) return;
+        
+        try {
+          const result = await window.electronAPI.saveTranscriptionAs(currentTranscription.text);
+          
+          if (result.success) {
+            console.log('Transcription saved as:', result.filePath);
+            
+            if (showNotificationsCheckbox.checked) {
+              new Notification('Dictation App', {
+                body: 'Transcription saved'
+              });
+            }
+            
+            refreshRecentTranscriptions();
+          } else if (!result.canceled) {
+            console.error('Failed to save transcription:', result.error);
+            alert('Failed to save transcription: ' + result.error);
+          }
+        } catch (error) {
+          console.error('Failed to save transcription as:', error);
+          alert('Failed to save transcription as: ' + error.message);
+        }
+      }
+      
+      saveAsBtn.addEventListener('click', saveTranscriptionAs);
+      
+      // Refresh recent transcriptions
+      async function refreshRecentTranscriptions() {
+        try {
+          const result = await window.electronAPI.getRecentTranscriptions();
+          
+          // Clear existing items
+          recentList.innerHTML = '';
+          
+          if (result.success) {
+            if (result.files.length === 0) {
+              recentList.innerHTML = '<li class="recent-item">No recent transcriptions found</li>';
+            } else {
+              result.files.forEach(file => {
+                const li = document.createElement('li');
+                li.className = 'recent-item';
+                li.onclick = () => openFile(file.path);
+                
+                const info = document.createElement('div');
+                info.className = 'recent-item-info';
+                
+                const name = document.createElement('div');
+                name.className = 'recent-item-name';
+                name.textContent = file.name;
+                
+                const meta = document.createElement('div');
+                meta.className = 'recent-item-meta';
+                meta.textContent = `${formatDate(file.modifiedAt)} • ${formatFileSize(file.size)}`;
+                
+                info.appendChild(name);
+                info.appendChild(meta);
+                
+                li.appendChild(info);
+                recentList.appendChild(li);
+              });
+            }
+          } else {
+            recentList.innerHTML = '<li class="recent-item">Failed to load recent transcriptions</li>';
+            console.error('Failed to get recent transcriptions:', result.error);
+          }
+        } catch (error) {
+          console.error('Failed to refresh recent transcriptions:', error);
+          recentList.innerHTML = '<li class="recent-item">Error loading recent transcriptions</li>';
+        }
+      }
+      
+      refreshRecentBtn.addEventListener('click', refreshRecentTranscriptions);
+      
+      // Open file
+      async function openFile(path) {
+        try {
+          await window.electronAPI.openFile(path);
+        } catch (error) {
+          console.error('Failed to open file:', error);
+          alert('Failed to open file: ' + error.message);
+        }
+      }
+      
+      // Format file size
+      function formatFileSize(bytes) {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+      }
+      
+      // Format date
+      function formatDate(dateString) {
+        return new Date(dateString).toLocaleString();
+      }
+    </script>
+  </body>
+</html> 
