@@ -388,6 +388,7 @@
           
           <div id="transcription-info" class="transcription-info" style="display: none;">
             <div class="chip" id="language-chip">Language: auto</div>
+            <div class="chip outline" id="model-chip">Model: whisper-large-v3</div>
             <div class="chip outline" id="timestamp-chip">No timestamp</div>
           </div>
           
@@ -449,6 +450,20 @@
                 </div>
               </div>
               
+              <div class="form-group">
+                <label for="transcription-model">Transcription Model</label>
+                <div class="select-wrapper">
+                  <select id="transcription-model" class="form-control">
+                    <option value="whisper-large-v3">Whisper Large V3 (Multilingual, High Accuracy)</option>
+                    <option value="whisper-large-v3-turbo">Whisper Large V3 Turbo (Multilingual, Faster)</option>
+                    <option value="distil-whisper-large-v3-en">Distil-Whisper (English-only, Fastest)</option>
+                  </select>
+                </div>
+                <small class="form-text" style="color: var(--text-secondary); font-size: 12px; margin-top: 4px;">
+                  Note: English-only model will be used automatically when English is selected as the language.
+                </small>
+              </div>
+              
               <div class="switch-label">
                 <span>Show Notifications</span>
                 <label class="switch">
@@ -487,6 +502,7 @@
       const transcriptionArea = document.getElementById('transcription-area');
       const transcriptionInfo = document.getElementById('transcription-info');
       const languageChip = document.getElementById('language-chip');
+      const modelChip = document.getElementById('model-chip');
       const timestampChip = document.getElementById('timestamp-chip');
       const saveBtn = document.getElementById('save');
       const saveAsBtn = document.getElementById('save-as');
@@ -497,6 +513,7 @@
       const recordingStatus = document.getElementById('recording-status');
       const apiKeyInput = document.getElementById('api-key');
       const defaultLanguageSelect = document.getElementById('default-language');
+      const transcriptionModelSelect = document.getElementById('transcription-model');
       const showNotificationsCheckbox = document.getElementById('show-notifications');
       const saveAutoCheckbox = document.getElementById('save-auto');
       const saveSettingsBtn = document.getElementById('save-settings');
@@ -521,6 +538,14 @@
             startRecording();
           }
         });
+        
+        // Set up event listener for language selection
+        defaultLanguageSelect.addEventListener('change', (e) => {
+          // If English is selected, recommend the English-only model
+          if (e.target.value === 'en') {
+            transcriptionModelSelect.value = 'distil-whisper-large-v3-en';
+          }
+        });
       });
       
       // Load settings
@@ -529,6 +554,7 @@
           const settings = await window.electronAPI.getSettings();
           apiKeyInput.value = settings.apiKey || '';
           defaultLanguageSelect.value = settings.defaultLanguage || 'auto';
+          transcriptionModelSelect.value = settings.transcriptionModel || 'whisper-large-v3';
           showNotificationsCheckbox.checked = settings.showNotifications;
           saveAutoCheckbox.checked = settings.saveTranscriptionsAutomatically;
         } catch (error) {
@@ -542,6 +568,7 @@
           const settings = {
             apiKey: apiKeyInput.value,
             defaultLanguage: defaultLanguageSelect.value,
+            transcriptionModel: transcriptionModelSelect.value,
             showNotifications: showNotificationsCheckbox.checked,
             saveTranscriptionsAutomatically: saveAutoCheckbox.checked
           };
@@ -696,7 +723,8 @@
           
           const filePath = await window.electronAPI.getRecordingPath();
           const result = await window.electronAPI.transcribeAudio(filePath, { 
-            language: defaultLanguageSelect.value 
+            language: defaultLanguageSelect.value,
+            model: transcriptionModelSelect.value
           });
           
           if (result.success) {
@@ -710,6 +738,7 @@
             transcriptionArea.textContent = result.text;
             transcriptionInfo.style.display = 'flex';
             languageChip.textContent = `Language: ${result.language}`;
+            modelChip.textContent = `Model: ${result.model}`;
             timestampChip.textContent = new Date().toLocaleString();
             saveControls.style.display = 'flex';
             
@@ -748,6 +777,7 @@
             transcriptionArea.textContent = result.text;
             transcriptionInfo.style.display = 'flex';
             languageChip.textContent = 'Language: en (translated)';
+            modelChip.textContent = `Model: ${result.model}`;
             timestampChip.textContent = new Date().toLocaleString();
             saveControls.style.display = 'flex';
             

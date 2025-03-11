@@ -9,6 +9,16 @@ const TEMP_DIR = path.join(os.tmpdir(), 'dictation-app');
 const AUDIO_FILE_PATH = path.join(TEMP_DIR, 'recording.webm');
 const DEFAULT_SAVE_DIR = path.join(os.homedir(), 'Documents', 'Dictation App');
 
+// Define Groq API models
+const GROQ_MODELS = {
+  TRANSCRIPTION: {
+    MULTILINGUAL: 'whisper-large-v3',
+    MULTILINGUAL_TURBO: 'whisper-large-v3-turbo',
+    ENGLISH: 'distil-whisper-large-v3-en'
+  },
+  TRANSLATION: 'whisper-large-v3'
+};
+
 // Initialize store for settings
 let store = null;
 
@@ -16,6 +26,7 @@ let store = null;
 const DEFAULT_SETTINGS = {
   defaultLanguage: 'auto',
   apiKey: '',
+  transcriptionModel: 'whisper-large-v3',
   showNotifications: true,
   saveTranscriptionsAutomatically: false
 };
@@ -145,16 +156,27 @@ const setupIpcHandlers = () => {
       
       const audioFile = fs.createReadStream(filePath);
       
+      // Choose the appropriate model based on options or settings
+      let model = options?.model || settings.transcriptionModel || GROQ_MODELS.TRANSCRIPTION.MULTILINGUAL;
+      
+      // Force English model if language is English
+      if (options?.language === 'en') {
+        model = GROQ_MODELS.TRANSCRIPTION.ENGLISH;
+      }
+      
+      console.log(`Using Groq model: ${model} for transcription`);
+      
       const transcription = await groqClient.audio.transcriptions.create({
         file: audioFile,
-        model: 'whisper-1',
+        model: model,
         language: options?.language,
       });
       
       return { 
         success: true, 
         text: transcription.text,
-        language: options?.language || 'auto'
+        language: options?.language || 'auto',
+        model: model
       };
     } catch (error) {
       console.error('Failed to transcribe audio:', error);
@@ -162,7 +184,7 @@ const setupIpcHandlers = () => {
     }
   });
   
-  // Translate audio file
+  // Translate audio file to English
   ipcMain.handle('translate-audio', async (_, filePath) => {
     try {
       groqClient = initGroqClient();
@@ -177,14 +199,17 @@ const setupIpcHandlers = () => {
       
       const audioFile = fs.createReadStream(filePath);
       
+      console.log(`Using Groq model: ${GROQ_MODELS.TRANSLATION} for translation`);
+      
       const translation = await groqClient.audio.translations.create({
         file: audioFile,
-        model: 'whisper-1',
+        model: GROQ_MODELS.TRANSLATION
       });
       
       return { 
         success: true, 
-        text: translation.text 
+        text: translation.text,
+        model: GROQ_MODELS.TRANSLATION
       };
     } catch (error) {
       console.error('Failed to translate audio:', error);
