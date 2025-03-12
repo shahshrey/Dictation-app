@@ -48,8 +48,8 @@ try {
       ipcRenderer.invoke('save-settings', settings),
     
     // Window management
-    setIgnoreMouseEvents: (ignore) => 
-      ipcRenderer.invoke('set-ignore-mouse-events', ignore),
+    setIgnoreMouseEvents: (ignore, options) => 
+      ipcRenderer.invoke('set-ignore-mouse-events', ignore, options),
     
     // Event listeners
     onToggleRecording: (callback) => {

@@ -29427,6 +29427,10 @@ For more information, see https://radix-ui.com/primitives/docs/components/${titl
       console.log("Mouse left popup");
       console.log("isDragging:", isDragging);
       setIsHovering(false);
+      if (!isDragging && window.electronAPI && typeof window.electronAPI.setIgnoreMouseEvents === "function") {
+        console.log("Setting ignore mouse events to true with forward=true");
+        window.electronAPI.setIgnoreMouseEvents(true, { forward: true }).catch((error) => console.error("Error in setIgnoreMouseEvents on mouse leave:", error));
+      }
     };
     const handleMouseDown = (e) => {
       console.log("Mouse down on popup");

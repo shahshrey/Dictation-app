@@ -1,6 +1,6 @@
 // Remove the warning message
 // console.log('WARNING: Using index.js instead of index.ts');
-const { app, BrowserWindow, ipcMain, globalShortcut, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, dialog, systemPreferences } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -19,6 +19,51 @@ const GROQ_MODELS = {
     ENGLISH: 'distil-whisper-large-v3-en'
   },
   TRANSLATION: 'whisper-large-v3'
+};
+
+// Check for macOS accessibility permissions
+const checkMacOSPermissions = () => {
+  if (process.platform === 'darwin') {
+    console.log('Checking macOS accessibility permissions');
+    
+    // Check for screen recording permission (needed for system-wide overlay)
+    const hasScreenRecordingPermission = systemPreferences.getMediaAccessStatus('screen');
+    console.log('Screen recording permission status:', hasScreenRecordingPermission);
+    
+    if (hasScreenRecordingPermission !== 'granted') {
+      console.log('Requesting screen recording permission');
+      try {
+        // This will prompt the user for permission
+        systemPreferences.askForMediaAccess('screen');
+      } catch (error) {
+        console.error('Error requesting screen recording permission:', error);
+      }
+    }
+    
+    // Check for accessibility permission (needed for system-wide overlay)
+    const hasAccessibilityPermission = systemPreferences.isTrustedAccessibilityClient(false);
+    console.log('Accessibility permission status:', hasAccessibilityPermission);
+    
+    if (!hasAccessibilityPermission) {
+      console.log('App needs accessibility permission for system-wide overlay');
+      dialog.showMessageBox({
+        type: 'info',
+        title: 'Accessibility Permission Required',
+        message: 'This app needs accessibility permission to show the dictation overlay on top of all applications.',
+        detail: 'Please go to System Preferences > Security & Privacy > Privacy > Accessibility and add this app to the list of allowed apps.',
+        buttons: ['Open System Preferences', 'Later'],
+        defaultId: 0
+      }).then(({ response }) => {
+        if (response === 0) {
+          // Open System Preferences to the Accessibility pane
+          const command = 'open x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility';
+          require('child_process').exec(command);
+        }
+      }).catch(error => {
+        console.error('Error showing permission dialog:', error);
+      });
+    }
+  }
 };
 
 // Initialize store for settings
@@ -146,13 +191,43 @@ const createWindow = () => {
   }
 };
 
+// After creating the popup window, set additional properties to hide it from dock
+const hidePopupFromDock = () => {
+  if (popupWindow && process.platform === 'darwin') {
+    console.log('Setting additional properties to hide popup from dock');
+    try {
+      // Set additional properties to hide from dock and app switcher
+      popupWindow.setSkipTaskbar(true);
+      
+      // For macOS, we need to set some additional properties
+      if (typeof popupWindow.setHiddenInMissionControl === 'function') {
+        popupWindow.setHiddenInMissionControl(true);
+      }
+      
+      // Set the window to be an accessory window which helps hide it from dock
+      if (typeof popupWindow.setWindowButtonVisibility === 'function') {
+        popupWindow.setWindowButtonVisibility(false);
+      }
+      
+      // Set the window to be a utility window which helps hide it from dock
+      if (typeof popupWindow.setVisibleOnAllWorkspaces === 'function') {
+        popupWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      }
+      
+      console.log('Successfully set additional properties to hide popup from dock');
+    } catch (error) {
+      console.error('Error setting additional properties to hide popup from dock:', error);
+    }
+  }
+};
+
 // Create a popup window for dictation
 const createPopupWindow = () => {
   console.log('createPopupWindow called');
   
   try {
-    console.log('Creating popup window with system-wide floating window settings');
-    // Create the popup window as a system-wide floating window
+    console.log('Creating popup window with system-wide overlay settings');
+    // Create the popup window as a system-wide overlay
     popupWindow = new BrowserWindow({
       width: 180,  // Smaller width for the pill
       height: 50,  // Smaller height for the pill
@@ -164,10 +239,10 @@ const createPopupWindow = () => {
       resizable: false,
       movable: true,
       hasShadow: false, // Remove shadow to eliminate white border
-      // Use a more compatible window type for macOS
-      // 'floating' is more compatible than 'panel'
-      type: process.platform === 'darwin' ? 'floating' : 'panel',
+      // Use 'panel' type for macOS to ensure it stays above all windows
+      type: process.platform === 'darwin' ? 'panel' : 'panel',
       visibleOnAllWorkspaces: true,  // Visible on all workspaces
+      focusable: false, // Make it non-focusable to prevent it from stealing focus
       webPreferences: {
         preload: path.join(__dirname, 'preload.js'),
         contextIsolation: true,
@@ -176,8 +251,16 @@ const createPopupWindow = () => {
       },
       // Remove any styling that might cause a white border
       backgroundColor: '#00000000', // Fully transparent background
+      // Set the window level to be above everything else
+      level: 'screen-saver', // Use the highest level possible
+      // Hide from dock and app switcher
+      skipDock: true, // macOS specific property to hide from dock
+      accessory: true, // macOS specific property to make it an accessory window
     });
     console.log('Popup window created successfully');
+    
+    // Set additional properties to hide from dock
+    hidePopupFromDock();
     
     console.log('Loading popup HTML file');
     // Load the popup HTML file
@@ -191,14 +274,21 @@ const createPopupWindow = () => {
     popupWindow.setPosition(width - 200, height - 100);
     
     console.log('Setting popup window to be visible on all workspaces');
-    // Don't hide the popup window when it loses focus
-    // This is important for a system-wide floating window
+    // Make sure it's visible on all workspaces and full screen
     popupWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    
+    // Set the window to be always on top with the highest level
+    popupWindow.setAlwaysOnTop(true, 'screen-saver');
+    
+    // For macOS, set the window level to floating (above everything)
+    if (process.platform === 'darwin') {
+      popupWindow.setWindowButtonVisibility(false);
+    }
     
     console.log('Setting popup window to ignore mouse events by default');
     // Make the window non-interactive when not hovered
     // This allows clicks to pass through to the application underneath
-    popupWindow.setIgnoreMouseEvents(true);
+    popupWindow.setIgnoreMouseEvents(true, { forward: true });
     
     console.log('Setting up mouse event handlers for the popup window');
     // But enable mouse events when hovering over the window
@@ -213,7 +303,7 @@ const createPopupWindow = () => {
           
           document.addEventListener('mouseout', () => {
             console.log('Mouse out of popup window, disabling mouse events');
-            window.electronAPI.setIgnoreMouseEvents(true);
+            window.electronAPI.setIgnoreMouseEvents(true, { forward: true });
           });
         `);
         console.log('Mouse event handlers set up successfully');
@@ -270,6 +360,15 @@ const showPopupWindow = () => {
       try {
         popupWindow.show();
         console.log('Popup window shown successfully');
+        
+        // Ensure it's always on top and visible on all workspaces
+        popupWindow.setAlwaysOnTop(true, 'screen-saver');
+        popupWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+        
+        // For macOS, set the window level to floating (above everything)
+        if (process.platform === 'darwin') {
+          popupWindow.setWindowButtonVisibility(false);
+        }
       } catch (error) {
         console.error('Error showing popup window:', error);
       }
@@ -290,19 +389,29 @@ const hidePopupWindow = () => {
     console.log('popupWindow destroyed:', popupWindow.isDestroyed());
     console.log('popupWindow visible:', popupWindow.isVisible());
     
-    if (!popupWindow.isDestroyed() && popupWindow.isVisible()) {
-      console.log('Hiding popup window');
+    if (!popupWindow.isDestroyed()) {
+      console.log('Updating popup window to show not recording state');
       try {
-        popupWindow.hide();
-        console.log('Popup window hidden successfully');
+        // Instead of hiding, we'll just update the UI to show not recording
+        // The actual UI update is handled by the renderer process based on isRecording state
+        // We'll just ensure it stays visible and on top
+        popupWindow.setAlwaysOnTop(true, 'screen-saver');
+        popupWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+        
+        // For macOS, ensure window level is set to floating
+        if (process.platform === 'darwin') {
+          popupWindow.setWindowButtonVisibility(false);
+        }
+        
+        console.log('Popup window updated to not recording state');
       } catch (error) {
-        console.error('Error hiding popup window:', error);
+        console.error('Error updating popup window:', error);
       }
     } else {
-      console.log('Popup window is already hidden or destroyed');
+      console.log('Popup window is destroyed, cannot update');
     }
   } else {
-    console.log('No popup window to hide');
+    console.log('No popup window to update');
   }
 };
 
@@ -780,18 +889,19 @@ const setupIpcHandlers = () => {
   });
 
   // Window management
-  ipcMain.handle('set-ignore-mouse-events', (event, ignore) => {
-    console.log('set-ignore-mouse-events IPC handler called with ignore:', ignore);
+  ipcMain.handle('set-ignore-mouse-events', (event, ignore, options = { forward: true }) => {
+    console.log('set-ignore-mouse-events IPC handler called with ignore:', ignore, 'options:', options);
     console.log('popupWindow exists:', !!popupWindow);
     
     if (popupWindow) {
       console.log('popupWindow destroyed:', popupWindow.isDestroyed());
       
       if (!popupWindow.isDestroyed()) {
-        console.log('Setting ignore mouse events to', ignore);
+        console.log('Setting ignore mouse events to', ignore, 'with options:', options);
         try {
-          // Always forward mouse events when not ignoring
-          popupWindow.setIgnoreMouseEvents(ignore, { forward: !ignore });
+          // Use the provided options or default to forwarding events when not ignoring
+          const forwardOptions = options || { forward: !ignore };
+          popupWindow.setIgnoreMouseEvents(ignore, forwardOptions);
           console.log('Successfully set ignore mouse events');
           return true;
         } catch (error) {
@@ -808,15 +918,84 @@ const setupIpcHandlers = () => {
   });
 };
 
+// Set up the dock menu for macOS
+const setupDockMenu = () => {
+  if (process.platform === 'darwin') {
+    console.log('Setting up dock menu for macOS');
+    
+    const dockMenu = [
+      {
+        label: 'Show/Hide Dictation Popup',
+        click: () => {
+          if (popupWindow && !popupWindow.isDestroyed()) {
+            if (popupWindow.isVisible()) {
+              console.log('Hiding popup window from dock menu');
+              hidePopupWindow();
+            } else {
+              console.log('Showing popup window from dock menu');
+              showPopupWindow();
+            }
+          } else {
+            console.log('Creating and showing popup window from dock menu');
+            createPopupWindow();
+            showPopupWindow();
+          }
+        }
+      }
+    ];
+    
+    app.dock.setMenu(require('electron').Menu.buildFromTemplate(dockMenu));
+    console.log('Dock menu set up successfully');
+  }
+};
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 app.whenReady().then(async () => {
   console.log('App ready event triggered');
   
-  // Ensure the app stays in the dock on macOS
+  // Check for macOS permissions needed for system-wide overlay
+  console.log('Checking macOS permissions for system-wide overlay');
+  checkMacOSPermissions();
+  
+  // Ensure the app stays in the dock on macOS, but the popup doesn't
   if (process.platform === 'darwin') {
     console.log('On macOS, setting app to stay in dock');
     app.dock.show();
+    
+    // Set up the dock menu
+    setupDockMenu();
+    
+    // Set the app's activation policy to show in dock but hide popup
+    try {
+      // This is a macOS specific API to control dock behavior
+      if (app.dock && typeof app.dock.setMenu === 'function') {
+        // Create a dock menu that allows controlling the popup
+        const dockMenu = require('electron').Menu.buildFromTemplate([
+          {
+            label: 'Show Dictation Popup',
+            click: () => {
+              if (!popupWindow || popupWindow.isDestroyed()) {
+                createPopupWindow();
+              }
+              showPopupWindow();
+            }
+          },
+          {
+            label: 'Hide Dictation Popup',
+            click: () => {
+              if (popupWindow && !popupWindow.isDestroyed()) {
+                hidePopupWindow();
+              }
+            }
+          }
+        ]);
+        
+        app.dock.setMenu(dockMenu);
+      }
+    } catch (error) {
+      console.error('Error setting dock menu:', error);
+    }
   }
   
   console.log('Initializing store');
@@ -832,6 +1011,42 @@ app.whenReady().then(async () => {
   // Create and show the floating popup window
   createPopupWindow();
   showPopupWindow();
+  
+  // Ensure the popup window doesn't appear in the app switcher
+  if (popupWindow && process.platform === 'darwin') {
+    try {
+      // This is a macOS specific trick to hide from the app switcher
+      popupWindow.setWindowButtonVisibility(false);
+      popupWindow.setSkipTaskbar(true);
+      
+      // Call the function to hide popup from dock
+      hidePopupFromDock();
+      
+      // For macOS Sequoia (15.1), we need an additional step to hide from dock
+      if (process.platform === 'darwin') {
+        // Get the macOS version
+        const osVersion = require('os').release();
+        console.log('macOS version:', osVersion);
+        
+        // If it's macOS Sequoia or newer
+        if (osVersion.startsWith('24.')) { // macOS Sequoia is Darwin 24.x
+          console.log('Using macOS Sequoia specific settings to hide popup from dock');
+          
+          // Set the window to be a utility window
+          if (typeof popupWindow.setWindowButtonVisibility === 'function') {
+            popupWindow.setWindowButtonVisibility(false);
+          }
+          
+          // Set the window to be an accessory window
+          if (typeof popupWindow.setAccessoryView === 'function') {
+            popupWindow.setAccessoryView(true);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error configuring popup window visibility:', error);
+    }
+  }
   
   console.log('Registering global hotkey');
   // Register the global shortcut with the current hotkey from settings
@@ -867,8 +1082,8 @@ app.on('window-all-closed', () => {
   } else {
     console.log('On macOS, app will remain running');
     
-    // Ensure the popup window is still visible
-    console.log('Checking if popup window needs to be recreated');
+    // Always ensure the popup window is visible
+    console.log('Ensuring popup window is visible');
     if (!popupWindow || (typeof popupWindow.isDestroyed === 'function' && popupWindow.isDestroyed())) {
       console.log('Popup window does not exist or is destroyed, recreating it');
       createPopupWindow();
@@ -876,6 +1091,13 @@ app.on('window-all-closed', () => {
     } else if (popupWindow && !popupWindow.isVisible()) {
       console.log('Popup window exists but is not visible, showing it');
       showPopupWindow();
+    } else {
+      console.log('Popup window is already visible');
+      // Ensure it's always on top and visible on all workspaces
+      if (popupWindow && !popupWindow.isDestroyed()) {
+        popupWindow.setAlwaysOnTop(true, 'screen-saver');
+        popupWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      }
     }
     
     // Ensure the app stays in the dock
@@ -963,22 +1185,30 @@ const registerGlobalHotkey = () => {
     // Toggle recording state and popup
     console.log('Toggling recording state from', isRecording, 'to', !isRecording);
     if (isRecording) {
-      console.log('Stopping recording and hiding popup');
+      console.log('Stopping recording');
       isRecording = false;
       
-      // Safely hide popup window if it exists and is not destroyed
+      // Update popup window to show not recording state
       if (popupWindow && typeof popupWindow.isDestroyed === 'function' && !popupWindow.isDestroyed()) {
-        console.log('Hiding popup window');
+        console.log('Updating popup window to show not recording state');
         try {
-          hidePopupWindow();
+          // Instead of hiding, we'll just update the UI to show not recording
+          // The actual UI update is handled by the renderer process based on isRecording state
+          popupWindow.setAlwaysOnTop(true, 'screen-saver');
+          popupWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+          
+          // For macOS, ensure window level is set to floating
+          if (process.platform === 'darwin') {
+            popupWindow.setWindowButtonVisibility(false);
+          }
         } catch (error) {
-          console.error('Error hiding popup window:', error);
+          console.error('Error updating popup window:', error);
         }
       } else {
-        console.log('Cannot hide popup window - it does not exist or is destroyed');
+        console.log('Cannot update popup window - it does not exist or is destroyed');
       }
     } else {
-      console.log('Starting recording and showing popup');
+      console.log('Starting recording');
       isRecording = true;
       
       // Create new popup window if it doesn't exist or is destroyed

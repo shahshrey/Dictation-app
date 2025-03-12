@@ -82,9 +82,13 @@ const DictationPopup: React.FC = () => {
     console.log('isDragging:', isDragging);
     setIsHovering(false);
     
-    // Don't set ignore mouse events to true when leaving
-    // This ensures the popup remains clickable at all times
-    // We'll let the user click through only when explicitly dragging
+    // Set ignore mouse events to true with forward=true when leaving
+    // This allows clicks to pass through but still shows the overlay
+    if (!isDragging && window.electronAPI && typeof window.electronAPI.setIgnoreMouseEvents === 'function') {
+      console.log('Setting ignore mouse events to true with forward=true');
+      window.electronAPI.setIgnoreMouseEvents(true, { forward: true })
+        .catch(error => console.error('Error in setIgnoreMouseEvents on mouse leave:', error));
+    }
   };
   
   // Ensure we can click on the pill
