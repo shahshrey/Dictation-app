@@ -19759,7 +19759,9 @@
     theme: "system",
     saveTranscriptions: true,
     transcriptionSavePath: "",
-    autoTranscribe: false
+    autoTranscribe: false,
+    hotkey: "Home"
+    // Default hotkey is Home
   };
 
   // src/renderer/hooks/useAudioRecording.ts
@@ -29010,6 +29012,28 @@ For more information, see https://radix-ui.com/primitives/docs/components/${titl
   // src/renderer/components/features/settings/SettingsPanel.tsx
   var SettingsPanel = () => {
     const { settings, updateSettings } = useAppContext();
+    const [listeningForHotkey, setListeningForHotkey] = (0, import_react8.useState)(false);
+    const hotkeyInputRef = (0, import_react8.useRef)(null);
+    (0, import_react8.useEffect)(() => {
+      if (!listeningForHotkey) return;
+      const handleKeyDown = (e) => {
+        e.preventDefault();
+        let keyName = e.key;
+        if (e.key === " ") keyName = "Space";
+        updateSettings({ hotkey: keyName });
+        setListeningForHotkey(false);
+      };
+      window.addEventListener("keydown", handleKeyDown);
+      return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+      };
+    }, [listeningForHotkey, updateSettings]);
+    const startListeningForHotkey = () => {
+      setListeningForHotkey(true);
+      if (hotkeyInputRef.current) {
+        hotkeyInputRef.current.focus();
+      }
+    };
     return /* @__PURE__ */ import_react8.default.createElement("div", { className: "space-y-6" }, /* @__PURE__ */ import_react8.default.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ import_react8.default.createElement("div", { className: "flex items-center justify-between" }, /* @__PURE__ */ import_react8.default.createElement(Label3, { htmlFor: "api-key", className: "text-sm font-medium" }, "Groq API Key")), /* @__PURE__ */ import_react8.default.createElement("div", { className: "flex space-x-2" }, /* @__PURE__ */ import_react8.default.createElement(
       Input,
       {
@@ -29037,7 +29061,25 @@ For more information, see https://radix-ui.com/primitives/docs/components/${titl
       },
       /* @__PURE__ */ import_react8.default.createElement(SelectTrigger2, { id: "language" }, /* @__PURE__ */ import_react8.default.createElement(SelectValue2, { placeholder: "Select language" })),
       /* @__PURE__ */ import_react8.default.createElement(SelectContent2, null, /* @__PURE__ */ import_react8.default.createElement(SelectItem2, { value: "en" }, "English"), /* @__PURE__ */ import_react8.default.createElement(SelectItem2, { value: "es" }, "Spanish"), /* @__PURE__ */ import_react8.default.createElement(SelectItem2, { value: "fr" }, "French"), /* @__PURE__ */ import_react8.default.createElement(SelectItem2, { value: "de" }, "German"), /* @__PURE__ */ import_react8.default.createElement(SelectItem2, { value: "it" }, "Italian"), /* @__PURE__ */ import_react8.default.createElement(SelectItem2, { value: "pt" }, "Portuguese"), /* @__PURE__ */ import_react8.default.createElement(SelectItem2, { value: "ja" }, "Japanese"), /* @__PURE__ */ import_react8.default.createElement(SelectItem2, { value: "zh" }, "Chinese"))
-    )), /* @__PURE__ */ import_react8.default.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ import_react8.default.createElement("div", { className: "flex items-center justify-between" }, /* @__PURE__ */ import_react8.default.createElement(Label3, { htmlFor: "save-path", className: "text-sm font-medium" }, "Save Transcriptions Path")), /* @__PURE__ */ import_react8.default.createElement("div", { className: "flex space-x-2" }, /* @__PURE__ */ import_react8.default.createElement(
+    )), /* @__PURE__ */ import_react8.default.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ import_react8.default.createElement("div", { className: "flex items-center justify-between" }, /* @__PURE__ */ import_react8.default.createElement(Label3, { htmlFor: "hotkey", className: "text-sm font-medium" }, "Dictation Hotkey")), /* @__PURE__ */ import_react8.default.createElement("div", { className: "flex space-x-2" }, /* @__PURE__ */ import_react8.default.createElement(
+      Input,
+      {
+        id: "hotkey",
+        ref: hotkeyInputRef,
+        value: listeningForHotkey ? "Press any key..." : settings.hotkey,
+        readOnly: true,
+        placeholder: "Click to set hotkey",
+        className: "flex-1",
+        onClick: startListeningForHotkey
+      }
+    ), /* @__PURE__ */ import_react8.default.createElement(
+      Button,
+      {
+        variant: "outline",
+        onClick: startListeningForHotkey
+      },
+      "Change"
+    )), /* @__PURE__ */ import_react8.default.createElement("p", { className: "text-xs text-muted-foreground" }, "Press this key to start/stop dictation. Current key: ", settings.hotkey)), /* @__PURE__ */ import_react8.default.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ import_react8.default.createElement("div", { className: "flex items-center justify-between" }, /* @__PURE__ */ import_react8.default.createElement(Label3, { htmlFor: "save-path", className: "text-sm font-medium" }, "Save Transcriptions Path")), /* @__PURE__ */ import_react8.default.createElement("div", { className: "flex space-x-2" }, /* @__PURE__ */ import_react8.default.createElement(
       Input,
       {
         id: "save-path",

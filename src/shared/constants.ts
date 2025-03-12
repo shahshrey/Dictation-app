@@ -14,7 +14,8 @@ export const DEFAULT_SETTINGS = {
   theme: 'system' as const,
   saveTranscriptions: true,
   transcriptionSavePath: '',
-  autoTranscribe: false
+  autoTranscribe: false,
+  hotkey: 'Home' // Default hotkey is Home
 };
 
 // File paths

@@ -571,6 +571,10 @@ const setupIpcHandlers = () => {
         const settingsPath = path.join(app.getPath('userData'), 'settings.json');
         fs.writeFileSync(settingsPath, JSON.stringify(settings), { encoding: 'utf-8' });
       }
+      
+      // Re-register the global hotkey with the new settings
+      registerGlobalHotkey();
+      
       return { success: true };
     } catch (error) {
       console.error('Failed to save settings:', error);
@@ -609,22 +613,9 @@ app.whenReady().then(async () => {
   createWindow();
   setupIpcHandlers();
   
-  // Setup global shortcut (Home key) for starting/stopping recording
-  globalShortcut.register('Home', () => {
-    if (mainWindow) {
-      mainWindow.webContents.send('toggle-recording');
-      
-      // Toggle recording state and popup
-      if (isRecording) {
-        isRecording = false;
-        hidePopupWindow();
-      } else {
-        isRecording = true;
-        showPopupWindow();
-      }
-    }
-  });
-
+  // Register the global shortcut with the current hotkey from settings
+  registerGlobalHotkey();
+  
   app.on('activate', () => {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
@@ -633,6 +624,62 @@ app.whenReady().then(async () => {
     }
   });
 });
+
+// Function to register the global hotkey
+const registerGlobalHotkey = () => {
+  // Unregister any existing shortcuts first
+  globalShortcut.unregisterAll();
+  
+  // Get the hotkey from settings, default to 'Home' if not set
+  const hotkey = settings.hotkey || 'Home';
+  
+  try {
+    // Register the global shortcut with the hotkey from settings
+    const registered = globalShortcut.register(hotkey, () => {
+      if (mainWindow) {
+        mainWindow.webContents.send('toggle-recording');
+        
+        // Toggle recording state and popup
+        if (isRecording) {
+          isRecording = false;
+          hidePopupWindow();
+        } else {
+          isRecording = true;
+          showPopupWindow();
+        }
+      }
+    });
+    
+    if (!registered) {
+      console.error(`Failed to register hotkey: ${hotkey}`);
+    } else {
+      console.log(`Successfully registered hotkey: ${hotkey}`);
+    }
+  } catch (error) {
+    console.error(`Error registering hotkey ${hotkey}:`, error);
+    
+    // Fallback to Home key if the specified hotkey is invalid
+    try {
+      globalShortcut.register('Home', () => {
+        if (mainWindow) {
+          mainWindow.webContents.send('toggle-recording');
+          
+          // Toggle recording state and popup
+          if (isRecording) {
+            isRecording = false;
+            hidePopupWindow();
+          } else {
+            isRecording = true;
+            showPopupWindow();
+          }
+        }
+      });
+      console.log('Fallback to Home key successful');
+    } catch (fallbackError) {
+      console.error('Failed to register fallback hotkey:', fallbackError);
+    }
+  }
+};
 
 // Quit when all windows are closed, except on macOS.
 app.on('window-all-closed', () => {

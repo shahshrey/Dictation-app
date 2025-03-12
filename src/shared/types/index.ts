@@ -20,6 +20,7 @@ export interface AppSettings {
   saveTranscriptions: boolean;
   transcriptionSavePath: string;
   autoTranscribe: boolean;
+  hotkey: string;
 }
 
 // Audio related types

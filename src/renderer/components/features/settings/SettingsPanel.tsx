@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '../../ui/button';
 import { Switch } from '../../ui/switch';
 import { useAppContext } from '../../../context/AppContext';
@@ -14,6 +14,40 @@ import { Input } from '../../ui/input';
 
 const SettingsPanel: React.FC = () => {
   const { settings, updateSettings } = useAppContext();
+  const [listeningForHotkey, setListeningForHotkey] = useState(false);
+  const hotkeyInputRef = useRef<HTMLInputElement>(null);
+
+  // Handle hotkey recording
+  useEffect(() => {
+    if (!listeningForHotkey) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault();
+      
+      // Get the key name
+      let keyName = e.key;
+      
+      // Handle special keys
+      if (e.key === ' ') keyName = 'Space';
+      
+      // Update settings with the new hotkey
+      updateSettings({ hotkey: keyName });
+      setListeningForHotkey(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [listeningForHotkey, updateSettings]);
+
+  // Start listening for hotkey
+  const startListeningForHotkey = () => {
+    setListeningForHotkey(true);
+    if (hotkeyInputRef.current) {
+      hotkeyInputRef.current.focus();
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -66,6 +100,34 @@ const SettingsPanel: React.FC = () => {
             <SelectItem value="zh">Chinese</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="hotkey" className="text-sm font-medium">
+            Dictation Hotkey
+          </Label>
+        </div>
+        <div className="flex space-x-2">
+          <Input
+            id="hotkey"
+            ref={hotkeyInputRef}
+            value={listeningForHotkey ? "Press any key..." : settings.hotkey}
+            readOnly
+            placeholder="Click to set hotkey"
+            className="flex-1"
+            onClick={startListeningForHotkey}
+          />
+          <Button
+            variant="outline"
+            onClick={startListeningForHotkey}
+          >
+            Change
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Press this key to start/stop dictation. Current key: {settings.hotkey}
+        </p>
       </div>
 
       <div className="space-y-2">
