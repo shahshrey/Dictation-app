@@ -1,6 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { ThemeProvider } from './components/theme-provider';
+import { ThemeProvider } from './components/layout/theme-provider';
 // Import only the processed CSS
 import './popup.css';
 import './mock-electron-api'; // Import the mock API

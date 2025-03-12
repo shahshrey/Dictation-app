@@ -2,7 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './components/App';
 import { AppContextProvider } from './context/AppContext';
-import { ThemeProvider } from './components/theme-provider';
+import { ThemeProvider } from './components/layout/theme-provider';
 // Import only the processed CSS
 import './index.css';
 import './mock-electron-api'; // Import the mock API

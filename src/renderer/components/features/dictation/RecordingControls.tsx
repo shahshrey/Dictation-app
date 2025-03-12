@@ -1,0 +1,118 @@
+import React from 'react';
+import { useAppContext } from '../../../context/AppContext';
+import { Button } from '../../ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
+import { Label } from '../../ui/label';
+import { Card } from '../../ui/card';
+import { AudioDevice } from '../../../../shared/types';
+
+const RecordingControls: React.FC = () => {
+  const { 
+    isRecording, 
+    recordingTime,
+    audioDevices,
+    selectedDevice,
+    setSelectedDevice,
+    refreshAudioDevices,
+    startRecording,
+    stopRecording,
+    transcribeRecording,
+    currentTranscription,
+    saveTranscription
+  } = useAppContext();
+
+  // Format recording time as MM:SS
+  const formatTime = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  // Handle device selection
+  const handleDeviceChange = (deviceId: string): void => {
+    const device = audioDevices.find(d => d.id === deviceId);
+    if (device) {
+      setSelectedDevice(device);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col space-y-2">
+        <Label htmlFor="microphone-select">Select Microphone</Label>
+        <Select 
+          value={selectedDevice?.id || ''} 
+          onValueChange={handleDeviceChange}
+        >
+          <SelectTrigger id="microphone-select" className="w-full">
+            <SelectValue placeholder="Select a microphone" />
+          </SelectTrigger>
+          <SelectContent>
+            {audioDevices.map((device: AudioDevice) => (
+              <SelectItem key={device.id} value={device.id}>
+                {device.name} {device.isDefault ? '(Default)' : ''}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => refreshAudioDevices()}
+          className="self-end mt-1"
+        >
+          Refresh Devices
+        </Button>
+      </div>
+      
+      <div className="flex flex-col space-y-4">
+        <div className="flex space-x-2">
+          <Button
+            variant={isRecording ? "destructive" : "default"}
+            className="flex-1"
+            onClick={isRecording ? stopRecording : startRecording}
+            disabled={!selectedDevice}
+          >
+            {isRecording ? "Stop Recording" : "Start Recording"}
+          </Button>
+          
+          <Button
+            variant="outline"
+            className="flex-1"
+            onClick={() => transcribeRecording()}
+            disabled={isRecording || !currentTranscription}
+          >
+            Transcribe
+          </Button>
+        </div>
+        
+        {isRecording && (
+          <Card className="p-4 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
+                <span className="font-medium">Recording</span>
+              </div>
+              <span className="font-mono">{formatTime(recordingTime)}</span>
+            </div>
+          </Card>
+        )}
+        
+        {currentTranscription && (
+          <div className="flex space-x-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => currentTranscription && saveTranscription(currentTranscription.id)}
+              disabled={!currentTranscription}
+            >
+              Save Transcription
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default RecordingControls; 

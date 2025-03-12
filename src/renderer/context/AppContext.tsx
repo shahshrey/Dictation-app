@@ -1,52 +1,36 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import '../mock-electron-api'; // Import the mock API at the top of the file
+import { AudioDevice, Transcription, AppSettings, IPC_CHANNELS } from '../../shared/types';
+import { DEFAULT_SETTINGS } from '../../shared/constants';
+import { useAudioRecording } from '../hooks/useAudioRecording';
 
 // Define types for our context
-interface AudioSource {
-  id: string;
-  name: string;
-}
-
-interface Transcription {
-  text: string;
-  language: string;
-  timestamp: Date;
-}
-
-interface RecentFile {
-  name: string;
-  path: string;
-  size: number;
-  createdAt: Date;
-  modifiedAt: Date;
-}
-
 interface AppContextType {
+  // Settings
+  settings: AppSettings;
+  updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
+  
   // Recording state
   isRecording: boolean;
-  setIsRecording: React.Dispatch<React.SetStateAction<boolean>>;
+  recordingTime: number;
   
   // Audio sources
-  audioSources: AudioSource[];
-  selectedSourceId: string;
-  setSelectedSourceId: React.Dispatch<React.SetStateAction<string>>;
-  refreshAudioSources: () => Promise<void>;
+  audioDevices: AudioDevice[];
+  selectedDevice: AudioDevice | null;
+  setSelectedDevice: (device: AudioDevice) => void;
+  refreshAudioDevices: () => Promise<void>;
   
   // Transcription
   currentTranscription: Transcription | null;
   setCurrentTranscription: React.Dispatch<React.SetStateAction<Transcription | null>>;
-  
-  // Recent files
-  recentFiles: RecentFile[];
-  refreshRecentFiles: () => Promise<void>;
+  recentTranscriptions: Transcription[];
+  refreshRecentTranscriptions: () => Promise<void>;
   
   // Actions
   startRecording: () => Promise<void>;
-  stopRecording: () => Promise<void>;
+  stopRecording: () => void;
   transcribeRecording: (language?: string) => Promise<void>;
-  translateRecording: () => Promise<void>;
-  saveTranscription: (filename?: string) => Promise<void>;
-  saveTranscriptionAs: () => Promise<void>;
+  saveTranscription: (id: string) => Promise<void>;
 }
 
 // Create the context with a default value
@@ -54,29 +38,37 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 // Provider component
 export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // State for recording
-  const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
-  const [audioChunks, setAudioChunks] = useState<Blob[]>([]);
+  // Settings state
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   
-  // State for audio sources
-  const [audioSources, setAudioSources] = useState<AudioSource[]>([]);
-  const [selectedSourceId, setSelectedSourceId] = useState<string>('');
+  // Audio devices state
+  const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
+  const [selectedDevice, setSelectedDevice] = useState<AudioDevice | null>(null);
   
-  // State for transcription
+  // Transcription state
   const [currentTranscription, setCurrentTranscription] = useState<Transcription | null>(null);
+  const [recentTranscriptions, setRecentTranscriptions] = useState<Transcription[]>([]);
   
-  // State for recent files
-  const [recentFiles, setRecentFiles] = useState<RecentFile[]>([]);
+  // Use our custom hook for audio recording
+  const { 
+    isRecording, 
+    startRecording: startAudioRecording, 
+    stopRecording: stopAudioRecording,
+    recordingTime,
+    error: recordingError
+  } = useAudioRecording({
+    selectedDevice: selectedDevice || undefined,
+    onRecordingComplete: handleRecordingComplete
+  });
   
-  // Fetch audio sources on component mount
+  // Fetch audio devices and settings on component mount
   useEffect(() => {
-    refreshAudioSources();
-    refreshRecentFiles();
+    refreshAudioDevices();
+    loadSettings();
+    refreshRecentTranscriptions();
     
     // Set up event listeners for the Home key
     let unsubscribeToggleRecording = () => {};
-    let unsubscribeRecordingSourceSelected = () => {};
     
     try {
       // Check if the API is available
@@ -89,14 +81,6 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
           }
         });
       }
-      
-      // Set up event listener for recording source selected
-      if (window.electronAPI && typeof window.electronAPI.onRecordingSourceSelected === 'function') {
-        unsubscribeRecordingSourceSelected = window.electronAPI.onRecordingSourceSelected((sourceId) => {
-          setSelectedSourceId(sourceId);
-          startMediaRecorder(sourceId);
-        });
-      }
     } catch (error) {
       console.error('Error setting up event listeners:', error);
     }
@@ -104,196 +88,162 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     return () => {
       try {
         unsubscribeToggleRecording();
-        unsubscribeRecordingSourceSelected();
       } catch (error) {
         console.error('Error cleaning up event listeners:', error);
       }
     };
   }, [isRecording]);
   
-  // Refresh audio sources
-  const refreshAudioSources = async (): Promise<void> => {
+  // Load settings from storage
+  const loadSettings = async (): Promise<void> => {
     try {
-      if (window.electronAPI && typeof window.electronAPI.getAudioSources === 'function') {
-        const sources = await window.electronAPI.getAudioSources();
-        setAudioSources(sources);
-        
-        // Select the first source if none is selected
-        if (sources.length > 0 && !selectedSourceId) {
-          setSelectedSourceId(sources[0].id);
-        }
-      } else {
-        console.warn('getAudioSources API not available');
-        // Use mock data
-        setAudioSources([
-          { id: 'mock-device-1', name: 'Mock Microphone 1' },
-          { id: 'mock-device-2', name: 'Mock Microphone 2' }
-        ]);
-        setSelectedSourceId('mock-device-1');
+      if (window.electronAPI && typeof window.electronAPI.getSettings === 'function') {
+        const loadedSettings = await window.electronAPI.getSettings();
+        setSettings(loadedSettings || DEFAULT_SETTINGS);
       }
     } catch (error) {
-      console.error('Failed to get audio sources:', error);
+      console.error('Failed to load settings:', error);
     }
   };
   
-  // Refresh recent files
-  const refreshRecentFiles = async (): Promise<void> => {
+  // Update settings
+  const updateSettings = async (newSettings: Partial<AppSettings>): Promise<void> => {
     try {
-      if (window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === 'function') {
-        const result = await window.electronAPI.getRecentTranscriptions();
-        if (result.success) {
-          setRecentFiles(result.files);
+      const updatedSettings = { ...settings, ...newSettings };
+      setSettings(updatedSettings);
+      
+      if (window.electronAPI && typeof window.electronAPI.saveSettings === 'function') {
+        await window.electronAPI.saveSettings(updatedSettings);
+      }
+    } catch (error) {
+      console.error('Failed to update settings:', error);
+    }
+  };
+  
+  // Refresh audio devices
+  const refreshAudioDevices = async (): Promise<void> => {
+    try {
+      if (window.electronAPI && typeof window.electronAPI.getAudioDevices === 'function') {
+        const devices = await window.electronAPI.getAudioDevices();
+        setAudioDevices(devices);
+        
+        // Select the first device if none is selected
+        if (devices.length > 0 && !selectedDevice) {
+          setSelectedDevice(devices[0]);
         }
       } else {
-        console.warn('getRecentTranscriptions API not available');
+        console.warn('getAudioDevices API not available');
         // Use mock data
-        setRecentFiles([
+        const mockDevices: AudioDevice[] = [
+          { id: 'mock-device-1', name: 'Mock Microphone 1', isDefault: true },
+          { id: 'mock-device-2', name: 'Mock Microphone 2', isDefault: false }
+        ];
+        setAudioDevices(mockDevices);
+        setSelectedDevice(mockDevices[0]);
+      }
+    } catch (error) {
+      console.error('Failed to get audio devices:', error);
+    }
+  };
+  
+  // Refresh recent transcriptions
+  const refreshRecentTranscriptions = async (): Promise<void> => {
+    try {
+      if (window.electronAPI && typeof window.electronAPI.getTranscriptions === 'function') {
+        const transcriptions = await window.electronAPI.getTranscriptions();
+        setRecentTranscriptions(transcriptions || []);
+      } else {
+        console.warn('getTranscriptions API not available');
+        // Use mock data
+        setRecentTranscriptions([
           { 
-            name: 'Mock Transcription 1.txt', 
-            path: '/mock/path/to/transcription1.txt',
-            size: 1024,
-            createdAt: new Date(Date.now() - 86400000), // 1 day ago
-            modifiedAt: new Date(Date.now() - 86400000)
+            id: 'mock-1',
+            text: 'This is a mock transcription for testing purposes.',
+            timestamp: Date.now() - 86400000, // 1 day ago
+            duration: 30,
+            language: 'en'
           },
           { 
-            name: 'Mock Transcription 2.txt', 
-            path: '/mock/path/to/transcription2.txt',
-            size: 2048,
-            createdAt: new Date(Date.now() - 172800000), // 2 days ago
-            modifiedAt: new Date(Date.now() - 172800000)
+            id: 'mock-2',
+            text: 'Another mock transcription with different content.',
+            timestamp: Date.now() - 172800000, // 2 days ago
+            duration: 45,
+            language: 'en'
           }
         ]);
       }
     } catch (error) {
-      console.error('Failed to get recent files:', error);
+      console.error('Failed to get recent transcriptions:', error);
     }
   };
   
-  // Start media recorder
-  const startMediaRecorder = async (sourceId: string): Promise<void> => {
+  // Handle recording complete
+  function handleRecordingComplete(audioBlob: Blob): void {
     try {
-      // Check if we're in a browser environment that supports MediaRecorder
-      if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            // @ts-ignore - Electron specific constraint
-            mandatory: {
-              chromeMediaSource: 'desktop',
-              chromeMediaSourceId: sourceId,
+      // Convert blob to array buffer for sending to main process
+      audioBlob.arrayBuffer().then(async (arrayBuffer) => {
+        if (window.electronAPI && typeof window.electronAPI.saveRecording === 'function') {
+          const result = await window.electronAPI.saveRecording(arrayBuffer);
+          if (result.success) {
+            console.log('Recording saved:', result.filePath);
+            // Auto-transcribe if enabled in settings
+            if (settings.autoTranscribe) {
+              transcribeRecording(settings.language);
             }
           }
-        });
-        
-        const recorder = new MediaRecorder(stream);
-        setMediaRecorder(recorder);
-        
-        recorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            setAudioChunks((chunks) => [...chunks, event.data]);
-          }
-        };
-        
-        recorder.onstop = async () => {
-          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-          const arrayBuffer = await audioBlob.arrayBuffer();
-          
-          // Save the recording
-          if (window.electronAPI && typeof window.electronAPI.saveRecording === 'function') {
-            const result = await window.electronAPI.saveRecording(arrayBuffer);
-            if (result.success) {
-              console.log('Recording saved:', result.filePath);
-            }
-          } else {
-            console.warn('saveRecording API not available');
-          }
-        };
-        
-        recorder.start();
-        setIsRecording(true);
-        setAudioChunks([]);
-      } else {
-        console.warn('MediaRecorder not supported in this environment');
-        // Mock recording behavior
-        setIsRecording(true);
-      }
+        } else {
+          console.warn('saveRecording API not available');
+        }
+      });
     } catch (error) {
-      console.error('Failed to start recording:', error);
+      console.error('Failed to handle recording complete:', error);
     }
-  };
+  }
   
   // Start recording
   const startRecording = async (): Promise<void> => {
-    if (selectedSourceId) {
+    if (selectedDevice) {
       try {
-        // Start the media recorder
-        await startMediaRecorder(selectedSourceId);
-        
-        // Notify the main process that recording has started
-        if (window.electronAPI && typeof window.electronAPI.startRecording === 'function') {
-          await window.electronAPI.startRecording(selectedSourceId);
-        } else {
-          console.warn('startRecording API not available');
-        }
-        
-        setIsRecording(true);
+        await startAudioRecording();
       } catch (error) {
         console.error('Failed to start recording:', error);
       }
     } else {
-      console.error('No audio source selected');
+      console.error('No audio device selected');
     }
   };
   
   // Stop recording
-  const stopRecording = async (): Promise<void> => {
-    try {
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        mediaRecorder.stop();
-        
-        // Stop all tracks in the stream
-        mediaRecorder.stream.getTracks().forEach(track => track.stop());
-      }
-      
-      // Notify the main process that recording has stopped
-      if (window.electronAPI && typeof window.electronAPI.stopRecording === 'function') {
-        await window.electronAPI.stopRecording();
-      } else {
-        console.warn('stopRecording API not available');
-      }
-      
-      setIsRecording(false);
-    } catch (error) {
-      console.error('Failed to stop recording:', error);
-      // Ensure recording state is reset even if there's an error
-      setIsRecording(false);
-    }
+  const stopRecording = (): void => {
+    stopAudioRecording();
   };
   
   // Transcribe recording
   const transcribeRecording = async (language?: string): Promise<void> => {
     try {
-      if (window.electronAPI && 
-          typeof window.electronAPI.getRecordingPath === 'function' && 
-          typeof window.electronAPI.transcribeAudio === 'function') {
-        const filePath = await window.electronAPI.getRecordingPath();
-        const result = await window.electronAPI.transcribeAudio(filePath, { language });
-        
+      if (window.electronAPI && typeof window.electronAPI.transcribeRecording === 'function') {
+        const result = await window.electronAPI.transcribeRecording(language || settings.language);
         if (result.success) {
           setCurrentTranscription({
-            text: result.text || '',
-            language: result.language || 'en',
-            timestamp: new Date()
+            id: result.id,
+            text: result.text,
+            timestamp: result.timestamp,
+            duration: result.duration,
+            language: result.language || settings.language
           });
-        } else {
-          console.error('Failed to transcribe audio:', result.error);
+          
+          // Refresh the list of transcriptions
+          refreshRecentTranscriptions();
         }
       } else {
-        console.warn('transcribeAudio API not available');
-        // Mock transcription
+        console.warn('transcribeRecording API not available');
+        // Mock transcription for testing
         setCurrentTranscription({
-          text: 'This is a mock transcription of the audio file.',
-          language: language || 'en',
-          timestamp: new Date()
+          id: `mock-${Date.now()}`,
+          text: 'This is a mock transcription generated for testing purposes.',
+          timestamp: Date.now(),
+          duration: recordingTime,
+          language: language || settings.language
         });
       }
     } catch (error) {
@@ -301,107 +251,47 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     }
   };
   
-  // Translate recording
-  const translateRecording = async (): Promise<void> => {
-    try {
-      if (window.electronAPI && 
-          typeof window.electronAPI.getRecordingPath === 'function' && 
-          typeof window.electronAPI.translateAudio === 'function') {
-        const filePath = await window.electronAPI.getRecordingPath();
-        const result = await window.electronAPI.translateAudio(filePath);
-        
-        if (result.success) {
-          setCurrentTranscription({
-            text: result.text || '',
-            language: 'en', // Translation is always to English
-            timestamp: new Date()
-          });
-        } else {
-          console.error('Failed to translate audio:', result.error);
-        }
-      } else {
-        console.warn('translateAudio API not available');
-        // Mock translation
-        setCurrentTranscription({
-          text: 'This is a mock translation of the audio file.',
-          language: 'en',
-          timestamp: new Date()
-        });
-      }
-    } catch (error) {
-      console.error('Failed to translate recording:', error);
-    }
-  };
-  
   // Save transcription
-  const saveTranscription = async (filename?: string): Promise<void> => {
-    if (!currentTranscription) return;
-    
+  const saveTranscription = async (id: string): Promise<void> => {
     try {
       if (window.electronAPI && typeof window.electronAPI.saveTranscription === 'function') {
-        const result = await window.electronAPI.saveTranscription(
-          currentTranscription.text,
-          { filename, format: 'txt' }
-        );
-        
-        if (result.success) {
-          console.log('Transcription saved:', result.filePath);
-          refreshRecentFiles();
-        } else {
-          console.error('Failed to save transcription:', result.error);
-        }
+        await window.electronAPI.saveTranscription(id);
+        refreshRecentTranscriptions();
       } else {
         console.warn('saveTranscription API not available');
-        console.log('Mock: Transcription would be saved as:', filename || 'transcription.txt');
       }
     } catch (error) {
       console.error('Failed to save transcription:', error);
     }
   };
   
-  // Save transcription as
-  const saveTranscriptionAs = async (): Promise<void> => {
-    if (!currentTranscription) return;
-    
-    try {
-      if (window.electronAPI && typeof window.electronAPI.saveTranscriptionAs === 'function') {
-        const result = await window.electronAPI.saveTranscriptionAs(currentTranscription.text);
-        
-        if (result.success) {
-          console.log('Transcription saved as:', result.filePath);
-          refreshRecentFiles();
-        } else if (result.canceled) {
-          console.log('Save dialog canceled');
-        } else {
-          console.error('Failed to save transcription:', result.error);
-        }
-      } else {
-        console.warn('saveTranscriptionAs API not available');
-        console.log('Mock: Save dialog would be shown');
-      }
-    } catch (error) {
-      console.error('Failed to save transcription as:', error);
-    }
-  };
-  
-  // Create the context value
+  // Context value
   const contextValue: AppContextType = {
+    // Settings
+    settings,
+    updateSettings,
+    
+    // Recording state
     isRecording,
-    setIsRecording,
-    audioSources,
-    selectedSourceId,
-    setSelectedSourceId,
-    refreshAudioSources,
+    recordingTime,
+    
+    // Audio devices
+    audioDevices,
+    selectedDevice,
+    setSelectedDevice,
+    refreshAudioDevices,
+    
+    // Transcription
     currentTranscription,
     setCurrentTranscription,
-    recentFiles,
-    refreshRecentFiles,
+    recentTranscriptions,
+    refreshRecentTranscriptions,
+    
+    // Actions
     startRecording,
     stopRecording,
     transcribeRecording,
-    translateRecording,
-    saveTranscription,
-    saveTranscriptionAs,
+    saveTranscription
   };
   
   return (

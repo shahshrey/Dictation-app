@@ -19289,7 +19289,7 @@
   var import_react = __toESM(require_react());
   var import_client = __toESM(require_client());
 
-  // src/renderer/components/theme-provider.tsx
+  // src/renderer/components/layout/theme-provider.tsx
   var React = __toESM(require_react());
   var initialState = {
     theme: "system",
@@ -19319,6 +19319,17 @@
     return /* @__PURE__ */ React.createElement(ThemeProviderContext.Provider, { ...props, value }, children);
   }
 
+  // src/shared/constants.ts
+  var DEFAULT_SETTINGS = {
+    apiKey: "",
+    selectedMicrophone: "",
+    language: "en",
+    theme: "system",
+    saveTranscriptions: true,
+    transcriptionSavePath: "",
+    autoTranscribe: false
+  };
+
   // src/renderer/mock-electron-api.ts
   var mockElectronAPI = {
     // Audio recording
@@ -19327,6 +19338,13 @@
       return [
         { id: "mock-device-1", name: "Mock Microphone 1" },
         { id: "mock-device-2", name: "Mock Microphone 2" }
+      ];
+    },
+    getAudioDevices: async () => {
+      console.log("Mock: getAudioDevices called");
+      return [
+        { id: "mock-device-1", name: "Mock Microphone 1", isDefault: true },
+        { id: "mock-device-2", name: "Mock Microphone 2", isDefault: false }
       ];
     },
     startRecording: async (sourceId) => {
@@ -19358,10 +19376,29 @@
         model: "mock-model"
       };
     },
+    transcribeRecording: async (language) => {
+      console.log(`Mock: transcribeRecording called with language: ${language}`);
+      return {
+        success: true,
+        id: `mock-${Date.now()}`,
+        text: "This is a mock transcription generated for testing purposes.",
+        timestamp: Date.now(),
+        duration: 30,
+        language
+      };
+    },
+    // Settings
+    getSettings: async () => {
+      console.log("Mock: getSettings called");
+      return DEFAULT_SETTINGS;
+    },
+    saveSettings: async (settings) => {
+      console.log(`Mock: saveSettings called with settings:`, settings);
+    },
     // File storage
-    saveTranscription: async (text, options) => {
-      console.log(`Mock: saveTranscription called with text: ${text.substring(0, 20)}..., filename: ${options.filename}, format: ${options.format}`);
-      return { success: true, filePath: `/mock/path/to/${options.filename || "transcription"}.${options.format || "txt"}` };
+    saveTranscription: async (id) => {
+      console.log(`Mock: saveTranscription called with id: ${id}`);
+      return { success: true };
     },
     saveTranscriptionAs: async (text) => {
       console.log(`Mock: saveTranscriptionAs called with text: ${text.substring(0, 20)}...`);
@@ -19390,6 +19427,27 @@
           }
         ]
       };
+    },
+    getTranscriptions: async () => {
+      console.log("Mock: getTranscriptions called");
+      return [
+        {
+          id: "mock-1",
+          text: "This is a mock transcription for testing purposes.",
+          timestamp: Date.now() - 864e5,
+          // 1 day ago
+          duration: 30,
+          language: "en"
+        },
+        {
+          id: "mock-2",
+          text: "Another mock transcription with different content.",
+          timestamp: Date.now() - 1728e5,
+          // 2 days ago
+          duration: 45,
+          language: "en"
+        }
+      ];
     },
     // Event listeners
     onToggleRecording: (callback) => {

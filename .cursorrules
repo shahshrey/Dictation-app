@@ -1,49 +1,57 @@
 # General Settings
+
 - description: Ensure the project follows Material Design and Electron best practices.
 - rules:
-    - Use TypeScript for all development.
-    - Follow Material Design guidelines for UI components.
-    - Use `electron-builder` for packaging the app.
+  - Use TypeScript for all development.
+  - Follow Material Design guidelines for UI components.
+  - Use `electron-builder` for packaging the app.
 
 # Groq API Integration
+
 - description: Integration with Groq API for audio processing.
 - rules:
-    - Use `groq-sdk` npm package for accessing Groq APIs.
-    - Implement audio.transcriptions.create and audio.translations.create endpoints.
-    - Handle API responses and errors gracefully.
+  - Use `groq-sdk` pnpm package for accessing Groq APIs.
+  - Implement audio.transcriptions.create and audio.translations.create endpoints.
+  - Handle API responses and errors gracefully.
 
 # User Interface
+
 - description: Rules for the renderer process concerning UI.
 - rules:
-    - Use React with Material UI for building the renderer interface.
-    - Display a popup with a live wave animation during recording.
-    - Allow user to start/stop recordings with a specific key (e.g., Home key).
+  - Use React with Material UI for building the renderer interface.
+  - Display a popup with a live wave animation during recording.
+  - Allow user to start/stop recordings with a specific key (e.g., Home key).
 
 # Audio Processing & Permissions
+
 - description: Managing audio inputs and permissions.
 - rules:
-    - Enable microphone access through macOS Accessibility APIs.
-    - Provide options to select microphones in the app settings.
+  - Enable microphone access through macOS Accessibility APIs.
+  - Provide options to select microphones in the app settings.
 
 # State Management and File Storage
+
 - description: Handle and store app data.
 - rules:
-    - Use React Context API for state management across components.
-    - Save transcriptions to a local text file as a temporary solution for data storage.
+  - Use React Context API for state management across components.
+  - Save transcriptions to a local text file as a temporary solution for data storage.
 
 # Security and Privacy
+
 - description: Minimal security setup for personal use.
 - rules:
-    - Implement basic security measures even for personal use.
+  - Implement basic security measures even for personal use.
 
 # Future scalability considerations
+
 - Consider upgrading storage solutions depending on future development needs.
 
 # Packaging
+
 - Use electron-forge for packaging the app.
 
-
 # UI
+
 - Use shadcn with tailwind css
 - Use shadcn components for the UI
 - Use shadcn icons for the UI

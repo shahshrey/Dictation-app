@@ -1,10 +1,13 @@
 // This file provides mock implementations of the Electron API for development
 // It allows the app to run without the actual Electron API being available
+import { AudioDevice, AppSettings, Transcription } from '../shared/types';
+import { DEFAULT_SETTINGS } from '../shared/constants';
 
 // Define the window.electronAPI interface
 interface ElectronAPI {
   // Audio recording
   getAudioSources: () => Promise<Array<{ id: string; name: string }>>;
+  getAudioDevices: () => Promise<AudioDevice[]>;
   startRecording: (sourceId: string) => Promise<void>;
   saveRecording: (arrayBuffer: ArrayBuffer) => Promise<{ success: boolean; filePath?: string; error?: string }>;
   getRecordingPath: () => Promise<string>;
@@ -14,14 +17,27 @@ interface ElectronAPI {
     Promise<{ success: boolean; text?: string; language?: string; model?: string; error?: string }>;
   translateAudio: (filePath: string) => 
     Promise<{ success: boolean; text?: string; model?: string; error?: string }>;
+  transcribeRecording: (language: string) => Promise<{ 
+    success: boolean; 
+    id: string; 
+    text: string; 
+    timestamp: number; 
+    duration: number; 
+    language?: string; 
+    error?: string 
+  }>;
+  
+  // Settings
+  getSettings: () => Promise<AppSettings>;
+  saveSettings: (settings: AppSettings) => Promise<void>;
   
   // File storage
-  saveTranscription: (text: string, options: { filename?: string, format?: string }) => 
-    Promise<{ success: boolean; filePath?: string; error?: string }>;
+  saveTranscription: (id: string) => Promise<{ success: boolean; error?: string }>;
   saveTranscriptionAs: (text: string) => 
     Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
   getRecentTranscriptions: () => 
     Promise<{ success: boolean; files?: Array<any>; error?: string }>;
+  getTranscriptions: () => Promise<Transcription[]>;
   
   // Event listeners
   onToggleRecording: (callback: () => void) => () => void;
@@ -37,6 +53,14 @@ const mockElectronAPI: ElectronAPI = {
     return [
       { id: 'mock-device-1', name: 'Mock Microphone 1' },
       { id: 'mock-device-2', name: 'Mock Microphone 2' }
+    ];
+  },
+  
+  getAudioDevices: async () => {
+    console.log('Mock: getAudioDevices called');
+    return [
+      { id: 'mock-device-1', name: 'Mock Microphone 1', isDefault: true },
+      { id: 'mock-device-2', name: 'Mock Microphone 2', isDefault: false }
     ];
   },
   
@@ -74,10 +98,32 @@ const mockElectronAPI: ElectronAPI = {
     };
   },
   
+  transcribeRecording: async (language: string) => {
+    console.log(`Mock: transcribeRecording called with language: ${language}`);
+    return {
+      success: true,
+      id: `mock-${Date.now()}`,
+      text: 'This is a mock transcription generated for testing purposes.',
+      timestamp: Date.now(),
+      duration: 30,
+      language: language
+    };
+  },
+  
+  // Settings
+  getSettings: async () => {
+    console.log('Mock: getSettings called');
+    return DEFAULT_SETTINGS;
+  },
+  
+  saveSettings: async (settings: AppSettings) => {
+    console.log(`Mock: saveSettings called with settings:`, settings);
+  },
+  
   // File storage
-  saveTranscription: async (text: string, options: { filename?: string, format?: string }) => {
-    console.log(`Mock: saveTranscription called with text: ${text.substring(0, 20)}..., filename: ${options.filename}, format: ${options.format}`);
-    return { success: true, filePath: `/mock/path/to/${options.filename || 'transcription'}.${options.format || 'txt'}` };
+  saveTranscription: async (id: string) => {
+    console.log(`Mock: saveTranscription called with id: ${id}`);
+    return { success: true };
   },
   
   saveTranscriptionAs: async (text: string) => {
@@ -108,6 +154,26 @@ const mockElectronAPI: ElectronAPI = {
     };
   },
   
+  getTranscriptions: async () => {
+    console.log('Mock: getTranscriptions called');
+    return [
+      { 
+        id: 'mock-1',
+        text: 'This is a mock transcription for testing purposes.',
+        timestamp: Date.now() - 86400000, // 1 day ago
+        duration: 30,
+        language: 'en'
+      },
+      { 
+        id: 'mock-2',
+        text: 'Another mock transcription with different content.',
+        timestamp: Date.now() - 172800000, // 2 days ago
+        duration: 45,
+        language: 'en'
+      }
+    ];
+  },
+  
   // Event listeners
   onToggleRecording: (callback: () => void) => {
     console.log('Mock: onToggleRecording listener registered');
@@ -134,6 +200,13 @@ const mockElectronAPI: ElectronAPI = {
 if (typeof window !== 'undefined' && !window.electronAPI) {
   console.log('Using mock Electron API');
   (window as any).electronAPI = mockElectronAPI;
+}
+
+// Declare the global window interface
+declare global {
+  interface Window {
+    electronAPI: ElectronAPI;
+  }
 }
 
 export default mockElectronAPI; 

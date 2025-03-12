@@ -1,10 +1,10 @@
 import React, { Suspense } from 'react';
-import Header from './Header';
-import RecordingControls from './RecordingControls';
-import TranscriptionDisplay from './TranscriptionDisplay';
-import RecentTranscriptions from './RecentTranscriptions';
-import SettingsPanel from './SettingsPanel';
-import DictationPopup from './DictationPopup';
+import Header from './layout/Header';
+import RecordingControls from './features/dictation/RecordingControls';
+import TranscriptionDisplay from './features/transcription/TranscriptionDisplay';
+import RecentTranscriptions from './features/transcription/RecentTranscriptions';
+import SettingsPanel from './features/settings/SettingsPanel';
+import DictationPopup from './features/dictation/DictationPopup';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 

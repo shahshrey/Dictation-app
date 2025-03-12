@@ -1,6 +1,6 @@
 import React from 'react';
-import { useAppContext } from '../context/AppContext';
-import { Button } from './ui/button';
+import { useAppContext } from '../../context/AppContext';
+import { Button } from '../ui/button';
 import { ThemeToggle } from './theme-toggle';
 
 const Header: React.FC = () => {

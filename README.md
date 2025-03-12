@@ -69,25 +69,35 @@ This will create distributable packages in the `out` directory.
 ```
 dictation-app/
 ├── src/
-│   ├── main/           # Electron main process
-│   │   ├── index.ts    # Main entry point
-│   │   ├── audio.ts    # Audio recording functionality
-│   │   ├── groq.ts     # Groq API integration
-│   │   └── storage.ts  # File storage functionality
-│   ├── preload/        # Preload scripts
-│   │   └── preload.ts  # Preload script for exposing APIs
-│   ├── renderer/       # React renderer process
-│   │   ├── components/ # React components
-│   │   ├── context/    # React context for state management
-│   │   ├── types/      # TypeScript type definitions
-│   │   ├── index.html  # HTML template
-│   │   └── index.tsx   # Renderer entry point
-│   └── shared/         # Shared code between processes
-│       └── theme.ts    # Theme configuration
-├── package.json        # Project metadata and dependencies
-├── tsconfig.json       # TypeScript configuration
-├── forge.config.ts     # Electron Forge configuration
-└── webpack.*.ts        # Webpack configuration files
+│   ├── main/                  # Main process code
+│   │   ├── services/          # Services for main process
+│   │   │   ├── audio.ts       # Audio recording functionality
+│   │   │   ├── groq.ts        # Groq API integration
+│   │   │   └── storage.ts     # File storage functionality
+│   │   ├── utils/             # Utility functions
+│   │   └── index.ts           # Main entry point
+│   ├── preload/               # Preload scripts
+│   │   └── preload.ts         # Preload script for exposing APIs
+│   ├── renderer/              # Renderer process code
+│   │   ├── components/        # React components
+│   │   │   ├── ui/            # UI components (shadcn)
+│   │   │   ├── features/      # Feature-specific components
+│   │   │   │   ├── dictation/ # Dictation-related components
+│   │   │   │   ├── settings/  # Settings-related components
+│   │   │   │   └── transcription/ # Transcription-related components
+│   │   │   └── layout/        # Layout components
+│   │   ├── context/           # React context providers
+│   │   ├── hooks/             # Custom React hooks
+│   │   ├── lib/               # Renderer-specific utilities
+│   │   ├── styles/            # Global styles
+│   │   └── index.tsx          # Renderer entry point
+│   └── shared/                # Shared code between processes
+│       ├── constants.ts       # Shared constants
+│       └── types/             # Shared TypeScript interfaces
+├── package.json               # Project metadata and dependencies
+├── tsconfig.json              # TypeScript configuration
+├── forge.config.js            # Electron Forge configuration
+└── webpack.*.js               # Webpack configuration files
 ```
 
 ## License

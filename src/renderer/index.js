@@ -19739,17 +19739,28 @@
   });
 
   // src/renderer/index.tsx
-  var import_react14 = __toESM(require_react());
+  var import_react15 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
   // src/renderer/components/App.tsx
-  var import_react13 = __toESM(require_react());
+  var import_react14 = __toESM(require_react());
 
-  // src/renderer/components/Header.tsx
-  var import_react4 = __toESM(require_react());
+  // src/renderer/components/layout/Header.tsx
+  var import_react5 = __toESM(require_react());
 
   // src/renderer/context/AppContext.tsx
-  var import_react = __toESM(require_react());
+  var import_react2 = __toESM(require_react());
+
+  // src/shared/constants.ts
+  var DEFAULT_SETTINGS = {
+    apiKey: "",
+    selectedMicrophone: "",
+    language: "en",
+    theme: "system",
+    saveTranscriptions: true,
+    transcriptionSavePath: "",
+    autoTranscribe: false
+  };
 
   // src/renderer/mock-electron-api.ts
   var mockElectronAPI = {
@@ -19759,6 +19770,13 @@
       return [
         { id: "mock-device-1", name: "Mock Microphone 1" },
         { id: "mock-device-2", name: "Mock Microphone 2" }
+      ];
+    },
+    getAudioDevices: async () => {
+      console.log("Mock: getAudioDevices called");
+      return [
+        { id: "mock-device-1", name: "Mock Microphone 1", isDefault: true },
+        { id: "mock-device-2", name: "Mock Microphone 2", isDefault: false }
       ];
     },
     startRecording: async (sourceId) => {
@@ -19790,10 +19808,29 @@
         model: "mock-model"
       };
     },
+    transcribeRecording: async (language) => {
+      console.log(`Mock: transcribeRecording called with language: ${language}`);
+      return {
+        success: true,
+        id: `mock-${Date.now()}`,
+        text: "This is a mock transcription generated for testing purposes.",
+        timestamp: Date.now(),
+        duration: 30,
+        language
+      };
+    },
+    // Settings
+    getSettings: async () => {
+      console.log("Mock: getSettings called");
+      return DEFAULT_SETTINGS;
+    },
+    saveSettings: async (settings) => {
+      console.log(`Mock: saveSettings called with settings:`, settings);
+    },
     // File storage
-    saveTranscription: async (text, options) => {
-      console.log(`Mock: saveTranscription called with text: ${text.substring(0, 20)}..., filename: ${options.filename}, format: ${options.format}`);
-      return { success: true, filePath: `/mock/path/to/${options.filename || "transcription"}.${options.format || "txt"}` };
+    saveTranscription: async (id) => {
+      console.log(`Mock: saveTranscription called with id: ${id}`);
+      return { success: true };
     },
     saveTranscriptionAs: async (text) => {
       console.log(`Mock: saveTranscriptionAs called with text: ${text.substring(0, 20)}...`);
@@ -19823,6 +19860,27 @@
         ]
       };
     },
+    getTranscriptions: async () => {
+      console.log("Mock: getTranscriptions called");
+      return [
+        {
+          id: "mock-1",
+          text: "This is a mock transcription for testing purposes.",
+          timestamp: Date.now() - 864e5,
+          // 1 day ago
+          duration: 30,
+          language: "en"
+        },
+        {
+          id: "mock-2",
+          text: "Another mock transcription with different content.",
+          timestamp: Date.now() - 1728e5,
+          // 2 days ago
+          duration: 45,
+          language: "en"
+        }
+      ];
+    },
     // Event listeners
     onToggleRecording: (callback) => {
       console.log("Mock: onToggleRecording listener registered");
@@ -19845,22 +19903,105 @@
     window.electronAPI = mockElectronAPI;
   }
 
-  // src/renderer/context/AppContext.tsx
-  var AppContext = (0, import_react.createContext)(void 0);
-  var AppContextProvider = ({ children }) => {
-    const [isRecording, setIsRecording] = (0, import_react.useState)(false);
+  // src/renderer/hooks/useAudioRecording.ts
+  var import_react = __toESM(require_react());
+  var useAudioRecording = ({
+    onRecordingComplete,
+    selectedDevice
+  } = {}) => {
     const [mediaRecorder, setMediaRecorder] = (0, import_react.useState)(null);
+    const [isRecording, setIsRecording] = (0, import_react.useState)(false);
+    const [recordingTime, setRecordingTime] = (0, import_react.useState)(0);
+    const [error, setError] = (0, import_react.useState)(null);
+    const [timer, setTimer] = (0, import_react.useState)(null);
     const [audioChunks, setAudioChunks] = (0, import_react.useState)([]);
-    const [audioSources, setAudioSources] = (0, import_react.useState)([]);
-    const [selectedSourceId, setSelectedSourceId] = (0, import_react.useState)("");
-    const [currentTranscription, setCurrentTranscription] = (0, import_react.useState)(null);
-    const [recentFiles, setRecentFiles] = (0, import_react.useState)([]);
     (0, import_react.useEffect)(() => {
-      refreshAudioSources();
-      refreshRecentFiles();
-      let unsubscribeToggleRecording = () => {
+      return () => {
+        if (timer) {
+          clearInterval(timer);
+        }
+        if (mediaRecorder && isRecording) {
+          mediaRecorder.stop();
+        }
       };
-      let unsubscribeRecordingSourceSelected = () => {
+    }, [timer, mediaRecorder, isRecording]);
+    const startRecording = (0, import_react.useCallback)(async () => {
+      try {
+        setError(null);
+        setAudioChunks([]);
+        const constraints = {
+          audio: selectedDevice ? { deviceId: { exact: selectedDevice.id } } : true,
+          video: false
+        };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const recorder = new MediaRecorder(stream);
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            setAudioChunks((chunks) => [...chunks, event.data]);
+          }
+        };
+        recorder.onstop = () => {
+          const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+          if (onRecordingComplete) {
+            onRecordingComplete(audioBlob);
+          }
+          stream.getTracks().forEach((track) => track.stop());
+          setRecordingTime(0);
+          setIsRecording(false);
+          if (timer) {
+            clearInterval(timer);
+            setTimer(null);
+          }
+        };
+        recorder.start();
+        setMediaRecorder(recorder);
+        setIsRecording(true);
+        const intervalId = setInterval(() => {
+          setRecordingTime((prev) => prev + 1);
+        }, 1e3);
+        setTimer(intervalId);
+      } catch (err) {
+        setError(`Failed to start recording: ${err instanceof Error ? err.message : String(err)}`);
+        console.error("Recording error:", err);
+      }
+    }, [selectedDevice, onRecordingComplete, audioChunks, timer]);
+    const stopRecording = (0, import_react.useCallback)(() => {
+      if (mediaRecorder && isRecording) {
+        mediaRecorder.stop();
+      }
+    }, [mediaRecorder, isRecording]);
+    return {
+      isRecording,
+      startRecording,
+      stopRecording,
+      recordingTime,
+      error
+    };
+  };
+
+  // src/renderer/context/AppContext.tsx
+  var AppContext = (0, import_react2.createContext)(void 0);
+  var AppContextProvider = ({ children }) => {
+    const [settings, setSettings] = (0, import_react2.useState)(DEFAULT_SETTINGS);
+    const [audioDevices, setAudioDevices] = (0, import_react2.useState)([]);
+    const [selectedDevice, setSelectedDevice] = (0, import_react2.useState)(null);
+    const [currentTranscription, setCurrentTranscription] = (0, import_react2.useState)(null);
+    const [recentTranscriptions, setRecentTranscriptions] = (0, import_react2.useState)([]);
+    const {
+      isRecording,
+      startRecording: startAudioRecording,
+      stopRecording: stopAudioRecording,
+      recordingTime,
+      error: recordingError
+    } = useAudioRecording({
+      selectedDevice: selectedDevice || void 0,
+      onRecordingComplete: handleRecordingComplete
+    });
+    (0, import_react2.useEffect)(() => {
+      refreshAudioDevices();
+      loadSettings();
+      refreshRecentTranscriptions();
+      let unsubscribeToggleRecording = () => {
       };
       try {
         if (window.electronAPI && typeof window.electronAPI.onToggleRecording === "function") {
@@ -19872,270 +20013,189 @@
             }
           });
         }
-        if (window.electronAPI && typeof window.electronAPI.onRecordingSourceSelected === "function") {
-          unsubscribeRecordingSourceSelected = window.electronAPI.onRecordingSourceSelected((sourceId) => {
-            setSelectedSourceId(sourceId);
-            startMediaRecorder(sourceId);
-          });
-        }
       } catch (error) {
         console.error("Error setting up event listeners:", error);
       }
       return () => {
         try {
           unsubscribeToggleRecording();
-          unsubscribeRecordingSourceSelected();
         } catch (error) {
           console.error("Error cleaning up event listeners:", error);
         }
       };
     }, [isRecording]);
-    const refreshAudioSources = async () => {
+    const loadSettings = async () => {
       try {
-        if (window.electronAPI && typeof window.electronAPI.getAudioSources === "function") {
-          const sources = await window.electronAPI.getAudioSources();
-          setAudioSources(sources);
-          if (sources.length > 0 && !selectedSourceId) {
-            setSelectedSourceId(sources[0].id);
-          }
-        } else {
-          console.warn("getAudioSources API not available");
-          setAudioSources([
-            { id: "mock-device-1", name: "Mock Microphone 1" },
-            { id: "mock-device-2", name: "Mock Microphone 2" }
-          ]);
-          setSelectedSourceId("mock-device-1");
+        if (window.electronAPI && typeof window.electronAPI.getSettings === "function") {
+          const loadedSettings = await window.electronAPI.getSettings();
+          setSettings(loadedSettings || DEFAULT_SETTINGS);
         }
       } catch (error) {
-        console.error("Failed to get audio sources:", error);
+        console.error("Failed to load settings:", error);
       }
     };
-    const refreshRecentFiles = async () => {
+    const updateSettings = async (newSettings) => {
       try {
-        if (window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === "function") {
-          const result = await window.electronAPI.getRecentTranscriptions();
-          if (result.success) {
-            setRecentFiles(result.files);
+        const updatedSettings = { ...settings, ...newSettings };
+        setSettings(updatedSettings);
+        if (window.electronAPI && typeof window.electronAPI.saveSettings === "function") {
+          await window.electronAPI.saveSettings(updatedSettings);
+        }
+      } catch (error) {
+        console.error("Failed to update settings:", error);
+      }
+    };
+    const refreshAudioDevices = async () => {
+      try {
+        if (window.electronAPI && typeof window.electronAPI.getAudioDevices === "function") {
+          const devices = await window.electronAPI.getAudioDevices();
+          setAudioDevices(devices);
+          if (devices.length > 0 && !selectedDevice) {
+            setSelectedDevice(devices[0]);
           }
         } else {
-          console.warn("getRecentTranscriptions API not available");
-          setRecentFiles([
+          console.warn("getAudioDevices API not available");
+          const mockDevices = [
+            { id: "mock-device-1", name: "Mock Microphone 1", isDefault: true },
+            { id: "mock-device-2", name: "Mock Microphone 2", isDefault: false }
+          ];
+          setAudioDevices(mockDevices);
+          setSelectedDevice(mockDevices[0]);
+        }
+      } catch (error) {
+        console.error("Failed to get audio devices:", error);
+      }
+    };
+    const refreshRecentTranscriptions = async () => {
+      try {
+        if (window.electronAPI && typeof window.electronAPI.getTranscriptions === "function") {
+          const transcriptions = await window.electronAPI.getTranscriptions();
+          setRecentTranscriptions(transcriptions || []);
+        } else {
+          console.warn("getTranscriptions API not available");
+          setRecentTranscriptions([
             {
-              name: "Mock Transcription 1.txt",
-              path: "/mock/path/to/transcription1.txt",
-              size: 1024,
-              createdAt: new Date(Date.now() - 864e5),
+              id: "mock-1",
+              text: "This is a mock transcription for testing purposes.",
+              timestamp: Date.now() - 864e5,
               // 1 day ago
-              modifiedAt: new Date(Date.now() - 864e5)
+              duration: 30,
+              language: "en"
             },
             {
-              name: "Mock Transcription 2.txt",
-              path: "/mock/path/to/transcription2.txt",
-              size: 2048,
-              createdAt: new Date(Date.now() - 1728e5),
+              id: "mock-2",
+              text: "Another mock transcription with different content.",
+              timestamp: Date.now() - 1728e5,
               // 2 days ago
-              modifiedAt: new Date(Date.now() - 1728e5)
+              duration: 45,
+              language: "en"
             }
           ]);
         }
       } catch (error) {
-        console.error("Failed to get recent files:", error);
+        console.error("Failed to get recent transcriptions:", error);
       }
     };
-    const startMediaRecorder = async (sourceId) => {
+    function handleRecordingComplete(audioBlob) {
       try {
-        if (typeof navigator !== "undefined" && navigator.mediaDevices) {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-              // @ts-ignore - Electron specific constraint
-              mandatory: {
-                chromeMediaSource: "desktop",
-                chromeMediaSourceId: sourceId
+        audioBlob.arrayBuffer().then(async (arrayBuffer) => {
+          if (window.electronAPI && typeof window.electronAPI.saveRecording === "function") {
+            const result = await window.electronAPI.saveRecording(arrayBuffer);
+            if (result.success) {
+              console.log("Recording saved:", result.filePath);
+              if (settings.autoTranscribe) {
+                transcribeRecording(settings.language);
               }
             }
-          });
-          const recorder = new MediaRecorder(stream);
-          setMediaRecorder(recorder);
-          recorder.ondataavailable = (event) => {
-            if (event.data.size > 0) {
-              setAudioChunks((chunks) => [...chunks, event.data]);
-            }
-          };
-          recorder.onstop = async () => {
-            const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
-            const arrayBuffer = await audioBlob.arrayBuffer();
-            if (window.electronAPI && typeof window.electronAPI.saveRecording === "function") {
-              const result = await window.electronAPI.saveRecording(arrayBuffer);
-              if (result.success) {
-                console.log("Recording saved:", result.filePath);
-              }
-            } else {
-              console.warn("saveRecording API not available");
-            }
-          };
-          recorder.start();
-          setIsRecording(true);
-          setAudioChunks([]);
-        } else {
-          console.warn("MediaRecorder not supported in this environment");
-          setIsRecording(true);
-        }
-      } catch (error) {
-        console.error("Failed to start recording:", error);
-      }
-    };
-    const startRecording = async () => {
-      if (selectedSourceId) {
-        try {
-          await startMediaRecorder(selectedSourceId);
-          if (window.electronAPI && typeof window.electronAPI.startRecording === "function") {
-            await window.electronAPI.startRecording(selectedSourceId);
           } else {
-            console.warn("startRecording API not available");
+            console.warn("saveRecording API not available");
           }
-          setIsRecording(true);
+        });
+      } catch (error) {
+        console.error("Failed to handle recording complete:", error);
+      }
+    }
+    const startRecording = async () => {
+      if (selectedDevice) {
+        try {
+          await startAudioRecording();
         } catch (error) {
           console.error("Failed to start recording:", error);
         }
       } else {
-        console.error("No audio source selected");
+        console.error("No audio device selected");
       }
     };
-    const stopRecording = async () => {
-      try {
-        if (mediaRecorder && mediaRecorder.state !== "inactive") {
-          mediaRecorder.stop();
-          mediaRecorder.stream.getTracks().forEach((track) => track.stop());
-        }
-        if (window.electronAPI && typeof window.electronAPI.stopRecording === "function") {
-          await window.electronAPI.stopRecording();
-        } else {
-          console.warn("stopRecording API not available");
-        }
-        setIsRecording(false);
-      } catch (error) {
-        console.error("Failed to stop recording:", error);
-        setIsRecording(false);
-      }
+    const stopRecording = () => {
+      stopAudioRecording();
     };
     const transcribeRecording = async (language) => {
       try {
-        if (window.electronAPI && typeof window.electronAPI.getRecordingPath === "function" && typeof window.electronAPI.transcribeAudio === "function") {
-          const filePath = await window.electronAPI.getRecordingPath();
-          const result = await window.electronAPI.transcribeAudio(filePath, { language });
+        if (window.electronAPI && typeof window.electronAPI.transcribeRecording === "function") {
+          const result = await window.electronAPI.transcribeRecording(language || settings.language);
           if (result.success) {
             setCurrentTranscription({
-              text: result.text || "",
-              language: result.language || "en",
-              timestamp: /* @__PURE__ */ new Date()
+              id: result.id,
+              text: result.text,
+              timestamp: result.timestamp,
+              duration: result.duration,
+              language: result.language || settings.language
             });
-          } else {
-            console.error("Failed to transcribe audio:", result.error);
+            refreshRecentTranscriptions();
           }
         } else {
-          console.warn("transcribeAudio API not available");
+          console.warn("transcribeRecording API not available");
           setCurrentTranscription({
-            text: "This is a mock transcription of the audio file.",
-            language: language || "en",
-            timestamp: /* @__PURE__ */ new Date()
+            id: `mock-${Date.now()}`,
+            text: "This is a mock transcription generated for testing purposes.",
+            timestamp: Date.now(),
+            duration: recordingTime,
+            language: language || settings.language
           });
         }
       } catch (error) {
         console.error("Failed to transcribe recording:", error);
       }
     };
-    const translateRecording = async () => {
-      try {
-        if (window.electronAPI && typeof window.electronAPI.getRecordingPath === "function" && typeof window.electronAPI.translateAudio === "function") {
-          const filePath = await window.electronAPI.getRecordingPath();
-          const result = await window.electronAPI.translateAudio(filePath);
-          if (result.success) {
-            setCurrentTranscription({
-              text: result.text || "",
-              language: "en",
-              // Translation is always to English
-              timestamp: /* @__PURE__ */ new Date()
-            });
-          } else {
-            console.error("Failed to translate audio:", result.error);
-          }
-        } else {
-          console.warn("translateAudio API not available");
-          setCurrentTranscription({
-            text: "This is a mock translation of the audio file.",
-            language: "en",
-            timestamp: /* @__PURE__ */ new Date()
-          });
-        }
-      } catch (error) {
-        console.error("Failed to translate recording:", error);
-      }
-    };
-    const saveTranscription = async (filename) => {
-      if (!currentTranscription) return;
+    const saveTranscription = async (id) => {
       try {
         if (window.electronAPI && typeof window.electronAPI.saveTranscription === "function") {
-          const result = await window.electronAPI.saveTranscription(
-            currentTranscription.text,
-            { filename, format: "txt" }
-          );
-          if (result.success) {
-            console.log("Transcription saved:", result.filePath);
-            refreshRecentFiles();
-          } else {
-            console.error("Failed to save transcription:", result.error);
-          }
+          await window.electronAPI.saveTranscription(id);
+          refreshRecentTranscriptions();
         } else {
           console.warn("saveTranscription API not available");
-          console.log("Mock: Transcription would be saved as:", filename || "transcription.txt");
         }
       } catch (error) {
         console.error("Failed to save transcription:", error);
       }
     };
-    const saveTranscriptionAs = async () => {
-      if (!currentTranscription) return;
-      try {
-        if (window.electronAPI && typeof window.electronAPI.saveTranscriptionAs === "function") {
-          const result = await window.electronAPI.saveTranscriptionAs(currentTranscription.text);
-          if (result.success) {
-            console.log("Transcription saved as:", result.filePath);
-            refreshRecentFiles();
-          } else if (result.canceled) {
-            console.log("Save dialog canceled");
-          } else {
-            console.error("Failed to save transcription:", result.error);
-          }
-        } else {
-          console.warn("saveTranscriptionAs API not available");
-          console.log("Mock: Save dialog would be shown");
-        }
-      } catch (error) {
-        console.error("Failed to save transcription as:", error);
-      }
-    };
     const contextValue = {
+      // Settings
+      settings,
+      updateSettings,
+      // Recording state
       isRecording,
-      setIsRecording,
-      audioSources,
-      selectedSourceId,
-      setSelectedSourceId,
-      refreshAudioSources,
+      recordingTime,
+      // Audio devices
+      audioDevices,
+      selectedDevice,
+      setSelectedDevice,
+      refreshAudioDevices,
+      // Transcription
       currentTranscription,
       setCurrentTranscription,
-      recentFiles,
-      refreshRecentFiles,
+      recentTranscriptions,
+      refreshRecentTranscriptions,
+      // Actions
       startRecording,
       stopRecording,
       transcribeRecording,
-      translateRecording,
-      saveTranscription,
-      saveTranscriptionAs
+      saveTranscription
     };
-    return /* @__PURE__ */ import_react.default.createElement(AppContext.Provider, { value: contextValue }, children);
+    return /* @__PURE__ */ import_react2.default.createElement(AppContext.Provider, { value: contextValue }, children);
   };
   var useAppContext = () => {
-    const context = (0, import_react.useContext)(AppContext);
+    const context = (0, import_react2.useContext)(AppContext);
     if (context === void 0) {
       throw new Error("useAppContext must be used within an AppContextProvider");
     }
@@ -23064,11 +23124,11 @@
   );
   Button.displayName = "Button";
 
-  // src/renderer/components/theme-toggle.tsx
+  // src/renderer/components/layout/theme-toggle.tsx
   var React6 = __toESM(require_react());
 
   // node_modules/.pnpm/lucide-react@0.479.0_react@19.0.0/node_modules/lucide-react/dist/esm/createLucideIcon.js
-  var import_react3 = __toESM(require_react());
+  var import_react4 = __toESM(require_react());
 
   // node_modules/.pnpm/lucide-react@0.479.0_react@19.0.0/node_modules/lucide-react/dist/esm/shared/src/utils.js
   var toKebabCase = (string) => string.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
@@ -23077,7 +23137,7 @@
   }).join(" ").trim();
 
   // node_modules/.pnpm/lucide-react@0.479.0_react@19.0.0/node_modules/lucide-react/dist/esm/Icon.js
-  var import_react2 = __toESM(require_react());
+  var import_react3 = __toESM(require_react());
 
   // node_modules/.pnpm/lucide-react@0.479.0_react@19.0.0/node_modules/lucide-react/dist/esm/defaultAttributes.js
   var defaultAttributes = {
@@ -23093,7 +23153,7 @@
   };
 
   // node_modules/.pnpm/lucide-react@0.479.0_react@19.0.0/node_modules/lucide-react/dist/esm/Icon.js
-  var Icon = (0, import_react2.forwardRef)(
+  var Icon = (0, import_react3.forwardRef)(
     ({
       color = "currentColor",
       size: size4 = 24,
@@ -23104,7 +23164,7 @@
       iconNode,
       ...rest
     }, ref) => {
-      return (0, import_react2.createElement)(
+      return (0, import_react3.createElement)(
         "svg",
         {
           ref,
@@ -23117,7 +23177,7 @@
           ...rest
         },
         [
-          ...iconNode.map(([tag, attrs]) => (0, import_react2.createElement)(tag, attrs)),
+          ...iconNode.map(([tag, attrs]) => (0, import_react3.createElement)(tag, attrs)),
           ...Array.isArray(children) ? children : [children]
         ]
       );
@@ -23126,8 +23186,8 @@
 
   // node_modules/.pnpm/lucide-react@0.479.0_react@19.0.0/node_modules/lucide-react/dist/esm/createLucideIcon.js
   var createLucideIcon = (iconName, iconNode) => {
-    const Component = (0, import_react3.forwardRef)(
-      ({ className, ...props }, ref) => (0, import_react3.createElement)(Icon, {
+    const Component = (0, import_react4.forwardRef)(
+      ({ className, ...props }, ref) => (0, import_react4.createElement)(Icon, {
         ref,
         iconNode,
         className: mergeClasses(`lucide-${toKebabCase(iconName)}`, className),
@@ -23170,7 +23230,7 @@
   ];
   var Sun = createLucideIcon("Sun", __iconNode5);
 
-  // src/renderer/components/theme-provider.tsx
+  // src/renderer/components/layout/theme-provider.tsx
   var React5 = __toESM(require_react());
   var initialState = {
     theme: "system",
@@ -23206,7 +23266,7 @@
     return context;
   };
 
-  // src/renderer/components/theme-toggle.tsx
+  // src/renderer/components/layout/theme-toggle.tsx
   function ThemeToggle() {
     const { theme, setTheme } = useTheme();
     return /* @__PURE__ */ React6.createElement(
@@ -23222,12 +23282,12 @@
     );
   }
 
-  // src/renderer/components/Header.tsx
+  // src/renderer/components/layout/Header.tsx
   var Header = () => {
     const { isRecording } = useAppContext();
-    return /* @__PURE__ */ import_react4.default.createElement("header", { className: "bg-primary text-primary-foreground" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "container mx-auto px-4 py-3 flex items-center" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "mr-2" }, /* @__PURE__ */ import_react4.default.createElement(MicIcon, { className: "h-5 w-5" })), /* @__PURE__ */ import_react4.default.createElement("h1", { className: "text-xl font-semibold flex-grow" }, "Dictation App"), isRecording && /* @__PURE__ */ import_react4.default.createElement("div", { className: "flex items-center mr-4" }, /* @__PURE__ */ import_react4.default.createElement("div", { className: "w-3 h-3 rounded-full bg-destructive mr-2 animate-pulse" }), /* @__PURE__ */ import_react4.default.createElement("span", { className: "text-sm" }, "Recording")), /* @__PURE__ */ import_react4.default.createElement(ThemeToggle, null), /* @__PURE__ */ import_react4.default.createElement(Button, { variant: "ghost", size: "icon", className: "text-primary-foreground ml-2" }, /* @__PURE__ */ import_react4.default.createElement(SettingsIcon, { className: "h-5 w-5" }))));
+    return /* @__PURE__ */ import_react5.default.createElement("header", { className: "bg-primary text-primary-foreground" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "container mx-auto px-4 py-3 flex items-center" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "mr-2" }, /* @__PURE__ */ import_react5.default.createElement(MicIcon, { className: "h-5 w-5" })), /* @__PURE__ */ import_react5.default.createElement("h1", { className: "text-xl font-semibold flex-grow" }, "Dictation App"), isRecording && /* @__PURE__ */ import_react5.default.createElement("div", { className: "flex items-center mr-4" }, /* @__PURE__ */ import_react5.default.createElement("div", { className: "w-3 h-3 rounded-full bg-destructive mr-2 animate-pulse" }), /* @__PURE__ */ import_react5.default.createElement("span", { className: "text-sm" }, "Recording")), /* @__PURE__ */ import_react5.default.createElement(ThemeToggle, null), /* @__PURE__ */ import_react5.default.createElement(Button, { variant: "ghost", size: "icon", className: "text-primary-foreground ml-2" }, /* @__PURE__ */ import_react5.default.createElement(SettingsIcon, { className: "h-5 w-5" }))));
   };
-  var MicIcon = ({ className }) => /* @__PURE__ */ import_react4.default.createElement(
+  var MicIcon = ({ className }) => /* @__PURE__ */ import_react5.default.createElement(
     "svg",
     {
       xmlns: "http://www.w3.org/2000/svg",
@@ -23239,11 +23299,11 @@
       strokeLinejoin: "round",
       className
     },
-    /* @__PURE__ */ import_react4.default.createElement("path", { d: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" }),
-    /* @__PURE__ */ import_react4.default.createElement("path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }),
-    /* @__PURE__ */ import_react4.default.createElement("line", { x1: "12", x2: "12", y1: "19", y2: "22" })
+    /* @__PURE__ */ import_react5.default.createElement("path", { d: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" }),
+    /* @__PURE__ */ import_react5.default.createElement("path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }),
+    /* @__PURE__ */ import_react5.default.createElement("line", { x1: "12", x2: "12", y1: "19", y2: "22" })
   );
-  var SettingsIcon = ({ className }) => /* @__PURE__ */ import_react4.default.createElement(
+  var SettingsIcon = ({ className }) => /* @__PURE__ */ import_react5.default.createElement(
     "svg",
     {
       xmlns: "http://www.w3.org/2000/svg",
@@ -23255,13 +23315,13 @@
       strokeLinejoin: "round",
       className
     },
-    /* @__PURE__ */ import_react4.default.createElement("path", { d: "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" }),
-    /* @__PURE__ */ import_react4.default.createElement("circle", { cx: "12", cy: "12", r: "3" })
+    /* @__PURE__ */ import_react5.default.createElement("path", { d: "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" }),
+    /* @__PURE__ */ import_react5.default.createElement("circle", { cx: "12", cy: "12", r: "3" })
   );
   var Header_default = Header;
 
-  // src/renderer/components/RecordingControls.tsx
-  var import_react8 = __toESM(require_react());
+  // src/renderer/components/features/dictation/RecordingControls.tsx
+  var import_react9 = __toESM(require_react());
 
   // src/renderer/components/ui/select.tsx
   var React35 = __toESM(require_react());
@@ -23286,7 +23346,7 @@
   }
 
   // node_modules/.pnpm/@radix-ui+react-collection@1.1.2_@types+react@19.0.10_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/@radix-ui/react-collection/dist/index.mjs
-  var import_react5 = __toESM(require_react(), 1);
+  var import_react6 = __toESM(require_react(), 1);
 
   // node_modules/.pnpm/@radix-ui+react-context@1.1.1_@types+react@19.0.10_react@19.0.0/node_modules/@radix-ui/react-context/dist/index.mjs
   var React8 = __toESM(require_react(), 1);
@@ -23360,13 +23420,13 @@
     );
     const CollectionProvider = (props) => {
       const { scope, children } = props;
-      const ref = import_react5.default.useRef(null);
-      const itemMap = import_react5.default.useRef(/* @__PURE__ */ new Map()).current;
+      const ref = import_react6.default.useRef(null);
+      const itemMap = import_react6.default.useRef(/* @__PURE__ */ new Map()).current;
       return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(CollectionProviderImpl, { scope, itemMap, collectionRef: ref, children });
     };
     CollectionProvider.displayName = PROVIDER_NAME;
     const COLLECTION_SLOT_NAME = name + "CollectionSlot";
-    const CollectionSlot = import_react5.default.forwardRef(
+    const CollectionSlot = import_react6.default.forwardRef(
       (props, forwardedRef) => {
         const { scope, children } = props;
         const context = useCollectionContext(COLLECTION_SLOT_NAME, scope);
@@ -23377,13 +23437,13 @@
     CollectionSlot.displayName = COLLECTION_SLOT_NAME;
     const ITEM_SLOT_NAME = name + "CollectionItemSlot";
     const ITEM_DATA_ATTR = "data-radix-collection-item";
-    const CollectionItemSlot = import_react5.default.forwardRef(
+    const CollectionItemSlot = import_react6.default.forwardRef(
       (props, forwardedRef) => {
         const { scope, children, ...itemData } = props;
-        const ref = import_react5.default.useRef(null);
+        const ref = import_react6.default.useRef(null);
         const composedRefs = useComposedRefs(forwardedRef, ref);
         const context = useCollectionContext(ITEM_SLOT_NAME, scope);
-        import_react5.default.useEffect(() => {
+        import_react6.default.useEffect(() => {
           context.itemMap.set(ref, { ref, ...itemData });
           return () => void context.itemMap.delete(ref);
         });
@@ -23393,7 +23453,7 @@
     CollectionItemSlot.displayName = ITEM_SLOT_NAME;
     function useCollection2(scope) {
       const context = useCollectionContext(name + "CollectionConsumer", scope);
-      const getItems = import_react5.default.useCallback(() => {
+      const getItems = import_react6.default.useCallback(() => {
         const collectionNode = context.collectionRef.current;
         if (!collectionNode) return [];
         const orderedNodes = Array.from(collectionNode.querySelectorAll(`[${ITEM_DATA_ATTR}]`));
@@ -25525,9 +25585,9 @@
 
   // node_modules/.pnpm/@floating-ui+react-dom@2.1.2_react-dom@19.0.0_react@19.0.0__react@19.0.0/node_modules/@floating-ui/react-dom/dist/floating-ui.react-dom.mjs
   var React19 = __toESM(require_react(), 1);
-  var import_react6 = __toESM(require_react(), 1);
+  var import_react7 = __toESM(require_react(), 1);
   var ReactDOM2 = __toESM(require_react_dom(), 1);
-  var index = typeof document !== "undefined" ? import_react6.useLayoutEffect : import_react6.useEffect;
+  var index = typeof document !== "undefined" ? import_react7.useLayoutEffect : import_react7.useEffect;
   function deepEqual(a, b) {
     if (a === b) {
       return true;
@@ -26407,9 +26467,9 @@
   }
 
   // node_modules/.pnpm/use-callback-ref@1.3.3_@types+react@19.0.10_react@19.0.0/node_modules/use-callback-ref/dist/es2015/useRef.js
-  var import_react7 = __toESM(require_react());
+  var import_react8 = __toESM(require_react());
   function useCallbackRef2(initialValue, callback) {
-    var ref = (0, import_react7.useState)(function() {
+    var ref = (0, import_react8.useState)(function() {
       return {
         // value
         value: initialValue,
@@ -28384,162 +28444,121 @@
   ));
   CardFooter.displayName = "CardFooter";
 
-  // src/renderer/components/RecordingControls.tsx
+  // src/renderer/components/features/dictation/RecordingControls.tsx
   var RecordingControls = () => {
     const {
       isRecording,
-      audioSources,
-      selectedSourceId,
-      setSelectedSourceId,
-      refreshAudioSources,
+      recordingTime,
+      audioDevices,
+      selectedDevice,
+      setSelectedDevice,
+      refreshAudioDevices,
       startRecording,
       stopRecording,
       transcribeRecording,
-      translateRecording,
       currentTranscription,
-      saveTranscription,
-      saveTranscriptionAs
+      saveTranscription
     } = useAppContext();
-    return /* @__PURE__ */ import_react8.default.createElement("div", { className: "flex flex-col gap-4" }, /* @__PURE__ */ import_react8.default.createElement("div", { className: "flex items-center gap-4" }, /* @__PURE__ */ import_react8.default.createElement("div", { className: "min-w-[200px]" }, /* @__PURE__ */ import_react8.default.createElement(Label3, { htmlFor: "audio-source", className: "mb-2 block" }, "Audio Source"), /* @__PURE__ */ import_react8.default.createElement(
+    const formatTime = (seconds) => {
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      return `${minutes.toString().padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
+    };
+    const handleDeviceChange = (deviceId) => {
+      const device = audioDevices.find((d) => d.id === deviceId);
+      if (device) {
+        setSelectedDevice(device);
+      }
+    };
+    return /* @__PURE__ */ import_react9.default.createElement("div", { className: "space-y-4" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "flex flex-col space-y-2" }, /* @__PURE__ */ import_react9.default.createElement(Label3, { htmlFor: "microphone-select" }, "Select Microphone"), /* @__PURE__ */ import_react9.default.createElement(
       Select2,
       {
-        value: selectedSourceId,
-        onValueChange: setSelectedSourceId,
-        disabled: isRecording
+        value: selectedDevice?.id || "",
+        onValueChange: handleDeviceChange
       },
-      /* @__PURE__ */ import_react8.default.createElement(SelectTrigger2, { id: "audio-source" }, /* @__PURE__ */ import_react8.default.createElement(SelectValue2, { placeholder: "Select audio source" })),
-      /* @__PURE__ */ import_react8.default.createElement(SelectContent2, null, audioSources.map((source) => /* @__PURE__ */ import_react8.default.createElement(SelectItem2, { key: source.id, value: source.id }, source.name)))
-    )), /* @__PURE__ */ import_react8.default.createElement(
+      /* @__PURE__ */ import_react9.default.createElement(SelectTrigger2, { id: "microphone-select", className: "w-full" }, /* @__PURE__ */ import_react9.default.createElement(SelectValue2, { placeholder: "Select a microphone" })),
+      /* @__PURE__ */ import_react9.default.createElement(SelectContent2, null, audioDevices.map((device) => /* @__PURE__ */ import_react9.default.createElement(SelectItem2, { key: device.id, value: device.id }, device.name, " ", device.isDefault ? "(Default)" : "")))
+    ), /* @__PURE__ */ import_react9.default.createElement(
       Button,
       {
         variant: "outline",
-        onClick: refreshAudioSources,
-        disabled: isRecording,
-        className: "flex gap-2 items-center"
+        size: "sm",
+        onClick: () => refreshAudioDevices(),
+        className: "self-end mt-1"
       },
-      /* @__PURE__ */ import_react8.default.createElement(RefreshIcon, { className: "h-4 w-4" }),
-      "Refresh"
-    )), /* @__PURE__ */ import_react8.default.createElement("div", { className: "flex gap-4 items-center" }, !isRecording ? /* @__PURE__ */ import_react8.default.createElement(
+      "Refresh Devices"
+    )), /* @__PURE__ */ import_react9.default.createElement("div", { className: "flex flex-col space-y-4" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "flex space-x-2" }, /* @__PURE__ */ import_react9.default.createElement(
       Button,
       {
-        variant: "default",
-        onClick: startRecording,
-        disabled: !selectedSourceId,
-        className: "flex gap-2 items-center"
+        variant: isRecording ? "destructive" : "default",
+        className: "flex-1",
+        onClick: isRecording ? stopRecording : startRecording,
+        disabled: !selectedDevice
       },
-      /* @__PURE__ */ import_react8.default.createElement(MicIcon2, { className: "h-4 w-4" }),
-      "Start Recording"
-    ) : /* @__PURE__ */ import_react8.default.createElement(
-      Button,
-      {
-        variant: "destructive",
-        onClick: stopRecording,
-        className: "flex gap-2 items-center"
-      },
-      /* @__PURE__ */ import_react8.default.createElement(StopIcon, { className: "h-4 w-4" }),
-      "Stop Recording"
-    ), /* @__PURE__ */ import_react8.default.createElement(
+      isRecording ? "Stop Recording" : "Start Recording"
+    ), /* @__PURE__ */ import_react9.default.createElement(
       Button,
       {
         variant: "outline",
+        className: "flex-1",
         onClick: () => transcribeRecording(),
-        disabled: isRecording,
-        className: "flex gap-2 items-center"
+        disabled: isRecording || !currentTranscription
       },
-      /* @__PURE__ */ import_react8.default.createElement(MicIcon2, { className: "h-4 w-4" }),
       "Transcribe"
-    ), /* @__PURE__ */ import_react8.default.createElement(
+    )), isRecording && /* @__PURE__ */ import_react9.default.createElement(Card, { className: "p-4 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "flex items-center justify-between" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "flex items-center space-x-2" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "h-3 w-3 rounded-full bg-red-500 animate-pulse" }), /* @__PURE__ */ import_react9.default.createElement("span", { className: "font-medium" }, "Recording")), /* @__PURE__ */ import_react9.default.createElement("span", { className: "font-mono" }, formatTime(recordingTime)))), currentTranscription && /* @__PURE__ */ import_react9.default.createElement("div", { className: "flex space-x-2" }, /* @__PURE__ */ import_react9.default.createElement(
       Button,
       {
         variant: "outline",
-        onClick: translateRecording,
-        disabled: isRecording,
-        className: "flex gap-2 items-center"
+        className: "flex-1",
+        onClick: () => currentTranscription && saveTranscription(currentTranscription.id),
+        disabled: !currentTranscription
       },
-      /* @__PURE__ */ import_react8.default.createElement(TranslateIcon, { className: "h-4 w-4" }),
-      "Translate"
-    )), currentTranscription && /* @__PURE__ */ import_react8.default.createElement("div", { className: "flex gap-4 mt-4" }, /* @__PURE__ */ import_react8.default.createElement(
-      Button,
-      {
-        variant: "outline",
-        onClick: () => saveTranscription(),
-        className: "flex gap-2 items-center"
-      },
-      /* @__PURE__ */ import_react8.default.createElement(SaveIcon, { className: "h-4 w-4" }),
-      "Save"
-    ), /* @__PURE__ */ import_react8.default.createElement(
-      Button,
-      {
-        variant: "outline",
-        onClick: saveTranscriptionAs,
-        className: "flex gap-2 items-center"
-      },
-      /* @__PURE__ */ import_react8.default.createElement(SaveIcon, { className: "h-4 w-4" }),
-      "Save As..."
-    )), /* @__PURE__ */ import_react8.default.createElement(Card, { className: "p-4 mt-4 bg-muted/50" }, /* @__PURE__ */ import_react8.default.createElement("p", { className: "text-sm text-muted-foreground" }, "Press the ", /* @__PURE__ */ import_react8.default.createElement("strong", null, "Home"), " key to start/stop recording at any time.")));
+      "Save Transcription"
+    ))));
   };
-  var MicIcon2 = ({ className }) => /* @__PURE__ */ import_react8.default.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className }, /* @__PURE__ */ import_react8.default.createElement("path", { d: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" }), /* @__PURE__ */ import_react8.default.createElement("path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }), /* @__PURE__ */ import_react8.default.createElement("line", { x1: "12", x2: "12", y1: "19", y2: "22" }));
-  var StopIcon = ({ className }) => /* @__PURE__ */ import_react8.default.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className }, /* @__PURE__ */ import_react8.default.createElement("rect", { width: "14", height: "14", x: "5", y: "5", rx: "2" }));
-  var RefreshIcon = ({ className }) => /* @__PURE__ */ import_react8.default.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className }, /* @__PURE__ */ import_react8.default.createElement("path", { d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" }), /* @__PURE__ */ import_react8.default.createElement("path", { d: "M21 3v5h-5" }), /* @__PURE__ */ import_react8.default.createElement("path", { d: "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" }), /* @__PURE__ */ import_react8.default.createElement("path", { d: "M3 21v-5h5" }));
-  var TranslateIcon = ({ className }) => /* @__PURE__ */ import_react8.default.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className }, /* @__PURE__ */ import_react8.default.createElement("path", { d: "m5 8 6 6" }), /* @__PURE__ */ import_react8.default.createElement("path", { d: "m4 14 6-6 2-3" }), /* @__PURE__ */ import_react8.default.createElement("path", { d: "M2 5h12" }), /* @__PURE__ */ import_react8.default.createElement("path", { d: "M7 2h1" }), /* @__PURE__ */ import_react8.default.createElement("path", { d: "m22 22-5-10-5 10" }), /* @__PURE__ */ import_react8.default.createElement("path", { d: "M14 18h6" }));
-  var SaveIcon = ({ className }) => /* @__PURE__ */ import_react8.default.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className }, /* @__PURE__ */ import_react8.default.createElement("path", { d: "M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" }), /* @__PURE__ */ import_react8.default.createElement("polyline", { points: "17 21 17 13 7 13 7 21" }), /* @__PURE__ */ import_react8.default.createElement("polyline", { points: "7 3 7 8 15 8" }));
   var RecordingControls_default = RecordingControls;
 
-  // src/renderer/components/TranscriptionDisplay.tsx
-  var import_react9 = __toESM(require_react());
+  // src/renderer/components/features/transcription/TranscriptionDisplay.tsx
+  var import_react10 = __toESM(require_react());
   var TranscriptionDisplay = () => {
     const { currentTranscription } = useAppContext();
     if (!currentTranscription) {
-      return /* @__PURE__ */ import_react9.default.createElement("div", { className: "flex flex-col items-center justify-center h-full min-h-[200px] p-6" }, /* @__PURE__ */ import_react9.default.createElement("p", { className: "text-muted-foreground text-center" }, "No transcription available. Record and transcribe audio to see results here."));
+      return /* @__PURE__ */ import_react10.default.createElement("div", { className: "flex items-center justify-center h-full text-muted-foreground" }, /* @__PURE__ */ import_react10.default.createElement("p", null, "No transcription available. Record and transcribe audio to see results here."));
     }
-    return /* @__PURE__ */ import_react9.default.createElement("div", { className: "flex flex-col h-full" }, /* @__PURE__ */ import_react9.default.createElement("div", { className: "flex justify-between mb-4" }, /* @__PURE__ */ import_react9.default.createElement("span", { className: "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-primary text-primary-foreground" }, "Language: ", currentTranscription.language), /* @__PURE__ */ import_react9.default.createElement("span", { className: "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold text-muted-foreground" }, new Date(currentTranscription.timestamp).toLocaleString())), /* @__PURE__ */ import_react9.default.createElement(Card, { className: "p-4 flex-1 overflow-auto bg-muted/50 border rounded" }, /* @__PURE__ */ import_react9.default.createElement("p", { className: "whitespace-pre-wrap" }, currentTranscription.text)));
+    return /* @__PURE__ */ import_react10.default.createElement("div", { className: "space-y-4" }, /* @__PURE__ */ import_react10.default.createElement(Card, { className: "p-4" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "flex justify-between items-center" }, /* @__PURE__ */ import_react10.default.createElement("span", { className: "text-sm text-muted-foreground" }, new Date(currentTranscription.timestamp).toLocaleString()), /* @__PURE__ */ import_react10.default.createElement("span", { className: "text-sm text-muted-foreground" }, "Language: ", currentTranscription.language || "auto")), /* @__PURE__ */ import_react10.default.createElement("div", { className: "whitespace-pre-wrap" }, currentTranscription.text))));
   };
   var TranscriptionDisplay_default = TranscriptionDisplay;
 
-  // src/renderer/components/RecentTranscriptions.tsx
-  var import_react10 = __toESM(require_react());
+  // src/renderer/components/features/transcription/RecentTranscriptions.tsx
+  var import_react11 = __toESM(require_react());
   var RecentTranscriptions = () => {
-    const { recentFiles, refreshRecentFiles } = useAppContext();
-    (0, import_react10.useEffect)(() => {
-      refreshRecentFiles();
-    }, []);
-    const formatFileSize = (bytes) => {
-      if (bytes < 1024) return `${bytes} B`;
-      if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-      return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    const { recentTranscriptions, setCurrentTranscription } = useAppContext();
+    if (recentTranscriptions.length === 0) {
+      return /* @__PURE__ */ import_react11.default.createElement("div", { className: "text-center text-muted-foreground" }, /* @__PURE__ */ import_react11.default.createElement("p", null, "No recent transcriptions found."));
+    }
+    const formatDate = (timestamp) => {
+      return new Date(timestamp).toLocaleString();
     };
-    const formatDate = (date) => {
-      return new Date(date).toLocaleString();
+    const formatDuration = (seconds) => {
+      const minutes = Math.floor(seconds / 60);
+      const remainingSeconds = seconds % 60;
+      return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
     };
-    const openFile = (path) => {
-      window.electronAPI.openFile(path);
-    };
-    return /* @__PURE__ */ import_react10.default.createElement("div", { className: "flex flex-col h-full" }, /* @__PURE__ */ import_react10.default.createElement("div", { className: "flex justify-between items-center mb-4" }, /* @__PURE__ */ import_react10.default.createElement("p", { className: "text-sm text-muted-foreground" }, recentFiles.length, " recent transcriptions"), /* @__PURE__ */ import_react10.default.createElement(
+    return /* @__PURE__ */ import_react11.default.createElement("div", { className: "space-y-3 max-h-[300px] overflow-auto pr-1" }, recentTranscriptions.map((transcription) => /* @__PURE__ */ import_react11.default.createElement(Card, { key: transcription.id, className: "p-3 hover:bg-accent/50 transition-colors" }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "flex justify-between items-start mb-2" }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "text-sm font-medium truncate flex-1" }, transcription.text.substring(0, 50), transcription.text.length > 50 ? "..." : ""), /* @__PURE__ */ import_react11.default.createElement(
       Button,
       {
         variant: "ghost",
         size: "sm",
-        onClick: refreshRecentFiles,
-        className: "flex items-center gap-1"
+        onClick: () => setCurrentTranscription(transcription),
+        className: "ml-2 shrink-0"
       },
-      /* @__PURE__ */ import_react10.default.createElement(RefreshIcon2, { className: "h-4 w-4" }),
-      "Refresh"
-    )), recentFiles.length === 0 ? /* @__PURE__ */ import_react10.default.createElement("div", { className: "flex flex-col items-center justify-center h-full min-h-[100px]" }, /* @__PURE__ */ import_react10.default.createElement("p", { className: "text-sm text-muted-foreground text-center" }, "No recent transcriptions found.")) : /* @__PURE__ */ import_react10.default.createElement(Card, { className: "w-full bg-muted/50 border rounded overflow-auto max-h-[300px]" }, /* @__PURE__ */ import_react10.default.createElement("ul", { className: "divide-y divide-border" }, recentFiles.map((file) => /* @__PURE__ */ import_react10.default.createElement("li", { key: file.path, className: "hover:bg-muted/80 transition-colors" }, /* @__PURE__ */ import_react10.default.createElement(
-      "button",
-      {
-        className: "w-full px-4 py-3 flex justify-between items-center text-left",
-        onClick: () => openFile(file.path)
-      },
-      /* @__PURE__ */ import_react10.default.createElement("div", { className: "overflow-hidden" }, /* @__PURE__ */ import_react10.default.createElement("p", { className: "truncate font-medium" }, file.name), /* @__PURE__ */ import_react10.default.createElement("p", { className: "text-xs text-muted-foreground truncate" }, formatDate(file.modifiedAt), " \u2022 ", formatFileSize(file.size))),
-      /* @__PURE__ */ import_react10.default.createElement(OpenIcon, { className: "h-4 w-4 text-muted-foreground" })
-    ))))));
+      "View"
+    )), /* @__PURE__ */ import_react11.default.createElement("div", { className: "flex justify-between text-xs text-muted-foreground" }, /* @__PURE__ */ import_react11.default.createElement("span", null, formatDate(transcription.timestamp)), /* @__PURE__ */ import_react11.default.createElement("span", null, formatDuration(transcription.duration))))));
   };
-  var RefreshIcon2 = ({ className }) => /* @__PURE__ */ import_react10.default.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className }, /* @__PURE__ */ import_react10.default.createElement("path", { d: "M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" }), /* @__PURE__ */ import_react10.default.createElement("path", { d: "M21 3v5h-5" }), /* @__PURE__ */ import_react10.default.createElement("path", { d: "M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" }), /* @__PURE__ */ import_react10.default.createElement("path", { d: "M3 21v-5h5" }));
-  var OpenIcon = ({ className }) => /* @__PURE__ */ import_react10.default.createElement("svg", { xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className }, /* @__PURE__ */ import_react10.default.createElement("path", { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" }), /* @__PURE__ */ import_react10.default.createElement("polyline", { points: "15 3 21 3 21 9" }), /* @__PURE__ */ import_react10.default.createElement("line", { x1: "10", x2: "21", y1: "14", y2: "3" }));
   var RecentTranscriptions_default = RecentTranscriptions;
 
-  // src/renderer/components/SettingsPanel.tsx
-  var import_react11 = __toESM(require_react());
+  // src/renderer/components/features/settings/SettingsPanel.tsx
+  var import_react12 = __toESM(require_react());
 
   // src/renderer/components/ui/switch.tsx
   var React43 = __toESM(require_react());
@@ -28715,64 +28734,78 @@
   );
   Input.displayName = "Input";
 
-  // src/renderer/components/SettingsPanel.tsx
-  var LANGUAGE_OPTIONS = [
-    { code: "auto", name: "Auto Detect" },
-    { code: "en", name: "English" },
-    { code: "es", name: "Spanish" },
-    { code: "fr", name: "French" },
-    { code: "de", name: "German" },
-    { code: "it", name: "Italian" },
-    { code: "pt", name: "Portuguese" },
-    { code: "ru", name: "Russian" },
-    { code: "ja", name: "Japanese" },
-    { code: "zh", name: "Chinese" }
-  ];
+  // src/renderer/components/features/settings/SettingsPanel.tsx
   var SettingsPanel = () => {
-    const [defaultLanguage, setDefaultLanguage] = (0, import_react11.useState)("auto");
-    const [apiKey, setApiKey] = (0, import_react11.useState)("");
-    const [showNotifications, setShowNotifications] = (0, import_react11.useState)(true);
-    const [saveTranscriptionsAutomatically, setSaveTranscriptionsAutomatically] = (0, import_react11.useState)(false);
-    const saveSettings = () => {
-      console.log("Saving settings:", {
-        defaultLanguage,
-        apiKey,
-        showNotifications,
-        saveTranscriptionsAutomatically
-      });
-    };
-    return /* @__PURE__ */ import_react11.default.createElement("div", { className: "flex flex-col space-y-4" }, /* @__PURE__ */ import_react11.default.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ import_react11.default.createElement(Label3, { htmlFor: "language" }, "Default Language"), /* @__PURE__ */ import_react11.default.createElement(Select2, { value: defaultLanguage, onValueChange: setDefaultLanguage }, /* @__PURE__ */ import_react11.default.createElement(SelectTrigger2, { id: "language" }, /* @__PURE__ */ import_react11.default.createElement(SelectValue2, { placeholder: "Select language" })), /* @__PURE__ */ import_react11.default.createElement(SelectContent2, null, LANGUAGE_OPTIONS.map((language) => /* @__PURE__ */ import_react11.default.createElement(SelectItem2, { key: language.code, value: language.code }, language.name))))), /* @__PURE__ */ import_react11.default.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ import_react11.default.createElement(Label3, { htmlFor: "api-key" }, "Groq API Key"), /* @__PURE__ */ import_react11.default.createElement(
+    const { settings, updateSettings } = useAppContext();
+    return /* @__PURE__ */ import_react12.default.createElement("div", { className: "space-y-6" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "flex items-center justify-between" }, /* @__PURE__ */ import_react12.default.createElement(Label3, { htmlFor: "api-key", className: "text-sm font-medium" }, "Groq API Key")), /* @__PURE__ */ import_react12.default.createElement("div", { className: "flex space-x-2" }, /* @__PURE__ */ import_react12.default.createElement(
       Input,
       {
         id: "api-key",
         type: "password",
-        value: apiKey,
-        onChange: (e) => setApiKey(e.target.value)
+        value: settings.apiKey,
+        onChange: (e) => updateSettings({ apiKey: e.target.value }),
+        placeholder: "Enter your Groq API key",
+        className: "flex-1"
       }
-    ), /* @__PURE__ */ import_react11.default.createElement("p", { className: "text-sm text-muted-foreground" }, "Enter your Groq API key for transcription services")), /* @__PURE__ */ import_react11.default.createElement("div", { className: "h-px bg-border my-4" }), /* @__PURE__ */ import_react11.default.createElement("h3", { className: "text-sm font-medium" }, "Application Settings"), /* @__PURE__ */ import_react11.default.createElement("div", { className: "flex items-center space-x-2" }, /* @__PURE__ */ import_react11.default.createElement(
+    ), /* @__PURE__ */ import_react12.default.createElement(
+      Button,
+      {
+        variant: "outline",
+        onClick: () => {
+          window.open("https://console.groq.com/keys", "_blank");
+        }
+      },
+      "Get Key"
+    ))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ import_react12.default.createElement(Label3, { htmlFor: "language", className: "text-sm font-medium" }, "Default Language"), /* @__PURE__ */ import_react12.default.createElement(
+      Select2,
+      {
+        value: settings.language,
+        onValueChange: (value) => updateSettings({ language: value })
+      },
+      /* @__PURE__ */ import_react12.default.createElement(SelectTrigger2, { id: "language" }, /* @__PURE__ */ import_react12.default.createElement(SelectValue2, { placeholder: "Select language" })),
+      /* @__PURE__ */ import_react12.default.createElement(SelectContent2, null, /* @__PURE__ */ import_react12.default.createElement(SelectItem2, { value: "en" }, "English"), /* @__PURE__ */ import_react12.default.createElement(SelectItem2, { value: "es" }, "Spanish"), /* @__PURE__ */ import_react12.default.createElement(SelectItem2, { value: "fr" }, "French"), /* @__PURE__ */ import_react12.default.createElement(SelectItem2, { value: "de" }, "German"), /* @__PURE__ */ import_react12.default.createElement(SelectItem2, { value: "it" }, "Italian"), /* @__PURE__ */ import_react12.default.createElement(SelectItem2, { value: "pt" }, "Portuguese"), /* @__PURE__ */ import_react12.default.createElement(SelectItem2, { value: "ja" }, "Japanese"), /* @__PURE__ */ import_react12.default.createElement(SelectItem2, { value: "zh" }, "Chinese"))
+    )), /* @__PURE__ */ import_react12.default.createElement("div", { className: "space-y-2" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "flex items-center justify-between" }, /* @__PURE__ */ import_react12.default.createElement(Label3, { htmlFor: "save-path", className: "text-sm font-medium" }, "Save Transcriptions Path")), /* @__PURE__ */ import_react12.default.createElement("div", { className: "flex space-x-2" }, /* @__PURE__ */ import_react12.default.createElement(
+      Input,
+      {
+        id: "save-path",
+        value: settings.transcriptionSavePath,
+        onChange: (e) => updateSettings({ transcriptionSavePath: e.target.value }),
+        placeholder: "Default path",
+        className: "flex-1"
+      }
+    ), /* @__PURE__ */ import_react12.default.createElement(
+      Button,
+      {
+        variant: "outline",
+        onClick: () => {
+          console.log("Browse button clicked - would open directory picker in production");
+        }
+      },
+      "Browse"
+    ))), /* @__PURE__ */ import_react12.default.createElement("div", { className: "flex items-center justify-between" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "space-y-0.5" }, /* @__PURE__ */ import_react12.default.createElement(Label3, { htmlFor: "auto-transcribe", className: "text-sm font-medium" }, "Auto-Transcribe"), /* @__PURE__ */ import_react12.default.createElement("p", { className: "text-xs text-muted-foreground" }, "Automatically transcribe recordings when stopped")), /* @__PURE__ */ import_react12.default.createElement(
       Switch2,
       {
-        id: "notifications",
-        checked: showNotifications,
-        onCheckedChange: setShowNotifications
+        id: "auto-transcribe",
+        checked: settings.autoTranscribe,
+        onCheckedChange: (checked) => updateSettings({ autoTranscribe: checked })
       }
-    ), /* @__PURE__ */ import_react11.default.createElement(Label3, { htmlFor: "notifications" }, "Show Notifications")), /* @__PURE__ */ import_react11.default.createElement("div", { className: "flex items-center space-x-2" }, /* @__PURE__ */ import_react11.default.createElement(
+    )), /* @__PURE__ */ import_react12.default.createElement("div", { className: "flex items-center justify-between" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "space-y-0.5" }, /* @__PURE__ */ import_react12.default.createElement(Label3, { htmlFor: "save-transcriptions", className: "text-sm font-medium" }, "Save Transcriptions"), /* @__PURE__ */ import_react12.default.createElement("p", { className: "text-xs text-muted-foreground" }, "Automatically save transcriptions to disk")), /* @__PURE__ */ import_react12.default.createElement(
       Switch2,
       {
-        id: "auto-save",
-        checked: saveTranscriptionsAutomatically,
-        onCheckedChange: setSaveTranscriptionsAutomatically
+        id: "save-transcriptions",
+        checked: settings.saveTranscriptions,
+        onCheckedChange: (checked) => updateSettings({ saveTranscriptions: checked })
       }
-    ), /* @__PURE__ */ import_react11.default.createElement(Label3, { htmlFor: "auto-save" }, "Save Transcriptions Automatically")), /* @__PURE__ */ import_react11.default.createElement("div", { className: "flex justify-end mt-4" }, /* @__PURE__ */ import_react11.default.createElement(Button, { onClick: saveSettings }, "Save Settings")));
+    )));
   };
   var SettingsPanel_default = SettingsPanel;
 
-  // src/renderer/components/DictationPopup/index.tsx
-  var import_react12 = __toESM(require_react());
+  // src/renderer/components/features/dictation/DictationPopup/index.tsx
+  var import_react13 = __toESM(require_react());
   var DictationPopup = () => {
     const { isRecording } = useAppContext();
-    const [visible, setVisible] = (0, import_react12.useState)(false);
-    (0, import_react12.useEffect)(() => {
+    const [visible, setVisible] = (0, import_react13.useState)(false);
+    (0, import_react13.useEffect)(() => {
       if (isRecording) {
         setVisible(true);
       } else {
@@ -28783,27 +28816,27 @@
       }
     }, [isRecording]);
     if (!visible) return null;
-    return /* @__PURE__ */ import_react12.default.createElement(
+    return /* @__PURE__ */ import_react13.default.createElement(
       "div",
       {
         className: "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none transition-opacity duration-300",
         style: { opacity: isRecording ? 1 : 0 }
       },
-      /* @__PURE__ */ import_react12.default.createElement("div", { className: "flex flex-col items-center justify-center p-8 rounded-2xl bg-black/80 w-[200px] h-[200px] shadow-lg" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "relative w-[120px] h-[120px] mb-4" }, /* @__PURE__ */ import_react12.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120px] h-[120px] rounded-full bg-transparent border-2 border-primary animate-ping opacity-70" }), /* @__PURE__ */ import_react12.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[110px] h-[110px] rounded-full bg-transparent border-2 border-primary animate-ping opacity-70 [animation-delay:200ms]" }), /* @__PURE__ */ import_react12.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100px] h-[100px] rounded-full bg-transparent border-2 border-primary animate-ping opacity-70 [animation-delay:400ms]" }), /* @__PURE__ */ import_react12.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center w-[60px] h-[60px] rounded-full bg-primary animate-pulse" }, /* @__PURE__ */ import_react12.default.createElement("svg", { className: "w-8 h-8 text-white", xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ import_react12.default.createElement("path", { d: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" }), /* @__PURE__ */ import_react12.default.createElement("path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }), /* @__PURE__ */ import_react12.default.createElement("line", { x1: "12", x2: "12", y1: "19", y2: "22" })))), /* @__PURE__ */ import_react12.default.createElement("h2", { className: "text-white font-bold text-lg mb-2" }, "Recording..."), /* @__PURE__ */ import_react12.default.createElement("p", { className: "text-white/70 text-xs mt-1" }, "Press Home to stop"))
+      /* @__PURE__ */ import_react13.default.createElement("div", { className: "flex flex-col items-center justify-center p-8 rounded-2xl bg-black/80 w-[200px] h-[200px] shadow-lg" }, /* @__PURE__ */ import_react13.default.createElement("div", { className: "relative w-[120px] h-[120px] mb-4" }, /* @__PURE__ */ import_react13.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120px] h-[120px] rounded-full bg-transparent border-2 border-primary animate-ping opacity-70" }), /* @__PURE__ */ import_react13.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[110px] h-[110px] rounded-full bg-transparent border-2 border-primary animate-ping opacity-70 [animation-delay:200ms]" }), /* @__PURE__ */ import_react13.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100px] h-[100px] rounded-full bg-transparent border-2 border-primary animate-ping opacity-70 [animation-delay:400ms]" }), /* @__PURE__ */ import_react13.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center w-[60px] h-[60px] rounded-full bg-primary animate-pulse" }, /* @__PURE__ */ import_react13.default.createElement("svg", { className: "w-8 h-8 text-white", xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ import_react13.default.createElement("path", { d: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" }), /* @__PURE__ */ import_react13.default.createElement("path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }), /* @__PURE__ */ import_react13.default.createElement("line", { x1: "12", x2: "12", y1: "19", y2: "22" })))), /* @__PURE__ */ import_react13.default.createElement("h2", { className: "text-white font-bold text-lg mb-2" }, "Recording..."), /* @__PURE__ */ import_react13.default.createElement("p", { className: "text-white/70 text-xs mt-1" }, "Press Home to stop"))
     );
   };
   var DictationPopup_default = DictationPopup;
 
   // src/renderer/components/App.tsx
   var App = () => {
-    return /* @__PURE__ */ import_react13.default.createElement("div", { className: "flex flex-col h-screen bg-background" }, /* @__PURE__ */ import_react13.default.createElement(Header_default, null), /* @__PURE__ */ import_react13.default.createElement("div", { className: "container mx-auto flex-1 py-3 flex flex-col" }, /* @__PURE__ */ import_react13.default.createElement(Card, { className: "mb-3" }, /* @__PURE__ */ import_react13.default.createElement(CardHeader, null, /* @__PURE__ */ import_react13.default.createElement(CardTitle, null, "Dictation")), /* @__PURE__ */ import_react13.default.createElement(CardContent, null, /* @__PURE__ */ import_react13.default.createElement(import_react13.Suspense, { fallback: /* @__PURE__ */ import_react13.default.createElement("div", { className: "flex justify-center" }, /* @__PURE__ */ import_react13.default.createElement(LoadingSpinner, null)) }, /* @__PURE__ */ import_react13.default.createElement(RecordingControls_default, null)))), /* @__PURE__ */ import_react13.default.createElement(Card, { className: "mb-3 flex-1 overflow-hidden" }, /* @__PURE__ */ import_react13.default.createElement(CardHeader, null, /* @__PURE__ */ import_react13.default.createElement(CardTitle, null, "Transcription")), /* @__PURE__ */ import_react13.default.createElement(CardContent, { className: "h-full overflow-auto" }, /* @__PURE__ */ import_react13.default.createElement(import_react13.Suspense, { fallback: /* @__PURE__ */ import_react13.default.createElement("div", { className: "flex justify-center" }, /* @__PURE__ */ import_react13.default.createElement(LoadingSpinner, null)) }, /* @__PURE__ */ import_react13.default.createElement(TranscriptionDisplay_default, null)))), /* @__PURE__ */ import_react13.default.createElement("div", { className: "flex gap-3" }, /* @__PURE__ */ import_react13.default.createElement(Card, { className: "flex-1" }, /* @__PURE__ */ import_react13.default.createElement(CardHeader, null, /* @__PURE__ */ import_react13.default.createElement(CardTitle, null, "Recent Transcriptions")), /* @__PURE__ */ import_react13.default.createElement(CardContent, null, /* @__PURE__ */ import_react13.default.createElement(import_react13.Suspense, { fallback: /* @__PURE__ */ import_react13.default.createElement("div", { className: "flex justify-center" }, /* @__PURE__ */ import_react13.default.createElement(LoadingSpinner, null)) }, /* @__PURE__ */ import_react13.default.createElement(RecentTranscriptions_default, null)))), /* @__PURE__ */ import_react13.default.createElement(Card, { className: "flex-1" }, /* @__PURE__ */ import_react13.default.createElement(CardHeader, null, /* @__PURE__ */ import_react13.default.createElement(CardTitle, null, "Settings")), /* @__PURE__ */ import_react13.default.createElement(CardContent, null, /* @__PURE__ */ import_react13.default.createElement(import_react13.Suspense, { fallback: /* @__PURE__ */ import_react13.default.createElement("div", { className: "flex justify-center" }, /* @__PURE__ */ import_react13.default.createElement(LoadingSpinner, null)) }, /* @__PURE__ */ import_react13.default.createElement(SettingsPanel_default, null)))))), /* @__PURE__ */ import_react13.default.createElement(DictationPopup_default, null));
+    return /* @__PURE__ */ import_react14.default.createElement("div", { className: "flex flex-col h-screen bg-background" }, /* @__PURE__ */ import_react14.default.createElement(Header_default, null), /* @__PURE__ */ import_react14.default.createElement("div", { className: "container mx-auto flex-1 py-3 flex flex-col" }, /* @__PURE__ */ import_react14.default.createElement(Card, { className: "mb-3" }, /* @__PURE__ */ import_react14.default.createElement(CardHeader, null, /* @__PURE__ */ import_react14.default.createElement(CardTitle, null, "Dictation")), /* @__PURE__ */ import_react14.default.createElement(CardContent, null, /* @__PURE__ */ import_react14.default.createElement(import_react14.Suspense, { fallback: /* @__PURE__ */ import_react14.default.createElement("div", { className: "flex justify-center" }, /* @__PURE__ */ import_react14.default.createElement(LoadingSpinner, null)) }, /* @__PURE__ */ import_react14.default.createElement(RecordingControls_default, null)))), /* @__PURE__ */ import_react14.default.createElement(Card, { className: "mb-3 flex-1 overflow-hidden" }, /* @__PURE__ */ import_react14.default.createElement(CardHeader, null, /* @__PURE__ */ import_react14.default.createElement(CardTitle, null, "Transcription")), /* @__PURE__ */ import_react14.default.createElement(CardContent, { className: "h-full overflow-auto" }, /* @__PURE__ */ import_react14.default.createElement(import_react14.Suspense, { fallback: /* @__PURE__ */ import_react14.default.createElement("div", { className: "flex justify-center" }, /* @__PURE__ */ import_react14.default.createElement(LoadingSpinner, null)) }, /* @__PURE__ */ import_react14.default.createElement(TranscriptionDisplay_default, null)))), /* @__PURE__ */ import_react14.default.createElement("div", { className: "flex gap-3" }, /* @__PURE__ */ import_react14.default.createElement(Card, { className: "flex-1" }, /* @__PURE__ */ import_react14.default.createElement(CardHeader, null, /* @__PURE__ */ import_react14.default.createElement(CardTitle, null, "Recent Transcriptions")), /* @__PURE__ */ import_react14.default.createElement(CardContent, null, /* @__PURE__ */ import_react14.default.createElement(import_react14.Suspense, { fallback: /* @__PURE__ */ import_react14.default.createElement("div", { className: "flex justify-center" }, /* @__PURE__ */ import_react14.default.createElement(LoadingSpinner, null)) }, /* @__PURE__ */ import_react14.default.createElement(RecentTranscriptions_default, null)))), /* @__PURE__ */ import_react14.default.createElement(Card, { className: "flex-1" }, /* @__PURE__ */ import_react14.default.createElement(CardHeader, null, /* @__PURE__ */ import_react14.default.createElement(CardTitle, null, "Settings")), /* @__PURE__ */ import_react14.default.createElement(CardContent, null, /* @__PURE__ */ import_react14.default.createElement(import_react14.Suspense, { fallback: /* @__PURE__ */ import_react14.default.createElement("div", { className: "flex justify-center" }, /* @__PURE__ */ import_react14.default.createElement(LoadingSpinner, null)) }, /* @__PURE__ */ import_react14.default.createElement(SettingsPanel_default, null)))))), /* @__PURE__ */ import_react14.default.createElement(DictationPopup_default, null));
   };
-  var LoadingSpinner = () => /* @__PURE__ */ import_react13.default.createElement("div", { className: "animate-spin rounded-full h-6 w-6 border-b-2 border-primary" });
+  var LoadingSpinner = () => /* @__PURE__ */ import_react14.default.createElement("div", { className: "animate-spin rounded-full h-6 w-6 border-b-2 border-primary" });
   var App_default = App;
 
   // src/renderer/index.tsx
   console.log("Renderer process started");
-  console.log("React version:", import_react14.default.version);
+  console.log("React version:", import_react15.default.version);
   console.log("Using shadcn/ui components");
   var rootElement = document.getElementById("root");
   if (!rootElement) {
@@ -28811,7 +28844,7 @@
   }
   var root = (0, import_client.createRoot)(rootElement);
   root.render(
-    /* @__PURE__ */ import_react14.default.createElement(import_react14.default.StrictMode, null, /* @__PURE__ */ import_react14.default.createElement(ThemeProvider, { defaultTheme: "system" }, /* @__PURE__ */ import_react14.default.createElement(AppContextProvider, null, /* @__PURE__ */ import_react14.default.createElement(App_default, null))))
+    /* @__PURE__ */ import_react15.default.createElement(import_react15.default.StrictMode, null, /* @__PURE__ */ import_react15.default.createElement(ThemeProvider, { defaultTheme: "system" }, /* @__PURE__ */ import_react15.default.createElement(AppContextProvider, null, /* @__PURE__ */ import_react15.default.createElement(App_default, null))))
   );
 })();
 /*! Bundled license information:

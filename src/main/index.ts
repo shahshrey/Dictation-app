@@ -1,8 +1,10 @@
 import { app, BrowserWindow, ipcMain, globalShortcut } from 'electron';
 import * as path from 'path';
-import { setupAudioRecording } from './audio';
-import { setupGroqAPI } from './groq';
-import { setupFileStorage } from './storage';
+import { setupAudioRecording } from './services/audio';
+import { setupGroqAPI } from './services/groq';
+import { setupFileStorage } from './services/storage';
+import { UI_CONSTANTS } from '../shared/constants';
+import { IPC_CHANNELS } from '../shared/types';
 
 // Declare the webpack entry points as globals
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
@@ -15,48 +17,59 @@ if (require('electron-squirrel-startup')) {
 // Global reference to the main window
 let mainWindow: BrowserWindow | null = null;
 
+/**
+ * Creates the main application window
+ */
 const createWindow = (): void => {
-  // Create the browser window.
-  mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
-    backgroundColor: '#f8f9fa', // Light background color
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
+  try {
+    // Create the browser window.
+    mainWindow = new BrowserWindow({
+      width: UI_CONSTANTS.MAIN_WINDOW_WIDTH,
+      height: UI_CONSTANTS.MAIN_WINDOW_HEIGHT,
+      backgroundColor: '#f8f9fa', // Light background color
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
+    });
 
-  // and load the index.html of the app.
-  mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
+    // and load the index.html of the app.
+    mainWindow.loadURL(MAIN_WINDOW_WEBPACK_ENTRY);
 
-  // Open the DevTools in development mode
-  if (process.env.NODE_ENV === 'development') {
-    mainWindow.webContents.openDevTools();
+    // Open the DevTools in development mode
+    if (process.env.NODE_ENV === 'development') {
+      mainWindow.webContents.openDevTools();
+    }
+  } catch (error) {
+    console.error('Error creating window:', error);
   }
 };
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 app.on('ready', () => {
-  createWindow();
-  
-  // Setup global shortcut (Home key) for starting/stopping recording
-  globalShortcut.register('Home', () => {
-    if (mainWindow) {
-      mainWindow.webContents.send('toggle-recording');
-    }
-  });
-  
-  // Setup audio recording handlers
-  setupAudioRecording(ipcMain, mainWindow);
-  
-  // Setup Groq API integration
-  setupGroqAPI(ipcMain);
-  
-  // Setup file storage for transcriptions
-  setupFileStorage(ipcMain);
+  try {
+    createWindow();
+    
+    // Setup global shortcut (Home key) for starting/stopping recording
+    globalShortcut.register('Home', () => {
+      if (mainWindow) {
+        mainWindow.webContents.send(IPC_CHANNELS.TOGGLE_RECORDING);
+      }
+    });
+    
+    // Setup audio recording handlers
+    setupAudioRecording(ipcMain, mainWindow);
+    
+    // Setup Groq API integration
+    setupGroqAPI(ipcMain);
+    
+    // Setup file storage for transcriptions
+    setupFileStorage(ipcMain);
+  } catch (error) {
+    console.error('Error during app initialization:', error);
+  }
 });
 
 // Quit when all windows are closed, except on macOS.
@@ -76,5 +89,9 @@ app.on('activate', () => {
 
 // Unregister all shortcuts when app is about to quit
 app.on('will-quit', () => {
-  globalShortcut.unregisterAll();
+  try {
+    globalShortcut.unregisterAll();
+  } catch (error) {
+    console.error('Error unregistering shortcuts:', error);
+  }
 }); 
