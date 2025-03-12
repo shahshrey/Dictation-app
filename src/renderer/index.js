@@ -19986,7 +19986,27 @@
           try {
             const transcriptions = await window.electronAPI.getTranscriptions();
             console.log("Transcriptions received:", transcriptions);
-            setRecentTranscriptions(transcriptions || []);
+            if (Array.isArray(transcriptions) && transcriptions.length > 0) {
+              setRecentTranscriptions(transcriptions);
+            } else if (!transcriptions || transcriptions.length === 0) {
+              console.log("No transcriptions received, will try again with getRecentTranscriptions");
+              if (window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === "function") {
+                const result = await window.electronAPI.getRecentTranscriptions();
+                if (result && result.success && Array.isArray(result.files) && result.files.length > 0) {
+                  const fallbackTranscriptions = result.files.map((file) => ({
+                    id: file.name.replace(/\.txt$/, ""),
+                    text: "",
+                    // We don't have the content here
+                    timestamp: file.modifiedAt instanceof Date ? file.modifiedAt.getTime() : file.createdAt instanceof Date ? file.createdAt.getTime() : Date.now(),
+                    duration: 0,
+                    language: "en"
+                  }));
+                  setRecentTranscriptions(fallbackTranscriptions);
+                }
+              }
+            } else {
+              setRecentTranscriptions([]);
+            }
           } catch (error) {
             console.error("Failed to get recent transcriptions:", error);
           }
@@ -20090,7 +20110,11 @@
               duration: result.duration,
               language: result.language || settings.language
             });
-            refreshRecentTranscriptions();
+            await refreshRecentTranscriptions();
+            setTimeout(async () => {
+              console.log("Performing delayed refresh of transcriptions");
+              await refreshRecentTranscriptions();
+            }, 2e3);
           } else if (result.error) {
             console.error("Transcription error:", result.error);
           }
@@ -29344,26 +29368,134 @@ For more information, see https://radix-ui.com/primitives/docs/components/${titl
   // src/renderer/components/features/dictation/DictationPopup/index.tsx
   var import_react14 = __toESM(require_react());
   var DictationPopup = () => {
-    const { isRecording } = useAppContext();
-    const [visible, setVisible] = (0, import_react14.useState)(false);
+    console.log("DictationPopup component rendering");
+    const { isRecording, startRecording, stopRecording, refreshRecentTranscriptions } = useAppContext();
+    const [isDragging, setIsDragging] = (0, import_react14.useState)(false);
+    const [isHovering, setIsHovering] = (0, import_react14.useState)(false);
+    const [wasRecording, setWasRecording] = (0, import_react14.useState)(false);
     (0, import_react14.useEffect)(() => {
-      if (isRecording) {
-        setVisible(true);
-      } else {
-        const timer = setTimeout(() => {
-          setVisible(false);
-        }, 300);
-        return () => clearTimeout(timer);
+      console.log("DictationPopup mounted or updated");
+      console.log("Current recording state:", isRecording);
+      if (window.electronAPI && typeof window.electronAPI.setIgnoreMouseEvents === "function") {
+        console.log("Setting ignore mouse events to false on mount");
+        window.electronAPI.setIgnoreMouseEvents(false).catch((error) => console.error("Error in setIgnoreMouseEvents on mount:", error));
       }
-    }, [isRecording]);
-    if (!visible) return null;
+      if (wasRecording && !isRecording) {
+        console.log("Recording stopped, refreshing transcriptions after delay");
+        const timeoutId = setTimeout(() => {
+          refreshRecentTranscriptions();
+          console.log("Transcriptions refreshed after recording stopped");
+        }, 2e3);
+        return () => clearTimeout(timeoutId);
+      }
+      setWasRecording(isRecording);
+      return () => {
+        console.log("DictationPopup unmounting");
+      };
+    }, [isRecording, wasRecording, refreshRecentTranscriptions]);
+    const handleToggleRecording = () => {
+      console.log("Toggle recording clicked");
+      console.log("Current recording state:", isRecording);
+      try {
+        if (isRecording) {
+          console.log("Stopping recording");
+          stopRecording();
+        } else {
+          console.log("Starting recording");
+          startRecording();
+        }
+        console.log("Toggle recording action completed");
+      } catch (error) {
+        console.error("Error toggling recording:", error);
+      }
+    };
+    const handleMouseEnter = () => {
+      console.log("Mouse entered popup");
+      setIsHovering(true);
+      try {
+        if (window.electronAPI && typeof window.electronAPI.setIgnoreMouseEvents === "function") {
+          console.log("Setting ignore mouse events to false");
+          window.electronAPI.setIgnoreMouseEvents(false).then((result) => console.log("setIgnoreMouseEvents result:", result)).catch((error) => console.error("Error in setIgnoreMouseEvents:", error));
+        } else {
+          console.warn("setIgnoreMouseEvents not available");
+        }
+      } catch (error) {
+        console.error("Error in handleMouseEnter:", error);
+      }
+    };
+    const handleMouseLeave = () => {
+      console.log("Mouse left popup");
+      console.log("isDragging:", isDragging);
+      setIsHovering(false);
+    };
+    const handleMouseDown = (e) => {
+      console.log("Mouse down on popup");
+      if (window.electronAPI && typeof window.electronAPI.setIgnoreMouseEvents === "function") {
+        console.log("Setting ignore mouse events to false on mouse down");
+        window.electronAPI.setIgnoreMouseEvents(false).catch((error) => console.error("Error in setIgnoreMouseEvents on mouse down:", error));
+      }
+      if (e.target.classList.contains("drag-handle")) {
+        setIsDragging(true);
+      }
+    };
+    const handleMouseUp = () => {
+      console.log("Mouse up on popup");
+      setIsDragging(false);
+    };
+    console.log("Rendering DictationPopup UI");
+    console.log("isHovering:", isHovering);
     return /* @__PURE__ */ import_react14.default.createElement(
       "div",
       {
-        className: "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none transition-opacity duration-300",
-        style: { opacity: isRecording ? 1 : 0 }
+        className: "w-full h-full flex items-center justify-center",
+        onMouseEnter: handleMouseEnter,
+        onMouseLeave: handleMouseLeave,
+        onMouseDown: handleMouseDown,
+        onMouseUp: handleMouseUp,
+        style: {
+          backgroundColor: "transparent",
+          border: "none",
+          outline: "none",
+          boxShadow: "none"
+        }
       },
-      /* @__PURE__ */ import_react14.default.createElement("div", { className: "flex flex-col items-center justify-center p-8 rounded-2xl bg-black/80 w-[200px] h-[200px] shadow-lg" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "relative w-[120px] h-[120px] mb-4" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120px] h-[120px] rounded-full bg-transparent border-2 border-primary animate-ping opacity-70" }), /* @__PURE__ */ import_react14.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[110px] h-[110px] rounded-full bg-transparent border-2 border-primary animate-ping opacity-70 [animation-delay:200ms]" }), /* @__PURE__ */ import_react14.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100px] h-[100px] rounded-full bg-transparent border-2 border-primary animate-ping opacity-70 [animation-delay:400ms]" }), /* @__PURE__ */ import_react14.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center w-[60px] h-[60px] rounded-full bg-primary animate-pulse" }, /* @__PURE__ */ import_react14.default.createElement("svg", { className: "w-8 h-8 text-white", xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ import_react14.default.createElement("path", { d: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" }), /* @__PURE__ */ import_react14.default.createElement("path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }), /* @__PURE__ */ import_react14.default.createElement("line", { x1: "12", x2: "12", y1: "19", y2: "22" })))), /* @__PURE__ */ import_react14.default.createElement("h2", { className: "text-white font-bold text-lg mb-2" }, "Recording..."), /* @__PURE__ */ import_react14.default.createElement("p", { className: "text-white/70 text-xs mt-1" }, "Press Home to stop"))
+      /* @__PURE__ */ import_react14.default.createElement(
+        "div",
+        {
+          className: `flex items-center gap-2 px-3 py-1.5 rounded-full shadow-lg cursor-pointer transition-all duration-300 hover:scale-105 ${isRecording ? "bg-primary/90 text-white" : "bg-black/50 text-white hover:bg-black/70"}`,
+          onClick: (e) => {
+            console.log("Pill clicked");
+            e.stopPropagation();
+            handleToggleRecording();
+          },
+          style: { WebkitAppRegion: isDragging ? "drag" : "no-drag" }
+        },
+        /* @__PURE__ */ import_react14.default.createElement(
+          "div",
+          {
+            className: "absolute inset-0 drag-handle",
+            style: { pointerEvents: "none" }
+          }
+        ),
+        /* @__PURE__ */ import_react14.default.createElement("div", { className: `flex items-center justify-center w-6 h-6 rounded-full ${isRecording ? "animate-pulse" : ""}` }, /* @__PURE__ */ import_react14.default.createElement(
+          "svg",
+          {
+            className: "w-4 h-4",
+            xmlns: "http://www.w3.org/2000/svg",
+            viewBox: "0 0 24 24",
+            fill: "none",
+            stroke: "currentColor",
+            strokeWidth: "2",
+            strokeLinecap: "round",
+            strokeLinejoin: "round"
+          },
+          /* @__PURE__ */ import_react14.default.createElement("path", { d: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" }),
+          /* @__PURE__ */ import_react14.default.createElement("path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }),
+          /* @__PURE__ */ import_react14.default.createElement("line", { x1: "12", x2: "12", y1: "19", y2: "22" })
+        )),
+        /* @__PURE__ */ import_react14.default.createElement("span", { className: "font-medium text-xs whitespace-nowrap" }, isRecording ? "Recording..." : "Dictate"),
+        isRecording && /* @__PURE__ */ import_react14.default.createElement("div", { className: "relative w-3 h-3 ml-1" }, /* @__PURE__ */ import_react14.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-red-500 animate-ping opacity-75" }), /* @__PURE__ */ import_react14.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-red-600" }))
+      )
     );
   };
   var DictationPopup_default = DictationPopup;

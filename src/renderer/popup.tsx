@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import DictationPopup from './components/features/dictation/DictationPopup';
+import { AppContextProvider } from './context/AppContext';
 
 // Import CSS
 import './index.css';
@@ -20,6 +21,8 @@ const root = createRoot(rootElement);
 // Render the popup
 root.render(
   <React.StrictMode>
-    <DictationPopup />
+    <AppContextProvider>
+      <DictationPopup />
+    </AppContextProvider>
   </React.StrictMode>
 ); 

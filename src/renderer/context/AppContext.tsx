@@ -207,7 +207,31 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
         try {
           const transcriptions = await window.electronAPI.getTranscriptions();
           console.log('Transcriptions received:', transcriptions);
-          setRecentTranscriptions(transcriptions || []);
+          
+          // Only update if we actually got transcriptions
+          if (Array.isArray(transcriptions) && transcriptions.length > 0) {
+            setRecentTranscriptions(transcriptions);
+          } else if (!transcriptions || transcriptions.length === 0) {
+            console.log('No transcriptions received, will try again with getRecentTranscriptions');
+            // Try the fallback method if no transcriptions were found
+            if (window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === 'function') {
+              const result = await window.electronAPI.getRecentTranscriptions();
+              if (result && result.success && Array.isArray(result.files) && result.files.length > 0) {
+                const fallbackTranscriptions = result.files.map(file => ({
+                  id: file.name.replace(/\.txt$/, ''),
+                  text: '', // We don't have the content here
+                  timestamp: file.modifiedAt instanceof Date ? file.modifiedAt.getTime() : 
+                           file.createdAt instanceof Date ? file.createdAt.getTime() : 
+                           Date.now(),
+                  duration: 0,
+                  language: 'en'
+                }));
+                setRecentTranscriptions(fallbackTranscriptions);
+              }
+            }
+          } else {
+            setRecentTranscriptions([]);
+          }
         } catch (error) {
           console.error('Failed to get recent transcriptions:', error);
         }
@@ -331,8 +355,15 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
             language: result.language || settings.language
           });
           
-          // Refresh the list of transcriptions
-          refreshRecentTranscriptions();
+          // Refresh the list of transcriptions immediately
+          await refreshRecentTranscriptions();
+          
+          // Add a second refresh after a delay to ensure we get the latest data
+          // This helps in case the file is still being written when the first refresh happens
+          setTimeout(async () => {
+            console.log('Performing delayed refresh of transcriptions');
+            await refreshRecentTranscriptions();
+          }, 2000);
         } else if (result.error) {
           console.error('Transcription error:', result.error);
           // You could add error handling UI here

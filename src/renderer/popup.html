@@ -5,6 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dictation Popup</title>
   <link rel="stylesheet" href="popup.css" />
+  <style>
+    /* Remove any default styling that might cause a white border */
+    html, body, #root {
+      margin: 0;
+      padding: 0;
+      background-color: transparent;
+      overflow: hidden;
+      border: none;
+      outline: none;
+      box-shadow: none;
+    }
+    
+    /* Ensure the root div takes up the full window */
+    #root {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
 </head>
 <body>
   <div id="root"></div>

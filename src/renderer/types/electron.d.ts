@@ -68,6 +68,9 @@ interface ElectronAPI {
   getSettings: () => Promise<any>;
   saveSettings: (settings: any) => Promise<{ success: boolean; error?: string }>;
   
+  // Window management
+  setIgnoreMouseEvents: (ignore: boolean) => Promise<boolean>;
+  
   // Event listeners
   onToggleRecording: (callback: () => void) => () => void;
 }

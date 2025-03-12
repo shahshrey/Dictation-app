@@ -47,6 +47,10 @@ try {
     saveSettings: (settings) => 
       ipcRenderer.invoke('save-settings', settings),
     
+    // Window management
+    setIgnoreMouseEvents: (ignore) => 
+      ipcRenderer.invoke('set-ignore-mouse-events', ignore),
+    
     // Event listeners
     onToggleRecording: (callback) => {
       const subscription = () => callback();

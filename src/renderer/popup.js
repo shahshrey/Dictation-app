@@ -19295,11 +19295,417 @@
   // src/renderer/context/AppContext.tsx
   var import_react2 = __toESM(require_react());
 
+  // src/shared/constants.ts
+  var DEFAULT_SETTINGS = {
+    apiKey: "",
+    selectedMicrophone: "",
+    language: "en",
+    theme: "system",
+    saveTranscriptions: true,
+    transcriptionSavePath: "",
+    autoTranscribe: false,
+    hotkey: "Home"
+    // Default hotkey is Home
+  };
+
   // src/renderer/hooks/useAudioRecording.ts
   var import_react = __toESM(require_react());
+  var useAudioRecording = ({
+    onRecordingComplete,
+    selectedDevice
+  } = {}) => {
+    const [mediaRecorder, setMediaRecorder] = (0, import_react.useState)(null);
+    const [isRecording, setIsRecording] = (0, import_react.useState)(false);
+    const [recordingTime, setRecordingTime] = (0, import_react.useState)(0);
+    const [error, setError] = (0, import_react.useState)(null);
+    const [timer, setTimer] = (0, import_react.useState)(null);
+    const audioChunksRef = (0, import_react.useRef)([]);
+    (0, import_react.useEffect)(() => {
+      return () => {
+        if (timer) {
+          clearInterval(timer);
+        }
+        if (mediaRecorder && isRecording) {
+          mediaRecorder.stop();
+        }
+      };
+    }, [timer, mediaRecorder, isRecording]);
+    const startRecording = (0, import_react.useCallback)(async () => {
+      try {
+        setError(null);
+        audioChunksRef.current = [];
+        console.log("Starting recording with device:", selectedDevice?.name || "default");
+        const constraints = {
+          audio: selectedDevice ? { deviceId: { exact: selectedDevice.id } } : true,
+          video: false
+        };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const recorder = new MediaRecorder(stream, {
+          mimeType: "audio/webm"
+          // Explicitly set the MIME type
+        });
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            console.log("Received audio chunk of size:", event.data.size);
+            audioChunksRef.current.push(event.data);
+          } else {
+            console.warn("Received empty audio chunk");
+          }
+        };
+        recorder.onstop = () => {
+          console.log(`Recording stopped, collected ${audioChunksRef.current.length} chunks`);
+          if (audioChunksRef.current.length === 0) {
+            console.error("No audio chunks collected during recording");
+            setError("No audio data was captured during recording");
+            return;
+          }
+          const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+          console.log("Created audio blob of size:", audioBlob.size);
+          if (onRecordingComplete) {
+            onRecordingComplete(audioBlob);
+          }
+          stream.getTracks().forEach((track) => track.stop());
+          setRecordingTime(0);
+          setIsRecording(false);
+          if (timer) {
+            clearInterval(timer);
+            setTimer(null);
+          }
+        };
+        recorder.start(1e3);
+        console.log("MediaRecorder started");
+        setMediaRecorder(recorder);
+        setIsRecording(true);
+        const intervalId = setInterval(() => {
+          setRecordingTime((prev) => prev + 1);
+        }, 1e3);
+        setTimer(intervalId);
+      } catch (err) {
+        setError(`Failed to start recording: ${err instanceof Error ? err.message : String(err)}`);
+        console.error("Recording error:", err);
+      }
+    }, [selectedDevice, onRecordingComplete, timer]);
+    const stopRecording = (0, import_react.useCallback)(() => {
+      if (mediaRecorder && isRecording) {
+        console.log("Stopping recording...");
+        mediaRecorder.requestData();
+        mediaRecorder.stop();
+      } else {
+        console.warn("Attempted to stop recording, but no active recorder found");
+      }
+    }, [mediaRecorder, isRecording]);
+    return {
+      isRecording,
+      startRecording,
+      stopRecording,
+      recordingTime,
+      error
+    };
+  };
 
   // src/renderer/context/AppContext.tsx
   var AppContext = (0, import_react2.createContext)(void 0);
+  var AppContextProvider = ({ children }) => {
+    const [settings, setSettings] = (0, import_react2.useState)(DEFAULT_SETTINGS);
+    const [audioDevices, setAudioDevices] = (0, import_react2.useState)([]);
+    const [selectedDevice, setSelectedDevice] = (0, import_react2.useState)(null);
+    const [currentTranscription, setCurrentTranscription] = (0, import_react2.useState)(null);
+    const [recentTranscriptions, setRecentTranscriptions] = (0, import_react2.useState)([]);
+    const {
+      isRecording,
+      startRecording: startAudioRecording,
+      stopRecording: stopAudioRecording,
+      recordingTime,
+      error: recordingError
+    } = useAudioRecording({
+      selectedDevice: selectedDevice || void 0,
+      onRecordingComplete: handleRecordingComplete
+    });
+    (0, import_react2.useEffect)(() => {
+      refreshAudioDevices();
+      loadSettings();
+      refreshRecentTranscriptions();
+      let unsubscribeToggleRecording = () => {
+      };
+      let unsubscribeAudioDevicesRequest = () => {
+      };
+      try {
+        if (window.electronAPI && typeof window.electronAPI.onToggleRecording === "function") {
+          unsubscribeToggleRecording = window.electronAPI.onToggleRecording(() => {
+            if (isRecording) {
+              stopRecording();
+            } else {
+              startRecording();
+            }
+          });
+        }
+        if (window.electronAPI && typeof window.electronAPI.onAudioDevicesRequest === "function") {
+          unsubscribeAudioDevicesRequest = window.electronAPI.onAudioDevicesRequest(() => {
+            refreshAudioDevices();
+          });
+        }
+      } catch (error) {
+        console.error("Error setting up event listeners:", error);
+      }
+      return () => {
+        try {
+          unsubscribeToggleRecording();
+          unsubscribeAudioDevicesRequest();
+        } catch (error) {
+          console.error("Error cleaning up event listeners:", error);
+        }
+      };
+    }, [isRecording]);
+    const loadSettings = async () => {
+      try {
+        if (window.electronAPI && typeof window.electronAPI.getSettings === "function") {
+          const loadedSettings = await window.electronAPI.getSettings();
+          setSettings(loadedSettings || DEFAULT_SETTINGS);
+        }
+      } catch (error) {
+        console.error("Failed to load settings:", error);
+      }
+    };
+    const updateSettings = async (newSettings) => {
+      try {
+        const updatedSettings = { ...settings, ...newSettings };
+        setSettings(updatedSettings);
+        if (window.electronAPI && typeof window.electronAPI.saveSettings === "function") {
+          await window.electronAPI.saveSettings(updatedSettings);
+        }
+      } catch (error) {
+        console.error("Failed to update settings:", error);
+      }
+    };
+    const refreshAudioDevices = async () => {
+      try {
+        const devices = [];
+        const mediaDevices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputDevices = mediaDevices.filter((device) => device.kind === "audioinput");
+        for (const device of audioInputDevices) {
+          devices.push({
+            id: device.deviceId,
+            name: device.label || `Microphone ${devices.length + 1}`,
+            isDefault: device.deviceId === "default" || device.deviceId === ""
+          });
+        }
+        if (devices.length > 0 && devices.every((d) => !d.name || d.name.startsWith("Microphone "))) {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach((track) => track.stop());
+            const devicesWithLabels = await navigator.mediaDevices.enumerateDevices();
+            const audioInputDevicesWithLabels = devicesWithLabels.filter((device) => device.kind === "audioinput");
+            devices.length = 0;
+            for (const device of audioInputDevicesWithLabels) {
+              devices.push({
+                id: device.deviceId,
+                name: device.label || `Microphone ${devices.length + 1}`,
+                isDefault: device.deviceId === "default" || device.deviceId === ""
+              });
+            }
+          } catch (err) {
+            console.error("Failed to get microphone permission:", err);
+          }
+        }
+        setAudioDevices(devices);
+        if (devices.length > 0 && !selectedDevice) {
+          const defaultDevice = devices.find((d) => d.isDefault) || devices[0];
+          setSelectedDevice(defaultDevice);
+        }
+        if (window.electronAPI && typeof window.electronAPI.sendAudioDevicesResult === "function") {
+          window.electronAPI.sendAudioDevicesResult(devices);
+        }
+      } catch (error) {
+        console.error("Failed to get audio devices:", error);
+      }
+    };
+    const refreshRecentTranscriptions = async () => {
+      try {
+        console.log("Attempting to refresh recent transcriptions...");
+        console.log("electronAPI available:", !!window.electronAPI);
+        console.log("getTranscriptions method available:", !!(window.electronAPI && typeof window.electronAPI.getTranscriptions === "function"));
+        console.log("getRecentTranscriptions method available:", !!(window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === "function"));
+        if (window.electronAPI && typeof window.electronAPI.getTranscriptions === "function") {
+          console.log("Calling getTranscriptions IPC method...");
+          try {
+            const transcriptions = await window.electronAPI.getTranscriptions();
+            console.log("Transcriptions received:", transcriptions);
+            if (Array.isArray(transcriptions) && transcriptions.length > 0) {
+              setRecentTranscriptions(transcriptions);
+            } else if (!transcriptions || transcriptions.length === 0) {
+              console.log("No transcriptions received, will try again with getRecentTranscriptions");
+              if (window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === "function") {
+                const result = await window.electronAPI.getRecentTranscriptions();
+                if (result && result.success && Array.isArray(result.files) && result.files.length > 0) {
+                  const fallbackTranscriptions = result.files.map((file) => ({
+                    id: file.name.replace(/\.txt$/, ""),
+                    text: "",
+                    // We don't have the content here
+                    timestamp: file.modifiedAt instanceof Date ? file.modifiedAt.getTime() : file.createdAt instanceof Date ? file.createdAt.getTime() : Date.now(),
+                    duration: 0,
+                    language: "en"
+                  }));
+                  setRecentTranscriptions(fallbackTranscriptions);
+                }
+              }
+            } else {
+              setRecentTranscriptions([]);
+            }
+          } catch (error) {
+            console.error("Failed to get recent transcriptions:", error);
+          }
+        } else if (window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === "function") {
+          console.log("Falling back to getRecentTranscriptions IPC method...");
+          try {
+            const result = await window.electronAPI.getRecentTranscriptions();
+            console.log("Recent transcriptions result:", result);
+            if (result && result.success && Array.isArray(result.files)) {
+              const transcriptions = result.files.map((file) => ({
+                id: file.name.replace(/\.txt$/, ""),
+                text: "",
+                // We don't have the content here
+                timestamp: file.modifiedAt instanceof Date ? file.modifiedAt.getTime() : file.createdAt instanceof Date ? file.createdAt.getTime() : Date.now(),
+                duration: 0,
+                language: "en"
+              }));
+              setRecentTranscriptions(transcriptions);
+            } else {
+              console.warn("getRecentTranscriptions returned invalid data:", result);
+              setRecentTranscriptions([]);
+            }
+          } catch (error) {
+            console.error("Failed to get recent transcriptions (fallback):", error);
+          }
+        } else {
+          console.warn("getTranscriptions API not available");
+        }
+      } catch (error) {
+        console.error("Failed to get recent transcriptions:", error);
+      }
+    };
+    function handleRecordingComplete(audioBlob) {
+      try {
+        console.log("Recording complete, blob size:", audioBlob.size, "bytes, type:", audioBlob.type);
+        if (audioBlob.size === 0) {
+          console.error("Error: Empty audio blob received");
+          return;
+        }
+        audioBlob.arrayBuffer().then(async (arrayBuffer) => {
+          console.log("Array buffer size:", arrayBuffer.byteLength, "bytes");
+          if (arrayBuffer.byteLength === 0) {
+            console.error("Error: Empty array buffer converted from blob");
+            return;
+          }
+          if (window.electronAPI && typeof window.electronAPI.saveRecording === "function") {
+            console.log("Sending recording to main process...");
+            const result = await window.electronAPI.saveRecording(arrayBuffer);
+            if (result.success) {
+              console.log("Recording saved:", result.filePath, "size:", result.size || "unknown");
+              if (settings.autoTranscribe) {
+                console.log("Auto-transcribe enabled, transcribing with language:", settings.language);
+                transcribeRecording(settings.language);
+              } else {
+                console.log("Auto-transcribe disabled, not transcribing automatically");
+              }
+            } else {
+              console.error("Failed to save recording:", result.error);
+            }
+          } else {
+            console.warn("saveRecording API not available");
+          }
+        }).catch((error) => {
+          console.error("Failed to convert blob to array buffer:", error);
+        });
+      } catch (error) {
+        console.error("Failed to handle recording complete:", error);
+      }
+    }
+    const startRecording = async () => {
+      if (selectedDevice) {
+        try {
+          await startAudioRecording();
+        } catch (error) {
+          console.error("Failed to start recording:", error);
+        }
+      } else {
+        console.error("No audio device selected");
+      }
+    };
+    const stopRecording = () => {
+      stopAudioRecording();
+    };
+    const transcribeRecording = async (language) => {
+      try {
+        console.log("Attempting to transcribe recording with language:", language || settings.language);
+        console.log("API key available:", !!settings.apiKey);
+        console.log("transcribeRecording API available:", !!(window.electronAPI && typeof window.electronAPI.transcribeRecording === "function"));
+        if (window.electronAPI && typeof window.electronAPI.transcribeRecording === "function") {
+          console.log("Calling transcribeRecording IPC method...");
+          const result = await window.electronAPI.transcribeRecording(
+            language || settings.language,
+            settings.apiKey
+          );
+          console.log("Transcription result:", result);
+          if (result.success) {
+            setCurrentTranscription({
+              id: result.id,
+              text: result.text,
+              timestamp: result.timestamp,
+              duration: result.duration,
+              language: result.language || settings.language
+            });
+            await refreshRecentTranscriptions();
+            setTimeout(async () => {
+              console.log("Performing delayed refresh of transcriptions");
+              await refreshRecentTranscriptions();
+            }, 2e3);
+          } else if (result.error) {
+            console.error("Transcription error:", result.error);
+          }
+        } else {
+          console.warn("transcribeRecording API not available");
+        }
+      } catch (error) {
+        console.error("Failed to transcribe recording:", error);
+      }
+    };
+    const saveTranscription = async (id) => {
+      try {
+        if (window.electronAPI && typeof window.electronAPI.saveTranscription === "function") {
+          await window.electronAPI.saveTranscription(id);
+          refreshRecentTranscriptions();
+        } else {
+          console.warn("saveTranscription API not available");
+        }
+      } catch (error) {
+        console.error("Failed to save transcription:", error);
+      }
+    };
+    const contextValue = {
+      // Settings
+      settings,
+      updateSettings,
+      // Recording state
+      isRecording,
+      recordingTime,
+      // Audio devices
+      audioDevices,
+      selectedDevice,
+      setSelectedDevice,
+      refreshAudioDevices,
+      // Transcription
+      currentTranscription,
+      setCurrentTranscription,
+      recentTranscriptions,
+      refreshRecentTranscriptions,
+      // Actions
+      startRecording,
+      stopRecording,
+      transcribeRecording,
+      saveTranscription
+    };
+    return /* @__PURE__ */ import_react2.default.createElement(AppContext.Provider, { value: contextValue }, children);
+  };
   var useAppContext = () => {
     const context = (0, import_react2.useContext)(AppContext);
     if (context === void 0) {
@@ -19310,26 +19716,134 @@
 
   // src/renderer/components/features/dictation/DictationPopup/index.tsx
   var DictationPopup = () => {
-    const { isRecording } = useAppContext();
-    const [visible, setVisible] = (0, import_react3.useState)(false);
+    console.log("DictationPopup component rendering");
+    const { isRecording, startRecording, stopRecording, refreshRecentTranscriptions } = useAppContext();
+    const [isDragging, setIsDragging] = (0, import_react3.useState)(false);
+    const [isHovering, setIsHovering] = (0, import_react3.useState)(false);
+    const [wasRecording, setWasRecording] = (0, import_react3.useState)(false);
     (0, import_react3.useEffect)(() => {
-      if (isRecording) {
-        setVisible(true);
-      } else {
-        const timer = setTimeout(() => {
-          setVisible(false);
-        }, 300);
-        return () => clearTimeout(timer);
+      console.log("DictationPopup mounted or updated");
+      console.log("Current recording state:", isRecording);
+      if (window.electronAPI && typeof window.electronAPI.setIgnoreMouseEvents === "function") {
+        console.log("Setting ignore mouse events to false on mount");
+        window.electronAPI.setIgnoreMouseEvents(false).catch((error) => console.error("Error in setIgnoreMouseEvents on mount:", error));
       }
-    }, [isRecording]);
-    if (!visible) return null;
+      if (wasRecording && !isRecording) {
+        console.log("Recording stopped, refreshing transcriptions after delay");
+        const timeoutId = setTimeout(() => {
+          refreshRecentTranscriptions();
+          console.log("Transcriptions refreshed after recording stopped");
+        }, 2e3);
+        return () => clearTimeout(timeoutId);
+      }
+      setWasRecording(isRecording);
+      return () => {
+        console.log("DictationPopup unmounting");
+      };
+    }, [isRecording, wasRecording, refreshRecentTranscriptions]);
+    const handleToggleRecording = () => {
+      console.log("Toggle recording clicked");
+      console.log("Current recording state:", isRecording);
+      try {
+        if (isRecording) {
+          console.log("Stopping recording");
+          stopRecording();
+        } else {
+          console.log("Starting recording");
+          startRecording();
+        }
+        console.log("Toggle recording action completed");
+      } catch (error) {
+        console.error("Error toggling recording:", error);
+      }
+    };
+    const handleMouseEnter = () => {
+      console.log("Mouse entered popup");
+      setIsHovering(true);
+      try {
+        if (window.electronAPI && typeof window.electronAPI.setIgnoreMouseEvents === "function") {
+          console.log("Setting ignore mouse events to false");
+          window.electronAPI.setIgnoreMouseEvents(false).then((result) => console.log("setIgnoreMouseEvents result:", result)).catch((error) => console.error("Error in setIgnoreMouseEvents:", error));
+        } else {
+          console.warn("setIgnoreMouseEvents not available");
+        }
+      } catch (error) {
+        console.error("Error in handleMouseEnter:", error);
+      }
+    };
+    const handleMouseLeave = () => {
+      console.log("Mouse left popup");
+      console.log("isDragging:", isDragging);
+      setIsHovering(false);
+    };
+    const handleMouseDown = (e) => {
+      console.log("Mouse down on popup");
+      if (window.electronAPI && typeof window.electronAPI.setIgnoreMouseEvents === "function") {
+        console.log("Setting ignore mouse events to false on mouse down");
+        window.electronAPI.setIgnoreMouseEvents(false).catch((error) => console.error("Error in setIgnoreMouseEvents on mouse down:", error));
+      }
+      if (e.target.classList.contains("drag-handle")) {
+        setIsDragging(true);
+      }
+    };
+    const handleMouseUp = () => {
+      console.log("Mouse up on popup");
+      setIsDragging(false);
+    };
+    console.log("Rendering DictationPopup UI");
+    console.log("isHovering:", isHovering);
     return /* @__PURE__ */ import_react3.default.createElement(
       "div",
       {
-        className: "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none transition-opacity duration-300",
-        style: { opacity: isRecording ? 1 : 0 }
+        className: "w-full h-full flex items-center justify-center",
+        onMouseEnter: handleMouseEnter,
+        onMouseLeave: handleMouseLeave,
+        onMouseDown: handleMouseDown,
+        onMouseUp: handleMouseUp,
+        style: {
+          backgroundColor: "transparent",
+          border: "none",
+          outline: "none",
+          boxShadow: "none"
+        }
       },
-      /* @__PURE__ */ import_react3.default.createElement("div", { className: "flex flex-col items-center justify-center p-8 rounded-2xl bg-black/80 w-[200px] h-[200px] shadow-lg" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "relative w-[120px] h-[120px] mb-4" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120px] h-[120px] rounded-full bg-transparent border-2 border-primary animate-ping opacity-70" }), /* @__PURE__ */ import_react3.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[110px] h-[110px] rounded-full bg-transparent border-2 border-primary animate-ping opacity-70 [animation-delay:200ms]" }), /* @__PURE__ */ import_react3.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100px] h-[100px] rounded-full bg-transparent border-2 border-primary animate-ping opacity-70 [animation-delay:400ms]" }), /* @__PURE__ */ import_react3.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center w-[60px] h-[60px] rounded-full bg-primary animate-pulse" }, /* @__PURE__ */ import_react3.default.createElement("svg", { className: "w-8 h-8 text-white", xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ import_react3.default.createElement("path", { d: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" }), /* @__PURE__ */ import_react3.default.createElement("path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }), /* @__PURE__ */ import_react3.default.createElement("line", { x1: "12", x2: "12", y1: "19", y2: "22" })))), /* @__PURE__ */ import_react3.default.createElement("h2", { className: "text-white font-bold text-lg mb-2" }, "Recording..."), /* @__PURE__ */ import_react3.default.createElement("p", { className: "text-white/70 text-xs mt-1" }, "Press Home to stop"))
+      /* @__PURE__ */ import_react3.default.createElement(
+        "div",
+        {
+          className: `flex items-center gap-2 px-3 py-1.5 rounded-full shadow-lg cursor-pointer transition-all duration-300 hover:scale-105 ${isRecording ? "bg-primary/90 text-white" : "bg-black/50 text-white hover:bg-black/70"}`,
+          onClick: (e) => {
+            console.log("Pill clicked");
+            e.stopPropagation();
+            handleToggleRecording();
+          },
+          style: { WebkitAppRegion: isDragging ? "drag" : "no-drag" }
+        },
+        /* @__PURE__ */ import_react3.default.createElement(
+          "div",
+          {
+            className: "absolute inset-0 drag-handle",
+            style: { pointerEvents: "none" }
+          }
+        ),
+        /* @__PURE__ */ import_react3.default.createElement("div", { className: `flex items-center justify-center w-6 h-6 rounded-full ${isRecording ? "animate-pulse" : ""}` }, /* @__PURE__ */ import_react3.default.createElement(
+          "svg",
+          {
+            className: "w-4 h-4",
+            xmlns: "http://www.w3.org/2000/svg",
+            viewBox: "0 0 24 24",
+            fill: "none",
+            stroke: "currentColor",
+            strokeWidth: "2",
+            strokeLinecap: "round",
+            strokeLinejoin: "round"
+          },
+          /* @__PURE__ */ import_react3.default.createElement("path", { d: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" }),
+          /* @__PURE__ */ import_react3.default.createElement("path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }),
+          /* @__PURE__ */ import_react3.default.createElement("line", { x1: "12", x2: "12", y1: "19", y2: "22" })
+        )),
+        /* @__PURE__ */ import_react3.default.createElement("span", { className: "font-medium text-xs whitespace-nowrap" }, isRecording ? "Recording..." : "Dictate"),
+        isRecording && /* @__PURE__ */ import_react3.default.createElement("div", { className: "relative w-3 h-3 ml-1" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-red-500 animate-ping opacity-75" }), /* @__PURE__ */ import_react3.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-red-600" }))
+      )
     );
   };
   var DictationPopup_default = DictationPopup;
@@ -19342,7 +19856,7 @@
   }
   var root = (0, import_client.createRoot)(rootElement);
   root.render(
-    /* @__PURE__ */ import_react4.default.createElement(import_react4.default.StrictMode, null, /* @__PURE__ */ import_react4.default.createElement(DictationPopup_default, null))
+    /* @__PURE__ */ import_react4.default.createElement(import_react4.default.StrictMode, null, /* @__PURE__ */ import_react4.default.createElement(AppContextProvider, null, /* @__PURE__ */ import_react4.default.createElement(DictationPopup_default, null)))
   );
 })();
 /*! Bundled license information:
