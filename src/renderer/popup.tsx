@@ -3,8 +3,8 @@ import { createRoot } from 'react-dom/client';
 import DictationPopup from './components/features/dictation/DictationPopup';
 import { AppContextProvider } from './context/AppContext';
 
-// Import CSS
-import './index.css';
+// Import styles
+import './styles/globals.css';
 
 console.log('Popup window started');
 

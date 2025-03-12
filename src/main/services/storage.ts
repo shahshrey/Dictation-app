@@ -2,6 +2,10 @@ import { IpcMain, dialog, app } from "electron";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { getLogger } from "../../shared/logger";
+
+// Get the logger instance
+const logger = getLogger('main');
 
 // Define constants for file storage
 const DEFAULT_SAVE_DIR = path.join(os.homedir(), "Documents", "Dictation App");
@@ -12,19 +16,25 @@ if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
   try {
     fs.mkdirSync(DEFAULT_SAVE_DIR, { recursive: true });
   } catch (error) {
-    console.error("Failed to create save directory:", error);
+    if (error instanceof Error) {
+      logger.exception(error, "Failed to create save directory");
+    } else {
+      logger.error("Failed to create save directory", { error: String(error) });
+    }
   }
 }
 
 export const setupFileStorage = (ipcMain: IpcMain): void => {
-  console.log('Setting up file storage handlers...');
+  logger.info('Setting up file storage handlers');
   
   // Check if ipcMain is valid
-  console.log('ipcMain object type:', typeof ipcMain);
-  console.log('ipcMain.handle method available:', typeof ipcMain.handle === 'function');
+  logger.debug('ipcMain validation', {
+    objectType: typeof ipcMain,
+    handleMethodAvailable: typeof ipcMain.handle === 'function'
+  });
   
   // Save transcription to a file
-  console.log('Registering save-transcription handler...');
+  logger.debug('Registering save-transcription handler');
   ipcMain.handle(
     "save-transcription",
     async (
@@ -32,7 +42,7 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
       text: string,
       options: { filename?: string; format?: string }
     ) => {
-      console.log('save-transcription handler called');
+      logger.debug('save-transcription handler called', { options });
       try {
         const filename = options.filename || DEFAULT_FILENAME;
         const format = options.format || "txt";
@@ -41,19 +51,24 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
         const filePath = path.join(DEFAULT_SAVE_DIR, fullFilename);
 
         fs.writeFileSync(filePath, text, { encoding: "utf-8" });
-
+        
+        logger.info('Transcription saved successfully', { filePath });
         return { success: true, filePath };
       } catch (error) {
-        console.error("Failed to save transcription:", error);
+        if (error instanceof Error) {
+          logger.exception(error, "Failed to save transcription");
+        } else {
+          logger.error("Failed to save transcription", { error: String(error) });
+        }
         return { success: false, error: String(error) };
       }
     }
   );
 
   // Save transcription with file dialog
-  console.log('Registering save-transcription-as handler...');
+  logger.debug('Registering save-transcription-as handler');
   ipcMain.handle("save-transcription-as", async (_, text: string) => {
-    console.log('save-transcription-as handler called');
+    logger.debug('save-transcription-as handler called');
     try {
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
       const defaultPath = path.join(
@@ -71,24 +86,31 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
       });
 
       if (canceled || !filePath) {
+        logger.debug('Save dialog canceled by user');
         return { success: false, canceled: true };
       }
 
       fs.writeFileSync(filePath, text, { encoding: "utf-8" });
-
+      
+      logger.info('Transcription saved with dialog', { filePath });
       return { success: true, filePath };
     } catch (error) {
-      console.error("Failed to save transcription:", error);
+      if (error instanceof Error) {
+        logger.exception(error, "Failed to save transcription");
+      } else {
+        logger.error("Failed to save transcription", { error: String(error) });
+      }
       return { success: false, error: String(error) };
     }
   });
 
   // Get recent transcriptions
-  console.log('Registering get-recent-transcriptions handler...');
+  logger.debug('Registering get-recent-transcriptions handler');
   ipcMain.handle("get-recent-transcriptions", async () => {
-    console.log('get-recent-transcriptions handler called');
+    logger.debug('get-recent-transcriptions handler called');
     try {
       if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
+        logger.debug('Save directory does not exist');
         return { success: true, files: [] };
       }
 
@@ -109,20 +131,26 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
         .sort((a, b) => b.modifiedAt.getTime() - a.modifiedAt.getTime())
         .slice(0, 10); // Get only the 10 most recent files
 
+      logger.debug('Found recent transcriptions', { count: files.length });
       return { success: true, files };
     } catch (error) {
-      console.error("Failed to get recent transcriptions:", error);
+      if (error instanceof Error) {
+        logger.exception(error, "Failed to get recent transcriptions");
+      } else {
+        logger.error("Failed to get recent transcriptions", { error: String(error) });
+      }
       return { success: false, error: String(error) };
     }
   });
   
   // Add handler for get-transcriptions (alias for get-recent-transcriptions)
-  console.log('Registering get-transcriptions handler...');
+  logger.debug('Registering get-transcriptions handler');
   try {
     ipcMain.handle("get-transcriptions", async () => {
-      console.log('Main process: get-transcriptions handler called');
+      logger.debug('get-transcriptions handler called');
       
       if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
+        logger.debug('Save directory does not exist');
         return [];
       }
 
@@ -132,7 +160,18 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
         .map((file) => {
           const filePath = path.join(DEFAULT_SAVE_DIR, file);
           const stats = fs.statSync(filePath);
-          const content = fs.readFileSync(filePath, { encoding: "utf-8" });
+          let content = '';
+          
+          try {
+            content = fs.readFileSync(filePath, { encoding: "utf-8" });
+          } catch (readError) {
+            if (readError instanceof Error) {
+              logger.exception(readError, `Failed to read file ${filePath}`);
+            } else {
+              logger.error(`Failed to read file ${filePath}`, { error: String(readError) });
+            }
+            content = ''; // Default to empty string if read fails
+          }
           
           // Extract timestamp from filename or use file creation time
           let timestamp = stats.birthtime.getTime();
@@ -153,19 +192,23 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
             language: 'en' // Default language
           };
         })
+        .filter(Boolean) // Remove null entries
         .sort((a, b) => b.timestamp - a.timestamp)
         .slice(0, 10); // Get only the 10 most recent files
 
-      console.log(`Main process: Found ${files.length} transcriptions`);
+      logger.debug('Found transcriptions', { count: files.length });
       return files;
     });
-    console.log('get-transcriptions handler registered successfully');
+    logger.info('get-transcriptions handler registered successfully');
   } catch (error) {
-    console.error('Error registering get-transcriptions handler:', error);
+    if (error instanceof Error) {
+      logger.exception(error, 'Error registering get-transcriptions handler');
+    } else {
+      logger.error('Error registering get-transcriptions handler', { error: String(error) });
+    }
   }
   
   // Log all registered IPC handlers for debugging
-  console.log('File storage handlers registered. Current IPC handlers:');
   const registeredChannels = (ipcMain as any)._events ? Object.keys((ipcMain as any)._events) : [];
-  console.log(registeredChannels);
+  logger.debug('File storage handlers registered', { registeredChannels });
 };

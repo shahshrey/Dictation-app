@@ -1,14 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { AudioDevice, IPC_CHANNELS } from '../shared/types';
+import { preloadLogger } from '../shared/preload-logger';
 
-console.log('Preload script starting...');
-console.log('ipcRenderer available:', !!ipcRenderer);
-console.log('contextBridge available:', !!contextBridge);
+preloadLogger.info('Preload script starting');
+preloadLogger.debug('ipcRenderer available:', { available: !!ipcRenderer });
+preloadLogger.debug('contextBridge available:', { available: !!contextBridge });
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 try {
-  console.log('Exposing electronAPI to renderer process...');
+  preloadLogger.info('Exposing electronAPI to renderer process');
   
   const api = {
     // Audio recording
@@ -38,8 +39,7 @@ try {
       ipcRenderer.invoke('translate-audio', filePath),
     
     transcribeRecording: (language: string, apiKey: string) => {
-      console.log('Preload: transcribeRecording called with language:', language);
-      console.log('Preload: API key available:', !!apiKey);
+      preloadLogger.debug('transcribeRecording called', { language, apiKeyAvailable: !!apiKey });
       return ipcRenderer.invoke('transcribe-recording', language, apiKey);
     },
     
@@ -51,7 +51,7 @@ try {
     getRecentTranscriptions: () => 
       ipcRenderer.invoke('get-recent-transcriptions'),
     getTranscriptions: () => {
-      console.log('Preload: getTranscriptions called');
+      preloadLogger.debug('getTranscriptions called');
       return ipcRenderer.invoke('get-transcriptions');
     },
     
@@ -73,9 +73,13 @@ try {
     }
   };
   
-  console.log('API methods being exposed:', Object.keys(api));
+  preloadLogger.debug('API methods being exposed', { methods: Object.keys(api) });
   contextBridge.exposeInMainWorld('electronAPI', api);
-  console.log('electronAPI successfully exposed to renderer process');
-} catch (error) {
-  console.error('Error in preload script:', error);
+  preloadLogger.info('electronAPI successfully exposed to renderer process');
+} catch (error: unknown) {
+  if (error instanceof Error) {
+    preloadLogger.exception(error, 'Error in preload script');
+  } else {
+    preloadLogger.error('Error in preload script', { error: String(error) });
+  }
 } 

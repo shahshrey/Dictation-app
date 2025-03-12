@@ -4,13 +4,15 @@
   "description": "A dictation app using Electron and Groq API",
   "main": "src/main/index.js",
   "scripts": {
-    "start": "electron .",
-    "dev": "electron-forge start",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
     "build": "node compile.js",
+    "clean": "rimraf dist",
+    "clean:all": "rimraf dist && rimraf src/renderer/*.js src/renderer/*.js.map src/renderer/*.css src/renderer/*.css.map",
     "start:dev": "npm run build && npm start"
   },
   "keywords": [
@@ -43,6 +45,7 @@
     "postcss": "8.4.31",
     "postcss-cli": "^11.0.0",
     "postcss-loader": "8.1.1",
+    "rimraf": "^6.0.1",
     "tailwindcss": "3.3.3",
     "tailwindcss-animate": "1.0.7",
     "ts-loader": "^9.5.2",
@@ -59,6 +62,7 @@
     "groq-sdk": "^0.3.2",
     "react": "^19.0.0",
     "react-dom": "19.0.0",
-    "tailwind-merge": "3.0.2"
+    "tailwind-merge": "3.0.2",
+    "winston": "^3.17.0"
   }
 }

@@ -47,4 +47,8 @@ module.exports = {
       path: require.resolve('path-browserify'),
     },
   },
+  output: {
+    path: require('path').resolve(__dirname, 'dist/renderer'),
+    filename: '[name].js',
+  },
 }; 

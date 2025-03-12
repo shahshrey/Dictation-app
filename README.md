@@ -93,12 +93,23 @@ dictation-app/
 │   │   └── index.tsx          # Renderer entry point
 │   └── shared/                # Shared code between processes
 │       ├── constants.ts       # Shared constants
+│       ├── logger.ts          # Winston-based logger for main process
+│       ├── preload-logger.ts  # Custom logger for preload/renderer
 │       └── types/             # Shared TypeScript interfaces
 ├── package.json               # Project metadata and dependencies
 ├── tsconfig.json              # TypeScript configuration
 ├── forge.config.js            # Electron Forge configuration
 └── webpack.*.js               # Webpack configuration files
 ```
+
+## Logging
+
+The application uses a structured logging system based on Winston for the main process and a custom lightweight logger for the preload/renderer processes. Logs are stored in the user's app data directory:
+
+- **Combined Log**: `{userData}/logs/combined.log` - Contains all log entries
+- **Error Log**: `{userData}/logs/error.log` - Contains only error-level entries
+
+For more details on the logging system, see [docs/logging.md](docs/logging.md).
 
 ## License
 

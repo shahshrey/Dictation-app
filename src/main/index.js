@@ -5,6 +5,11 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { Groq } = require('groq-sdk');
+// Import the logger
+const { getLogger, initLoggers, LOG_LEVELS } = require('../../dist/shared/logger');
+
+// Initialize the logger
+let logger;
 
 // Define constants
 const TEMP_DIR = path.join(os.tmpdir(), 'dictation-app');
@@ -24,28 +29,28 @@ const GROQ_MODELS = {
 // Check for macOS accessibility permissions
 const checkMacOSPermissions = () => {
   if (process.platform === 'darwin') {
-    console.log('Checking macOS accessibility permissions');
+    logger.info('Checking macOS accessibility permissions');
     
     // Check for screen recording permission (needed for system-wide overlay)
     const hasScreenRecordingPermission = systemPreferences.getMediaAccessStatus('screen');
-    console.log('Screen recording permission status:', hasScreenRecordingPermission);
+    logger.info('Screen recording permission status', { status: hasScreenRecordingPermission });
     
     if (hasScreenRecordingPermission !== 'granted') {
-      console.log('Requesting screen recording permission');
+      logger.info('Requesting screen recording permission');
       try {
         // This will prompt the user for permission
         systemPreferences.askForMediaAccess('screen');
       } catch (error) {
-        console.error('Error requesting screen recording permission:', error);
+        logger.exception(error, 'Error requesting screen recording permission');
       }
     }
     
     // Check for accessibility permission (needed for system-wide overlay)
     const hasAccessibilityPermission = systemPreferences.isTrustedAccessibilityClient(false);
-    console.log('Accessibility permission status:', hasAccessibilityPermission);
+    logger.info('Accessibility permission status', { status: hasAccessibilityPermission });
     
     if (!hasAccessibilityPermission) {
-      console.log('App needs accessibility permission for system-wide overlay');
+      logger.info('App needs accessibility permission for system-wide overlay');
       dialog.showMessageBox({
         type: 'info',
         title: 'Accessibility Permission Required',
@@ -60,7 +65,7 @@ const checkMacOSPermissions = () => {
           require('child_process').exec(command);
         }
       }).catch(error => {
-        console.error('Error showing permission dialog:', error);
+        logger.exception(error, 'Error showing permission dialog');
       });
     }
   }
@@ -91,7 +96,7 @@ async function initStore() {
     settings = store.store;
     return true;
   } catch (error) {
-    console.error('Failed to initialize store:', error);
+    logger.exception(error, 'Failed to initialize store');
     return false;
   }
 }
@@ -101,7 +106,7 @@ if (!fs.existsSync(TEMP_DIR)) {
   try {
     fs.mkdirSync(TEMP_DIR, { recursive: true });
   } catch (error) {
-    console.error('Failed to create temp directory:', error);
+    logger.exception(error, 'Failed to create temp directory');
   }
 }
 
@@ -110,7 +115,7 @@ if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
   try {
     fs.mkdirSync(DEFAULT_SAVE_DIR, { recursive: true });
   } catch (error) {
-    console.error('Failed to create save directory:', error);
+    logger.exception(error, 'Failed to create save directory');
   }
 }
 
@@ -134,16 +139,16 @@ const initGroqClient = () => {
   try {
     return new Groq({ apiKey });
   } catch (error) {
-    console.error('Failed to initialize Groq client:', error);
+    logger.exception(error, 'Failed to initialize Groq client');
     return null;
   }
 };
 
 const createWindow = () => {
-  console.log('createWindow called');
+  logger.debug('createWindow called');
   
   try {
-    console.log('Creating main browser window');
+    logger.info('Creating main browser window');
     // Create the browser window.
     mainWindow = new BrowserWindow({
       width: 800,
@@ -155,46 +160,46 @@ const createWindow = () => {
         webSecurity: false, // Allow loading local resources
       },
     });
-    console.log('Main window created successfully');
+    logger.info('Main window created successfully');
 
-    console.log('Loading index.html file');
+    logger.debug('Loading index.html file');
     // Load the index.html file
-    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+    mainWindow.loadFile(path.join(__dirname, '../../dist/renderer/index.html'));
 
     // Open DevTools in development mode
     if (process.env.NODE_ENV === 'development' || true) {
-      console.log('Opening DevTools');
+      logger.debug('Opening DevTools');
       mainWindow.webContents.openDevTools();
     }
     
     // Add event listeners to track window state
     mainWindow.on('close', () => {
-      console.log('Main window close event triggered');
+      logger.debug('Main window close event triggered');
     });
     
     mainWindow.on('closed', () => {
-      console.log('Main window closed event triggered');
+      logger.debug('Main window closed event triggered');
       mainWindow = null;
     });
     
     mainWindow.on('focus', () => {
-      console.log('Main window focus event triggered');
+      logger.debug('Main window focus event triggered');
     });
     
     mainWindow.on('blur', () => {
-      console.log('Main window blur event triggered');
+      logger.debug('Main window blur event triggered');
     });
     
-    console.log('Main window setup complete');
+    logger.info('Main window setup complete');
   } catch (error) {
-    console.error('Error creating main window:', error);
+    logger.exception(error, 'Error creating main window');
   }
 };
 
 // After creating the popup window, set additional properties to hide it from dock
 const hidePopupFromDock = () => {
   if (popupWindow && process.platform === 'darwin') {
-    console.log('Setting additional properties to hide popup from dock');
+    logger.debug('Setting additional properties to hide popup from dock');
     try {
       // Set additional properties to hide from dock and app switcher
       popupWindow.setSkipTaskbar(true);
@@ -214,19 +219,19 @@ const hidePopupFromDock = () => {
         popupWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
       }
       
-      console.log('Successfully set additional properties to hide popup from dock');
+      logger.info('Successfully set additional properties to hide popup from dock');
     } catch (error) {
-      console.error('Error setting additional properties to hide popup from dock:', error);
+      logger.exception(error, 'Error setting additional properties to hide popup from dock');
     }
   }
 };
 
 // Create a popup window for dictation
 const createPopupWindow = () => {
-  console.log('createPopupWindow called');
+  logger.debug('createPopupWindow called');
   
   try {
-    console.log('Creating popup window with system-wide overlay settings');
+    logger.info('Creating popup window with system-wide overlay settings');
     // Create the popup window as a system-wide overlay
     popupWindow = new BrowserWindow({
       width: 180,  // Smaller width for the pill
@@ -257,23 +262,23 @@ const createPopupWindow = () => {
       skipDock: true, // macOS specific property to hide from dock
       accessory: true, // macOS specific property to make it an accessory window
     });
-    console.log('Popup window created successfully');
+    logger.info('Popup window created successfully');
     
     // Set additional properties to hide from dock
     hidePopupFromDock();
     
-    console.log('Loading popup HTML file');
+    logger.debug('Loading popup HTML file');
     // Load the popup HTML file
-    popupWindow.loadFile(path.join(__dirname, '../renderer/popup.html'));
+    popupWindow.loadFile(path.join(__dirname, '../../dist/renderer/popup.html'));
     
-    console.log('Getting primary display dimensions');
+    logger.debug('Getting primary display dimensions');
     // Position the popup window in the bottom right corner
     const { width, height } = require('electron').screen.getPrimaryDisplay().workAreaSize;
-    console.log('Primary display dimensions:', width, 'x', height);
-    console.log('Positioning popup window at:', width - 200, height - 100);
+    logger.debug('Primary display dimensions:', width, 'x', height);
+    logger.debug('Positioning popup window at:', width - 200, height - 100);
     popupWindow.setPosition(width - 200, height - 100);
     
-    console.log('Setting popup window to be visible on all workspaces');
+    logger.debug('Setting popup window to be visible on all workspaces');
     // Make sure it's visible on all workspaces and full screen
     popupWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     
@@ -285,81 +290,81 @@ const createPopupWindow = () => {
       popupWindow.setWindowButtonVisibility(false);
     }
     
-    console.log('Setting popup window to ignore mouse events by default');
+    logger.debug('Setting popup window to ignore mouse events by default');
     // Make the window non-interactive when not hovered
     // This allows clicks to pass through to the application underneath
     popupWindow.setIgnoreMouseEvents(true, { forward: true });
     
-    console.log('Setting up mouse event handlers for the popup window');
+    logger.debug('Setting up mouse event handlers for the popup window');
     // But enable mouse events when hovering over the window
     popupWindow.webContents.on('did-finish-load', () => {
-      console.log('Popup window finished loading, setting up mouse event handlers');
+      logger.debug('Popup window finished loading, setting up mouse event handlers');
       try {
         popupWindow.webContents.executeJavaScript(`
           document.addEventListener('mouseover', () => {
-            console.log('Mouse over popup window, enabling mouse events');
+            logger.debug('Mouse over popup window, enabling mouse events');
             window.electronAPI.setIgnoreMouseEvents(false);
           });
           
           document.addEventListener('mouseout', () => {
-            console.log('Mouse out of popup window, disabling mouse events');
+            logger.debug('Mouse out of popup window, disabling mouse events');
             window.electronAPI.setIgnoreMouseEvents(true, { forward: true });
           });
         `);
-        console.log('Mouse event handlers set up successfully');
+        logger.debug('Mouse event handlers set up successfully');
       } catch (error) {
-        console.error('Error setting up mouse event handlers:', error);
+        logger.exception(error, 'Error setting up mouse event handlers');
       }
     });
     
     // Add event listeners to track window state
     popupWindow.on('close', () => {
-      console.log('Popup window close event triggered');
+      logger.debug('Popup window close event triggered');
     });
     
     popupWindow.on('closed', () => {
-      console.log('Popup window closed event triggered');
+      logger.debug('Popup window closed event triggered');
       popupWindow = null;
     });
     
     popupWindow.on('show', () => {
-      console.log('Popup window show event triggered');
+      logger.debug('Popup window show event triggered');
     });
     
     popupWindow.on('hide', () => {
-      console.log('Popup window hide event triggered');
+      logger.debug('Popup window hide event triggered');
     });
     
-    console.log('Popup window setup complete');
+    logger.info('Popup window setup complete');
   } catch (error) {
-    console.error('Error creating popup window:', error);
+    logger.exception(error, 'Error creating popup window');
   }
 };
 
 // Show the popup window - always show it when the app starts
 const showPopupWindow = () => {
-  console.log('showPopupWindow called');
-  console.log('popupWindow exists:', !!popupWindow);
+  logger.debug('showPopupWindow called');
+  logger.debug('popupWindow exists:', !!popupWindow);
   
   if (!popupWindow) {
-    console.log('No popup window exists, creating one');
+    logger.debug('No popup window exists, creating one');
     createPopupWindow();
   }
   
   if (popupWindow) {
-    console.log('popupWindow destroyed:', popupWindow.isDestroyed());
-    console.log('popupWindow visible:', popupWindow.isVisible());
+    logger.debug('popupWindow destroyed:', popupWindow.isDestroyed());
+    logger.debug('popupWindow visible:', popupWindow.isVisible());
     
     if (popupWindow.isDestroyed()) {
-      console.log('Popup window is destroyed, creating a new one');
+      logger.debug('Popup window is destroyed, creating a new one');
       createPopupWindow();
     }
     
     if (!popupWindow.isVisible()) {
-      console.log('Showing popup window');
+      logger.debug('Showing popup window');
       try {
         popupWindow.show();
-        console.log('Popup window shown successfully');
+        logger.debug('Popup window shown successfully');
         
         // Ensure it's always on top and visible on all workspaces
         popupWindow.setAlwaysOnTop(true, 'screen-saver');
@@ -370,27 +375,27 @@ const showPopupWindow = () => {
           popupWindow.setWindowButtonVisibility(false);
         }
       } catch (error) {
-        console.error('Error showing popup window:', error);
+        logger.exception(error, 'Error showing popup window');
       }
     } else {
-      console.log('Popup window is already visible');
+      logger.debug('Popup window is already visible');
     }
   } else {
-    console.error('Failed to create popup window');
+    logger.error('Failed to create popup window');
   }
 };
 
 // Hide the popup window - we'll keep this for potential future use
 const hidePopupWindow = () => {
-  console.log('hidePopupWindow called');
-  console.log('popupWindow exists:', !!popupWindow);
+  logger.debug('hidePopupWindow called');
+  logger.debug('popupWindow exists:', !!popupWindow);
   
   if (popupWindow) {
-    console.log('popupWindow destroyed:', popupWindow.isDestroyed());
-    console.log('popupWindow visible:', popupWindow.isVisible());
+    logger.debug('popupWindow destroyed:', popupWindow.isDestroyed());
+    logger.debug('popupWindow visible:', popupWindow.isVisible());
     
     if (!popupWindow.isDestroyed()) {
-      console.log('Updating popup window to show not recording state');
+      logger.debug('Updating popup window to show not recording state');
       try {
         // Instead of hiding, we'll just update the UI to show not recording
         // The actual UI update is handled by the renderer process based on isRecording state
@@ -403,15 +408,15 @@ const hidePopupWindow = () => {
           popupWindow.setWindowButtonVisibility(false);
         }
         
-        console.log('Popup window updated to not recording state');
+        logger.debug('Popup window updated to not recording state');
       } catch (error) {
-        console.error('Error updating popup window:', error);
+        logger.exception(error, 'Error updating popup window');
       }
     } else {
-      console.log('Popup window is destroyed, cannot update');
+      logger.debug('Popup window is destroyed, cannot update');
     }
   } else {
-    console.log('No popup window to update');
+    logger.debug('No popup window to update');
   }
 };
 
@@ -426,7 +431,7 @@ const setupIpcHandlers = () => {
           .map(device => ({ id: device.deviceId, name: device.label || 'Microphone ' + device.deviceId })))
       `);
     } catch (error) {
-      console.error('Failed to get audio sources:', error);
+      logger.exception(error, 'Failed to get audio sources');
       return [];
     }
   });
@@ -434,11 +439,11 @@ const setupIpcHandlers = () => {
   // Save the recorded audio blob sent from the renderer
   ipcMain.handle('save-recording', async (_, arrayBuffer) => {
     try {
-      console.log('Saving recording, buffer size:', arrayBuffer.byteLength);
+      logger.debug('Saving recording, buffer size:', arrayBuffer.byteLength);
       
       // Validate that we have actual data
       if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-        console.error('Error: Empty audio buffer received');
+        logger.error('Error: Empty audio buffer received');
         return { success: false, error: 'Empty audio buffer received' };
       }
       
@@ -455,20 +460,20 @@ const setupIpcHandlers = () => {
       // Verify the file was written correctly
       if (fs.existsSync(AUDIO_FILE_PATH)) {
         const stats = fs.statSync(AUDIO_FILE_PATH);
-        console.log(`Recording saved successfully: ${AUDIO_FILE_PATH}, size: ${stats.size} bytes`);
+        logger.info(`Recording saved successfully: ${AUDIO_FILE_PATH}, size: ${stats.size} bytes`);
         
         if (stats.size === 0) {
-          console.error('Error: File was saved but is empty');
+          logger.error('Error: File was saved but is empty');
           return { success: false, error: 'File was saved but is empty', filePath: AUDIO_FILE_PATH };
         }
         
         return { success: true, filePath: AUDIO_FILE_PATH, size: stats.size };
       } else {
-        console.error('Error: File was not saved');
+        logger.error('Error: File was not saved');
         return { success: false, error: 'File was not saved' };
       }
     } catch (error) {
-      console.error('Failed to save recording:', error);
+      logger.exception(error, 'Failed to save recording');
       return { success: false, error: String(error) };
     }
   });
@@ -504,7 +509,7 @@ const setupIpcHandlers = () => {
       // Default to English if no language is specified or if 'auto' is specified
       const language = (options?.language === 'auto' || !options?.language) ? 'en' : options?.language;
       
-      console.log(`Using Groq model: ${model} for transcription with language: ${language}`);
+      logger.info(`Using Groq model: ${model} for transcription with language: ${language}`);
       
       const transcription = await groqClient.audio.transcriptions.create({
         file: audioFile,
@@ -519,7 +524,7 @@ const setupIpcHandlers = () => {
         model: model
       };
     } catch (error) {
-      console.error('Failed to transcribe audio:', error);
+      logger.exception(error, 'Failed to transcribe audio');
       return { success: false, error: String(error) };
     }
   });
@@ -539,7 +544,7 @@ const setupIpcHandlers = () => {
       
       const audioFile = fs.createReadStream(filePath);
       
-      console.log(`Using Groq model: ${GROQ_MODELS.TRANSLATION} for translation`);
+      logger.info(`Using Groq model: ${GROQ_MODELS.TRANSLATION} for translation`);
       
       const translation = await groqClient.audio.translations.create({
         file: audioFile,
@@ -552,7 +557,7 @@ const setupIpcHandlers = () => {
         model: GROQ_MODELS.TRANSLATION
       };
     } catch (error) {
-      console.error('Failed to translate audio:', error);
+      logger.exception(error, 'Failed to translate audio');
       return { success: false, error: String(error) };
     }
   });
@@ -570,7 +575,7 @@ const setupIpcHandlers = () => {
       
       return { success: true, filePath };
     } catch (error) {
-      console.error('Failed to save transcription:', error);
+      logger.exception(error, 'Failed to save transcription');
       return { success: false, error: String(error) };
     }
   });
@@ -598,7 +603,7 @@ const setupIpcHandlers = () => {
       
       return { success: true, filePath };
     } catch (error) {
-      console.error('Failed to save transcription:', error);
+      logger.exception(error, 'Failed to save transcription');
       return { success: false, error: String(error) };
     }
   });
@@ -628,7 +633,7 @@ const setupIpcHandlers = () => {
       
       return { success: true, files };
     } catch (error) {
-      console.error('Failed to get recent transcriptions:', error);
+      logger.exception(error, 'Failed to get recent transcriptions');
       return { success: false, error: String(error) };
     }
   });
@@ -636,10 +641,10 @@ const setupIpcHandlers = () => {
   // Get transcriptions (alias for get-recent-transcriptions)
   // This handler returns transcriptions in a format compatible with the renderer's expectations
   ipcMain.handle('get-transcriptions', async () => {
-    console.log('Main process: get-transcriptions handler called');
+    logger.debug('Main process: get-transcriptions handler called');
     try {
       if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
-        console.log('Main process: Save directory does not exist');
+        logger.debug('Main process: Save directory does not exist');
         return [];
       }
 
@@ -659,7 +664,7 @@ const setupIpcHandlers = () => {
             try {
               content = fs.readFileSync(filePath, { encoding: "utf-8" });
             } catch (readError) {
-              console.error(`Failed to read file ${filePath}:`, readError);
+              logger.exception(readError, `Failed to read file ${filePath}`);
               content = ''; // Default to empty string if read fails
             }
             
@@ -682,17 +687,17 @@ const setupIpcHandlers = () => {
               language: 'en' // Default language
             };
           } catch (error) {
-            console.error(`Failed to process file ${dirent.name}:`, error);
+            logger.exception(error, `Failed to process file ${dirent.name}`);
             return null;
           }
         })
         .filter(Boolean) // Remove any null entries from errors
         .sort((a, b) => b.timestamp - a.timestamp);
 
-      console.log(`Main process: Found ${files.length} transcriptions`);
+      logger.debug(`Main process: Found ${files.length} transcriptions`);
       return files;
     } catch (error) {
-      console.error("Failed to get transcriptions:", error);
+      logger.exception(error, "Failed to get transcriptions");
       return [];
     }
   });
@@ -701,13 +706,13 @@ const setupIpcHandlers = () => {
   // This handler takes the language and API key from the renderer
   // and returns a transcription object with the transcribed text
   ipcMain.handle('transcribe-recording', async (_, language, apiKey) => {
-    console.log('Main process: transcribe-recording handler called with language:', language);
-    console.log('Main process: API key available:', !!apiKey);
+    logger.debug('Main process: transcribe-recording handler called with language:', language);
+    logger.debug('Main process: API key available:', !!apiKey);
     
     try {
       // Initialize Groq client with the provided API key
       if (!apiKey) {
-        console.error('Error: No API key provided');
+        logger.error('Error: No API key provided');
         return { 
           success: false, 
           error: 'No API key provided',
@@ -722,7 +727,7 @@ const setupIpcHandlers = () => {
       
       // Get the path to the most recent recording
       if (!fs.existsSync(AUDIO_FILE_PATH)) {
-        console.error('Error: Recording file not found at', AUDIO_FILE_PATH);
+        logger.error('Error: Recording file not found at', AUDIO_FILE_PATH);
         return { 
           success: false, 
           error: 'Recording file not found',
@@ -735,10 +740,10 @@ const setupIpcHandlers = () => {
       
       // Validate the file size
       const fileStats = fs.statSync(AUDIO_FILE_PATH);
-      console.log(`Audio file size: ${fileStats.size} bytes`);
+      logger.debug(`Audio file size: ${fileStats.size} bytes`);
       
       if (fileStats.size === 0) {
-        console.error('Error: Audio file is empty');
+        logger.error('Error: Audio file is empty');
         return { 
           success: false, 
           error: 'Audio file is empty',
@@ -755,7 +760,7 @@ const setupIpcHandlers = () => {
       // Choose the appropriate model based on language
       let model = language === 'en' ? GROQ_MODELS.TRANSCRIPTION.ENGLISH : GROQ_MODELS.TRANSCRIPTION.MULTILINGUAL;
       
-      console.log(`Using Groq model: ${model} for transcription with language: ${language || 'auto'}`);
+      logger.info(`Using Groq model: ${model} for transcription with language: ${language || 'auto'}`);
       
       // Transcribe the audio
       const transcription = await client.audio.transcriptions.create({
@@ -764,7 +769,7 @@ const setupIpcHandlers = () => {
         language: language || 'auto',
       });
       
-      console.log('Transcription successful, text length:', transcription.text.length);
+      logger.debug('Transcription successful, text length:', transcription.text.length);
       
       // Generate a unique ID for the transcription
       const id = `transcription-${Date.now()}`;
@@ -782,21 +787,21 @@ const setupIpcHandlers = () => {
         
         // Write the file synchronously to ensure it's fully written before returning
         fs.writeFileSync(filePath, transcription.text, { encoding: 'utf-8' });
-        console.log(`Transcription saved to: ${filePath}`);
+        logger.info(`Transcription saved to: ${filePath}`);
         
         // Verify the file was written correctly
         if (fs.existsSync(filePath)) {
           const fileContent = fs.readFileSync(filePath, { encoding: 'utf-8' });
           if (fileContent !== transcription.text) {
-            console.error('Error: File content does not match transcription text');
+            logger.error('Error: File content does not match transcription text');
           } else {
-            console.log('File content verified successfully');
+            logger.debug('File content verified successfully');
           }
         } else {
-          console.error('Error: File was not created');
+          logger.error('Error: File was not created');
         }
       } catch (saveError) {
-        console.error('Failed to save transcription to file:', saveError);
+        logger.exception(saveError, 'Failed to save transcription to file');
         // Continue even if saving fails
       }
       
@@ -813,7 +818,7 @@ const setupIpcHandlers = () => {
         filePath // Include the file path for debugging
       };
     } catch (error) {
-      console.error('Failed to transcribe recording:', error);
+      logger.exception(error, 'Failed to transcribe recording');
       return { 
         success: false, 
         error: error instanceof Error ? error.message : String(error),
@@ -832,7 +837,7 @@ const setupIpcHandlers = () => {
       shell.openPath(filePath);
       return { success: true };
     } catch (error) {
-      console.error('Failed to open file:', error);
+      logger.exception(error, 'Failed to open file');
       return { success: false, error: String(error) };
     }
   });
@@ -860,7 +865,7 @@ const setupIpcHandlers = () => {
       
       return { success: true };
     } catch (error) {
-      console.error('Failed to save settings:', error);
+      logger.exception(error, 'Failed to save settings');
       return { success: false, error: String(error) };
     }
   });
@@ -872,7 +877,7 @@ const setupIpcHandlers = () => {
       showPopupWindow();
       return { success: true };
     } catch (error) {
-      console.error('Failed to start recording:', error);
+      logger.exception(error, 'Failed to start recording');
       return { success: false, error: String(error) };
     }
   });
@@ -883,37 +888,37 @@ const setupIpcHandlers = () => {
       hidePopupWindow();
       return { success: true };
     } catch (error) {
-      console.error('Failed to stop recording:', error);
+      logger.exception(error, 'Failed to stop recording');
       return { success: false, error: String(error) };
     }
   });
 
   // Window management
   ipcMain.handle('set-ignore-mouse-events', (event, ignore, options = { forward: true }) => {
-    console.log('set-ignore-mouse-events IPC handler called with ignore:', ignore, 'options:', options);
-    console.log('popupWindow exists:', !!popupWindow);
+    logger.debug('set-ignore-mouse-events IPC handler called with ignore:', ignore, 'options:', options);
+    logger.debug('popupWindow exists:', !!popupWindow);
     
     if (popupWindow) {
-      console.log('popupWindow destroyed:', popupWindow.isDestroyed());
+      logger.debug('popupWindow destroyed:', popupWindow.isDestroyed());
       
       if (!popupWindow.isDestroyed()) {
-        console.log('Setting ignore mouse events to', ignore, 'with options:', options);
+        logger.debug('Setting ignore mouse events to', ignore, 'with options:', options);
         try {
           // Use the provided options or default to forwarding events when not ignoring
           const forwardOptions = options || { forward: !ignore };
           popupWindow.setIgnoreMouseEvents(ignore, forwardOptions);
-          console.log('Successfully set ignore mouse events');
+          logger.debug('Successfully set ignore mouse events');
           return true;
         } catch (error) {
-          console.error('Error setting ignore mouse events:', error);
+          logger.exception(error, 'Error setting ignore mouse events');
           return false;
         }
       } else {
-        console.log('Cannot set ignore mouse events - popup window is destroyed');
+        logger.debug('Cannot set ignore mouse events - popup window is destroyed');
         return false;
       }
     }
-    console.log('Cannot set ignore mouse events - popup window does not exist');
+    logger.debug('Cannot set ignore mouse events - popup window does not exist');
     return false;
   });
 };
@@ -921,7 +926,7 @@ const setupIpcHandlers = () => {
 // Set up the dock menu for macOS
 const setupDockMenu = () => {
   if (process.platform === 'darwin') {
-    console.log('Setting up dock menu for macOS');
+    logger.debug('Setting up dock menu for macOS');
     
     const dockMenu = [
       {
@@ -929,14 +934,14 @@ const setupDockMenu = () => {
         click: () => {
           if (popupWindow && !popupWindow.isDestroyed()) {
             if (popupWindow.isVisible()) {
-              console.log('Hiding popup window from dock menu');
+              logger.debug('Hiding popup window from dock menu');
               hidePopupWindow();
             } else {
-              console.log('Showing popup window from dock menu');
+              logger.debug('Showing popup window from dock menu');
               showPopupWindow();
             }
           } else {
-            console.log('Creating and showing popup window from dock menu');
+            logger.debug('Creating and showing popup window from dock menu');
             createPopupWindow();
             showPopupWindow();
           }
@@ -945,22 +950,25 @@ const setupDockMenu = () => {
     ];
     
     app.dock.setMenu(require('electron').Menu.buildFromTemplate(dockMenu));
-    console.log('Dock menu set up successfully');
+    logger.info('Dock menu set up successfully');
   }
 };
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 app.whenReady().then(async () => {
-  console.log('App ready event triggered');
+  // Initialize the logger first
+  initLoggers();
+  logger = getLogger('main');
+  logger.info('Application starting', { version: app.getVersion(), platform: process.platform });
   
   // Check for macOS permissions needed for system-wide overlay
-  console.log('Checking macOS permissions for system-wide overlay');
+  logger.info('Checking macOS permissions for system-wide overlay');
   checkMacOSPermissions();
   
   // Ensure the app stays in the dock on macOS, but the popup doesn't
   if (process.platform === 'darwin') {
-    console.log('On macOS, setting app to stay in dock');
+    logger.debug('On macOS, setting app to stay in dock');
     app.dock.show();
     
     // Set up the dock menu
@@ -994,20 +1002,20 @@ app.whenReady().then(async () => {
         app.dock.setMenu(dockMenu);
       }
     } catch (error) {
-      console.error('Error setting dock menu:', error);
+      logger.exception(error, 'Error setting dock menu');
     }
   }
   
-  console.log('Initializing store');
+  logger.info('Initializing store');
   await initStore();
   
-  console.log('Creating main window');
+  logger.info('Creating main window');
   createWindow();
   
-  console.log('Setting up IPC handlers');
+  logger.info('Setting up IPC handlers');
   setupIpcHandlers();
   
-  console.log('Creating and showing the floating popup window');
+  logger.info('Creating and showing the floating popup window');
   // Create and show the floating popup window
   createPopupWindow();
   showPopupWindow();
@@ -1026,11 +1034,11 @@ app.whenReady().then(async () => {
       if (process.platform === 'darwin') {
         // Get the macOS version
         const osVersion = require('os').release();
-        console.log('macOS version:', osVersion);
+        logger.debug('macOS version:', osVersion);
         
         // If it's macOS Sequoia or newer
         if (osVersion.startsWith('24.')) { // macOS Sequoia is Darwin 24.x
-          console.log('Using macOS Sequoia specific settings to hide popup from dock');
+          logger.debug('Using macOS Sequoia specific settings to hide popup from dock');
           
           // Set the window to be a utility window
           if (typeof popupWindow.setWindowButtonVisibility === 'function') {
@@ -1044,55 +1052,55 @@ app.whenReady().then(async () => {
         }
       }
     } catch (error) {
-      console.error('Error configuring popup window visibility:', error);
+      logger.exception(error, 'Error configuring popup window visibility');
     }
   }
   
-  console.log('Registering global hotkey');
+  logger.info('Registering global hotkey');
   // Register the global shortcut with the current hotkey from settings
   registerGlobalHotkey();
   
   app.on('activate', () => {
-    console.log('App activate event triggered');
+    logger.info('App activate event triggered');
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
-    console.log('Number of open windows:', BrowserWindow.getAllWindows().length);
+    logger.debug('Number of open windows:', BrowserWindow.getAllWindows().length);
     
     if (BrowserWindow.getAllWindows().length === 0) {
-      console.log('No windows open, creating main window');
+      logger.debug('No windows open, creating main window');
       createWindow();
-      console.log('Showing popup window');
+      logger.debug('Showing popup window');
       showPopupWindow();
     } else {
-      console.log('Windows already open, not creating new ones');
+      logger.debug('Windows already open, not creating new ones');
     }
   });
   
-  console.log('App initialization complete');
+  logger.info('App initialization complete');
 });
 
 // Quit when all windows are closed, except on macOS.
 app.on('window-all-closed', () => {
-  console.log('All windows closed event triggered');
-  console.log('Platform:', process.platform);
+  logger.debug('All windows closed event triggered');
+  logger.debug('Platform:', process.platform);
   
   if (process.platform !== 'darwin') {
-    console.log('Not on macOS, quitting app');
+    logger.debug('Not on macOS, quitting app');
     app.quit();
   } else {
-    console.log('On macOS, app will remain running');
+    logger.debug('On macOS, app will remain running');
     
     // Always ensure the popup window is visible
-    console.log('Ensuring popup window is visible');
+    logger.debug('Ensuring popup window is visible');
     if (!popupWindow || (typeof popupWindow.isDestroyed === 'function' && popupWindow.isDestroyed())) {
-      console.log('Popup window does not exist or is destroyed, recreating it');
+      logger.debug('Popup window does not exist or is destroyed, recreating it');
       createPopupWindow();
       showPopupWindow();
     } else if (popupWindow && !popupWindow.isVisible()) {
-      console.log('Popup window exists but is not visible, showing it');
+      logger.debug('Popup window exists but is not visible, showing it');
       showPopupWindow();
     } else {
-      console.log('Popup window is already visible');
+      logger.debug('Popup window is already visible');
       // Ensure it's always on top and visible on all workspaces
       if (popupWindow && !popupWindow.isDestroyed()) {
         popupWindow.setAlwaysOnTop(true, 'screen-saver');
@@ -1101,96 +1109,96 @@ app.on('window-all-closed', () => {
     }
     
     // Ensure the app stays in the dock
-    console.log('Ensuring app stays in dock');
+    logger.debug('Ensuring app stays in dock');
     app.dock.show();
   }
 });
 
 // Unregister all shortcuts when app is about to quit
 app.on('will-quit', () => {
-  console.log('App will-quit event triggered');
+  logger.debug('App will-quit event triggered');
   
-  console.log('Unregistering all global shortcuts');
+  logger.debug('Unregistering all global shortcuts');
   globalShortcut.unregisterAll();
   
-  console.log('Checking if popup window exists');
+  logger.debug('Checking if popup window exists');
   // Close the popup window if it exists
   if (popupWindow) {
-    console.log('Popup window exists, checking if destroyed');
+    logger.debug('Popup window exists, checking if destroyed');
     if (!popupWindow.isDestroyed()) {
-      console.log('Closing popup window');
+      logger.debug('Closing popup window');
       try {
         popupWindow.close();
-        console.log('Popup window closed successfully');
+        logger.debug('Popup window closed successfully');
       } catch (error) {
-        console.error('Error closing popup window:', error);
+        logger.exception(error, 'Error closing popup window');
       }
     } else {
-      console.log('Popup window is already destroyed');
+      logger.debug('Popup window is already destroyed');
     }
     popupWindow = null;
   } else {
-    console.log('No popup window to close');
+    logger.debug('No popup window to close');
   }
   
-  console.log('App cleanup complete');
+  logger.debug('App cleanup complete');
 });
 
 // Add a handler for the before-quit event
 app.on('before-quit', () => {
-  console.log('App before-quit event triggered');
+  logger.debug('App before-quit event triggered');
 });
 
 // Add a handler for the quit event
 app.on('quit', () => {
-  console.log('App quit event triggered');
+  logger.debug('App quit event triggered');
 });
 
 // Function to register the global hotkey
 const registerGlobalHotkey = () => {
-  console.log('Registering global hotkey...');
-  console.log('Current recording state:', isRecording);
-  console.log('mainWindow exists:', !!mainWindow);
-  console.log('popupWindow exists:', !!popupWindow);
+  logger.debug('Registering global hotkey...');
+  logger.debug('Current recording state:', isRecording);
+  logger.debug('mainWindow exists:', !!mainWindow);
+  logger.debug('popupWindow exists:', !!popupWindow);
   
   // Unregister any existing shortcuts first
   globalShortcut.unregisterAll();
-  console.log('Unregistered all existing shortcuts');
+  logger.debug('Unregistered all existing shortcuts');
   
   // Get the hotkey from settings, default to 'Home' if not set
   const hotkey = settings.hotkey || 'Home';
-  console.log('Using hotkey:', hotkey);
+  logger.debug('Using hotkey:', hotkey);
   
   // Define the hotkey handler function
   const hotkeyHandler = () => {
-    console.log('Hotkey pressed!');
-    console.log('mainWindow exists:', !!mainWindow);
-    console.log('mainWindow destroyed:', mainWindow?.isDestroyed?.());
-    console.log('popupWindow exists:', !!popupWindow);
-    console.log('popupWindow destroyed:', popupWindow?.isDestroyed?.());
-    console.log('Current recording state:', isRecording);
+    logger.debug('Hotkey pressed!');
+    logger.debug('mainWindow exists:', !!mainWindow);
+    logger.debug('mainWindow destroyed:', mainWindow?.isDestroyed?.());
+    logger.debug('popupWindow exists:', !!popupWindow);
+    logger.debug('popupWindow destroyed:', popupWindow?.isDestroyed?.());
+    logger.debug('Current recording state:', isRecording);
     
     // Safely send event to main window if it exists and is not destroyed
     if (mainWindow && typeof mainWindow.isDestroyed === 'function' && !mainWindow.isDestroyed()) {
-      console.log('Sending toggle-recording event to mainWindow');
+      logger.debug('Sending toggle-recording event to mainWindow');
       try {
         mainWindow.webContents.send('toggle-recording');
       } catch (error) {
-        console.error('Error sending toggle-recording event:', error);
+        logger.exception(error, 'Error sending toggle-recording event');
       }
     } else {
-      console.log('Cannot send toggle-recording event - mainWindow does not exist or is destroyed');
+      logger.debug('Cannot send toggle-recording event - mainWindow does not exist or is destroyed');
     }
     
     // Toggle recording state and popup
-    console.log('Toggling recording state from', isRecording, 'to', !isRecording);
+    logger.debug('Toggling recording state from', isRecording, 'to', !isRecording);
     if (isRecording) {
-      console.log('Stopping recording');
+      logger.debug('Stopping recording');
       isRecording = false;
       
       // Update popup window to show not recording state
       if (popupWindow && typeof popupWindow.isDestroyed === 'function' && !popupWindow.isDestroyed()) {
-        console.log('Updating popup window to show not recording state');
+        logger.debug('Updating popup window to show not recording state');
         try {
           // Instead of hiding, we'll just update the UI to show not recording
           // The actual UI update is handled by the renderer process based on isRecording state
@@ -1202,67 +1210,88 @@ const registerGlobalHotkey = () => {
             popupWindow.setWindowButtonVisibility(false);
           }
         } catch (error) {
-          console.error('Error updating popup window:', error);
+          logger.exception(error, 'Error updating popup window');
         }
       } else {
-        console.log('Cannot update popup window - it does not exist or is destroyed');
-      }
-    } else {
-      console.log('Starting recording');
-      isRecording = true;
-      
-      // Create new popup window if it doesn't exist or is destroyed
-      if (!popupWindow || (typeof popupWindow.isDestroyed === 'function' && popupWindow.isDestroyed())) {
-        console.log('Creating new popup window');
-        try {
-          createPopupWindow();
-        } catch (error) {
-          console.error('Error creating popup window:', error);
+        logger.debug('Starting recording');
+        isRecording = true;
+        
+        // Create new popup window if it doesn't exist or is destroyed
+        if (!popupWindow || (typeof popupWindow.isDestroyed === 'function' && popupWindow.isDestroyed())) {
+          logger.debug('Creating new popup window');
+          try {
+            createPopupWindow();
+          } catch (error) {
+            logger.exception(error, 'Error creating popup window');
+          }
+        }
+        
+        // Show the popup window
+        if (popupWindow && typeof popupWindow.isDestroyed === 'function' && !popupWindow.isDestroyed()) {
+          logger.debug('Showing popup window');
+          try {
+            showPopupWindow();
+            
+            // Ensure the popup window is interactive
+            setTimeout(() => {
+              if (popupWindow && !popupWindow.isDestroyed()) {
+                logger.debug('Setting popup window to be interactive after showing');
+                popupWindow.setIgnoreMouseEvents(false, { forward: true });
+              }
+            }, 100); // Short delay to ensure the window is fully shown
+          } catch (error) {
+            logger.exception(error, 'Error showing popup window');
+          }
+        } else {
+          logger.debug('Cannot show popup window - it does not exist or is destroyed');
         }
       }
+    };
+    
+    try {
+      // Register the global shortcut with the hotkey from settings
+      logger.debug('Attempting to register hotkey:', hotkey);
+      const registered = globalShortcut.register(hotkey, hotkeyHandler);
       
-      // Show the popup window
-      if (popupWindow && typeof popupWindow.isDestroyed === 'function' && !popupWindow.isDestroyed()) {
-        console.log('Showing popup window');
-        try {
-          showPopupWindow();
-          
-          // Ensure the popup window is interactive
-          setTimeout(() => {
-            if (popupWindow && !popupWindow.isDestroyed()) {
-              console.log('Setting popup window to be interactive after showing');
-              popupWindow.setIgnoreMouseEvents(false, { forward: true });
-            }
-          }, 100); // Short delay to ensure the window is fully shown
-        } catch (error) {
-          console.error('Error showing popup window:', error);
-        }
+      if (!registered) {
+        logger.error(`Failed to register hotkey: ${hotkey}`);
       } else {
-        console.log('Cannot show popup window - it does not exist or is destroyed');
+        logger.info(`Successfully registered hotkey: ${hotkey}`);
+      }
+    } catch (error) {
+      logger.exception(error, `Error registering hotkey ${hotkey}`);
+      
+      // Fallback to Home key if the specified hotkey is invalid
+      try {
+        logger.debug('Attempting to register fallback hotkey: Home');
+        globalShortcut.register('Home', hotkeyHandler);
+        logger.debug('Fallback to Home key successful');
+      } catch (fallbackError) {
+        logger.exception(fallbackError, 'Failed to register fallback hotkey');
       }
     }
   };
   
   try {
     // Register the global shortcut with the hotkey from settings
-    console.log('Attempting to register hotkey:', hotkey);
+    logger.debug('Attempting to register hotkey:', hotkey);
     const registered = globalShortcut.register(hotkey, hotkeyHandler);
     
     if (!registered) {
-      console.error(`Failed to register hotkey: ${hotkey}`);
+      logger.error(`Failed to register hotkey: ${hotkey}`);
     } else {
-      console.log(`Successfully registered hotkey: ${hotkey}`);
+      logger.info(`Successfully registered hotkey: ${hotkey}`);
     }
   } catch (error) {
-    console.error(`Error registering hotkey ${hotkey}:`, error);
+    logger.exception(error, `Error registering hotkey ${hotkey}`);
     
     // Fallback to Home key if the specified hotkey is invalid
     try {
-      console.log('Attempting to register fallback hotkey: Home');
+      logger.debug('Attempting to register fallback hotkey: Home');
       globalShortcut.register('Home', hotkeyHandler);
-      console.log('Fallback to Home key successful');
+      logger.debug('Fallback to Home key successful');
     } catch (fallbackError) {
-      console.error('Failed to register fallback hotkey:', fallbackError);
+      logger.exception(fallbackError, 'Failed to register fallback hotkey');
     }
   }
 }; 
