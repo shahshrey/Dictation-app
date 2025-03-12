@@ -1064,10 +1064,10 @@
         exports.use = function(usable) {
           return resolveDispatcher().use(usable);
         };
-        exports.useActionState = function(action, initialState2, permalink) {
+        exports.useActionState = function(action, initialState, permalink) {
           return resolveDispatcher().useActionState(
             action,
-            initialState2,
+            initialState,
             permalink
           );
         };
@@ -1114,8 +1114,8 @@
         exports.useRef = function(initialValue) {
           return resolveDispatcher().useRef(initialValue);
         };
-        exports.useState = function(initialState2) {
-          return resolveDispatcher().useState(initialState2);
+        exports.useState = function(initialState) {
+          return resolveDispatcher().useState(initialState);
         };
         exports.useSyncExternalStore = function(subscribe, getSnapshot, getServerSnapshot) {
           return resolveDispatcher().useSyncExternalStore(
@@ -1474,7 +1474,7 @@
           return dispatcher;
         }
         "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
-        var React3 = require_react(), Internals = {
+        var React4 = require_react(), Internals = {
           d: {
             f: noop,
             r: function() {
@@ -1492,7 +1492,7 @@
           },
           p: 0,
           findDOMNode: null
-        }, REACT_PORTAL_TYPE = Symbol.for("react.portal"), ReactSharedInternals = React3.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
+        }, REACT_PORTAL_TYPE = Symbol.for("react.portal"), ReactSharedInternals = React4.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
         "function" === typeof Map && null != Map.prototype && "function" === typeof Map.prototype.forEach && "function" === typeof Set && null != Set.prototype && "function" === typeof Set.prototype.clear && "function" === typeof Set.prototype.forEach || console.error(
           "React depends on Map and Set built-in types. Make sure that you load a polyfill in older browsers. https://reactjs.org/link/react-polyfills"
         );
@@ -1657,8 +1657,8 @@
         exports.unstable_batchedUpdates = function(fn, a) {
           return fn(a);
         };
-        exports.useFormState = function(action, initialState2, permalink) {
-          return resolveDispatcher().useFormState(action, initialState2, permalink);
+        exports.useFormState = function(action, initialState, permalink) {
+          return resolveDispatcher().useFormState(action, initialState, permalink);
         };
         exports.useFormStatus = function() {
           return resolveDispatcher().useHostTransitionStatus();
@@ -2948,7 +2948,7 @@
           "number" === type && getActiveElement(node.ownerDocument) === node || node.defaultValue === "" + value || (node.defaultValue = "" + value);
         }
         function validateOptionProps(element, props) {
-          null == props.value && ("object" === typeof props.children && null !== props.children ? React3.Children.forEach(props.children, function(child) {
+          null == props.value && ("object" === typeof props.children && null !== props.children ? React4.Children.forEach(props.children, function(child) {
             null == child || "string" === typeof child || "number" === typeof child || "bigint" === typeof child || didWarnInvalidChild || (didWarnInvalidChild = true, console.error(
               "Cannot infer the option value of complex children. Pass a `value` prop or use a plain string as children to <option>."
             ));
@@ -5899,7 +5899,7 @@
         function mountReducer(reducer, initialArg, init) {
           var hook = mountWorkInProgressHook();
           if (void 0 !== init) {
-            var initialState2 = init(initialArg);
+            var initialState = init(initialArg);
             if (shouldDoubleInvokeUserFnsInHooksDEV) {
               setIsStrictModeForDevtools(true);
               try {
@@ -5908,14 +5908,14 @@
                 setIsStrictModeForDevtools(false);
               }
             }
-          } else initialState2 = initialArg;
-          hook.memoizedState = hook.baseState = initialState2;
+          } else initialState = initialArg;
+          hook.memoizedState = hook.baseState = initialState;
           reducer = {
             pending: null,
             lanes: 0,
             dispatch: null,
             lastRenderedReducer: reducer,
-            lastRenderedState: initialState2
+            lastRenderedState: initialState
           };
           hook.queue = reducer;
           reducer = reducer.dispatch = dispatchReducerAction.bind(
@@ -6144,11 +6144,11 @@
           var root3 = enqueueConcurrentRenderForLane(fiber, 2);
           null !== root3 && scheduleUpdateOnFiber(root3, fiber, 2);
         }
-        function mountStateImpl(initialState2) {
+        function mountStateImpl(initialState) {
           var hook = mountWorkInProgressHook();
-          if ("function" === typeof initialState2) {
-            var initialStateInitializer = initialState2;
-            initialState2 = initialStateInitializer();
+          if ("function" === typeof initialState) {
+            var initialStateInitializer = initialState;
+            initialState = initialStateInitializer();
             if (shouldDoubleInvokeUserFnsInHooksDEV) {
               setIsStrictModeForDevtools(true);
               try {
@@ -6158,25 +6158,25 @@
               }
             }
           }
-          hook.memoizedState = hook.baseState = initialState2;
+          hook.memoizedState = hook.baseState = initialState;
           hook.queue = {
             pending: null,
             lanes: 0,
             dispatch: null,
             lastRenderedReducer: basicStateReducer,
-            lastRenderedState: initialState2
+            lastRenderedState: initialState
           };
           return hook;
         }
-        function mountState(initialState2) {
-          initialState2 = mountStateImpl(initialState2);
-          var queue = initialState2.queue, dispatch = dispatchSetState.bind(
+        function mountState(initialState) {
+          initialState = mountStateImpl(initialState);
+          var queue = initialState.queue, dispatch = dispatchSetState.bind(
             null,
             currentlyRenderingFiber$1,
             queue
           );
           queue.dispatch = dispatch;
-          return [initialState2.memoizedState, dispatch];
+          return [initialState.memoizedState, dispatch];
         }
         function mountOptimistic(passthrough) {
           var hook = mountWorkInProgressHook();
@@ -16418,13 +16418,13 @@
           ));
         }
         "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
-        var Scheduler = require_scheduler(), React3 = require_react(), ReactDOM = require_react_dom(), REACT_LEGACY_ELEMENT_TYPE = Symbol.for("react.element"), REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = Symbol.for("react.profiler"), REACT_PROVIDER_TYPE = Symbol.for("react.provider"), REACT_CONSUMER_TYPE = Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = Symbol.for("react.memo"), REACT_LAZY_TYPE = Symbol.for("react.lazy");
+        var Scheduler = require_scheduler(), React4 = require_react(), ReactDOM = require_react_dom(), REACT_LEGACY_ELEMENT_TYPE = Symbol.for("react.element"), REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = Symbol.for("react.profiler"), REACT_PROVIDER_TYPE = Symbol.for("react.provider"), REACT_CONSUMER_TYPE = Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = Symbol.for("react.memo"), REACT_LAZY_TYPE = Symbol.for("react.lazy");
         Symbol.for("react.scope");
         Symbol.for("react.debug_trace_mode");
         var REACT_OFFSCREEN_TYPE = Symbol.for("react.offscreen");
         Symbol.for("react.legacy_hidden");
         Symbol.for("react.tracing_marker");
-        var REACT_MEMO_CACHE_SENTINEL = Symbol.for("react.memo_cache_sentinel"), MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE = Symbol.for("react.client.reference"), ReactSharedInternals = React3.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, assign = Object.assign, disabledDepth = 0, prevLog, prevInfo, prevWarn, prevError, prevGroup, prevGroupCollapsed, prevGroupEnd;
+        var REACT_MEMO_CACHE_SENTINEL = Symbol.for("react.memo_cache_sentinel"), MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE = Symbol.for("react.client.reference"), ReactSharedInternals = React4.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, assign = Object.assign, disabledDepth = 0, prevLog, prevInfo, prevWarn, prevError, prevGroup, prevGroupCollapsed, prevGroupEnd;
         disabledLog.__reactDisabledLog = true;
         var prefix, suffix, reentry = false;
         var componentFrameCache = new ("function" === typeof WeakMap ? WeakMap : Map)();
@@ -17811,13 +17811,13 @@
             mountHookTypesDev();
             return mountRef(initialValue);
           },
-          useState: function(initialState2) {
+          useState: function(initialState) {
             currentHookNameInDev = "useState";
             mountHookTypesDev();
             var prevDispatcher = ReactSharedInternals.H;
             ReactSharedInternals.H = InvalidNestedHooksDispatcherOnMountInDEV;
             try {
-              return mountState(initialState2);
+              return mountState(initialState);
             } finally {
               ReactSharedInternals.H = prevDispatcher;
             }
@@ -17858,16 +17858,16 @@
         };
         HooksDispatcherOnMountInDEV.useMemoCache = useMemoCache;
         HooksDispatcherOnMountInDEV.useHostTransitionStatus = useHostTransitionStatus;
-        HooksDispatcherOnMountInDEV.useFormState = function(action, initialState2) {
+        HooksDispatcherOnMountInDEV.useFormState = function(action, initialState) {
           currentHookNameInDev = "useFormState";
           mountHookTypesDev();
           warnOnUseFormStateInDev();
-          return mountActionState(action, initialState2);
+          return mountActionState(action, initialState);
         };
-        HooksDispatcherOnMountInDEV.useActionState = function(action, initialState2) {
+        HooksDispatcherOnMountInDEV.useActionState = function(action, initialState) {
           currentHookNameInDev = "useActionState";
           mountHookTypesDev();
-          return mountActionState(action, initialState2);
+          return mountActionState(action, initialState);
         };
         HooksDispatcherOnMountInDEV.useOptimistic = function(passthrough) {
           currentHookNameInDev = "useOptimistic";
@@ -17936,13 +17936,13 @@
             updateHookTypesDev();
             return mountRef(initialValue);
           },
-          useState: function(initialState2) {
+          useState: function(initialState) {
             currentHookNameInDev = "useState";
             updateHookTypesDev();
             var prevDispatcher = ReactSharedInternals.H;
             ReactSharedInternals.H = InvalidNestedHooksDispatcherOnMountInDEV;
             try {
-              return mountState(initialState2);
+              return mountState(initialState);
             } finally {
               ReactSharedInternals.H = prevDispatcher;
             }
@@ -17983,16 +17983,16 @@
         };
         HooksDispatcherOnMountWithHookTypesInDEV.useMemoCache = useMemoCache;
         HooksDispatcherOnMountWithHookTypesInDEV.useHostTransitionStatus = useHostTransitionStatus;
-        HooksDispatcherOnMountWithHookTypesInDEV.useFormState = function(action, initialState2) {
+        HooksDispatcherOnMountWithHookTypesInDEV.useFormState = function(action, initialState) {
           currentHookNameInDev = "useFormState";
           updateHookTypesDev();
           warnOnUseFormStateInDev();
-          return mountActionState(action, initialState2);
+          return mountActionState(action, initialState);
         };
-        HooksDispatcherOnMountWithHookTypesInDEV.useActionState = function(action, initialState2) {
+        HooksDispatcherOnMountWithHookTypesInDEV.useActionState = function(action, initialState) {
           currentHookNameInDev = "useActionState";
           updateHookTypesDev();
-          return mountActionState(action, initialState2);
+          return mountActionState(action, initialState);
         };
         HooksDispatcherOnMountWithHookTypesInDEV.useOptimistic = function(passthrough) {
           currentHookNameInDev = "useOptimistic";
@@ -18324,14 +18324,14 @@
             mountHookTypesDev();
             return mountRef(initialValue);
           },
-          useState: function(initialState2) {
+          useState: function(initialState) {
             currentHookNameInDev = "useState";
             warnInvalidHookAccess();
             mountHookTypesDev();
             var prevDispatcher = ReactSharedInternals.H;
             ReactSharedInternals.H = InvalidNestedHooksDispatcherOnMountInDEV;
             try {
-              return mountState(initialState2);
+              return mountState(initialState);
             } finally {
               ReactSharedInternals.H = prevDispatcher;
             }
@@ -18380,17 +18380,17 @@
           }
         };
         InvalidNestedHooksDispatcherOnMountInDEV.useHostTransitionStatus = useHostTransitionStatus;
-        InvalidNestedHooksDispatcherOnMountInDEV.useFormState = function(action, initialState2) {
+        InvalidNestedHooksDispatcherOnMountInDEV.useFormState = function(action, initialState) {
           currentHookNameInDev = "useFormState";
           warnInvalidHookAccess();
           mountHookTypesDev();
-          return mountActionState(action, initialState2);
+          return mountActionState(action, initialState);
         };
-        InvalidNestedHooksDispatcherOnMountInDEV.useActionState = function(action, initialState2) {
+        InvalidNestedHooksDispatcherOnMountInDEV.useActionState = function(action, initialState) {
           currentHookNameInDev = "useActionState";
           warnInvalidHookAccess();
           mountHookTypesDev();
-          return mountActionState(action, initialState2);
+          return mountActionState(action, initialState);
         };
         InvalidNestedHooksDispatcherOnMountInDEV.useOptimistic = function(passthrough) {
           currentHookNameInDev = "useOptimistic";
@@ -19144,7 +19144,7 @@
           }
         };
         (function() {
-          var isomorphicReactPackageVersion = React3.version;
+          var isomorphicReactPackageVersion = React4.version;
           if ("19.0.0" !== isomorphicReactPackageVersion)
             throw Error(
               'Incompatible React versions: The "react" and "react-dom" packages must have the exact same version. Instead got:\n  - react:      ' + (isomorphicReactPackageVersion + "\n  - react-dom:  19.0.0\nLearn more: https://react.dev/warnings/version-mismatch")
@@ -19286,202 +19286,63 @@
   });
 
   // src/renderer/popup.tsx
-  var import_react = __toESM(require_react());
+  var import_react4 = __toESM(require_react());
   var import_client = __toESM(require_client());
 
-  // src/renderer/components/layout/theme-provider.tsx
-  var React = __toESM(require_react());
-  var initialState = {
-    theme: "system",
-    setTheme: () => null
-  };
-  var ThemeProviderContext = React.createContext(initialState);
-  function ThemeProvider({
-    children,
-    defaultTheme = "system",
-    ...props
-  }) {
-    const [theme, setTheme] = React.useState(defaultTheme);
-    React.useEffect(() => {
-      const root2 = window.document.documentElement;
-      root2.classList.remove("light", "dark");
-      if (theme === "system") {
-        const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-        root2.classList.add(systemTheme);
-        return;
-      }
-      root2.classList.add(theme);
-    }, [theme]);
-    const value = {
-      theme,
-      setTheme: (theme2) => setTheme(theme2)
-    };
-    return /* @__PURE__ */ React.createElement(ThemeProviderContext.Provider, { ...props, value }, children);
-  }
+  // src/renderer/components/features/dictation/DictationPopup/index.tsx
+  var import_react3 = __toESM(require_react());
 
-  // src/shared/constants.ts
-  var DEFAULT_SETTINGS = {
-    apiKey: "",
-    selectedMicrophone: "",
-    language: "en",
-    theme: "system",
-    saveTranscriptions: true,
-    transcriptionSavePath: "",
-    autoTranscribe: false
-  };
+  // src/renderer/context/AppContext.tsx
+  var import_react2 = __toESM(require_react());
 
-  // src/renderer/mock-electron-api.ts
-  var mockElectronAPI = {
-    // Audio recording
-    getAudioSources: async () => {
-      console.log("Mock: getAudioSources called");
-      return [
-        { id: "mock-device-1", name: "Mock Microphone 1" },
-        { id: "mock-device-2", name: "Mock Microphone 2" }
-      ];
-    },
-    getAudioDevices: async () => {
-      console.log("Mock: getAudioDevices called");
-      return [
-        { id: "mock-device-1", name: "Mock Microphone 1", isDefault: true },
-        { id: "mock-device-2", name: "Mock Microphone 2", isDefault: false }
-      ];
-    },
-    startRecording: async (sourceId) => {
-      console.log(`Mock: startRecording called with sourceId: ${sourceId}`);
-    },
-    saveRecording: async (arrayBuffer) => {
-      console.log(`Mock: saveRecording called with ${arrayBuffer.byteLength} bytes`);
-      return { success: true, filePath: "/mock/path/to/recording.webm" };
-    },
-    getRecordingPath: async () => {
-      console.log("Mock: getRecordingPath called");
-      return "/mock/path/to/recording.webm";
-    },
-    // Groq API
-    transcribeAudio: async (filePath, options) => {
-      console.log(`Mock: transcribeAudio called with filePath: ${filePath}, language: ${options.language}`);
-      return {
-        success: true,
-        text: "This is a mock transcription of the audio file.",
-        language: options.language || "en",
-        model: "mock-model"
-      };
-    },
-    translateAudio: async (filePath) => {
-      console.log(`Mock: translateAudio called with filePath: ${filePath}`);
-      return {
-        success: true,
-        text: "This is a mock translation of the audio file.",
-        model: "mock-model"
-      };
-    },
-    transcribeRecording: async (language) => {
-      console.log(`Mock: transcribeRecording called with language: ${language}`);
-      return {
-        success: true,
-        id: `mock-${Date.now()}`,
-        text: "This is a mock transcription generated for testing purposes.",
-        timestamp: Date.now(),
-        duration: 30,
-        language
-      };
-    },
-    // Settings
-    getSettings: async () => {
-      console.log("Mock: getSettings called");
-      return DEFAULT_SETTINGS;
-    },
-    saveSettings: async (settings) => {
-      console.log(`Mock: saveSettings called with settings:`, settings);
-    },
-    // File storage
-    saveTranscription: async (id) => {
-      console.log(`Mock: saveTranscription called with id: ${id}`);
-      return { success: true };
-    },
-    saveTranscriptionAs: async (text) => {
-      console.log(`Mock: saveTranscriptionAs called with text: ${text.substring(0, 20)}...`);
-      return { success: true, filePath: "/mock/path/to/user-selected-file.txt" };
-    },
-    getRecentTranscriptions: async () => {
-      console.log("Mock: getRecentTranscriptions called");
-      return {
-        success: true,
-        files: [
-          {
-            name: "Mock Transcription 1.txt",
-            path: "/mock/path/to/transcription1.txt",
-            size: 1024,
-            createdAt: new Date(Date.now() - 864e5),
-            // 1 day ago
-            modifiedAt: new Date(Date.now() - 864e5)
-          },
-          {
-            name: "Mock Transcription 2.txt",
-            path: "/mock/path/to/transcription2.txt",
-            size: 2048,
-            createdAt: new Date(Date.now() - 1728e5),
-            // 2 days ago
-            modifiedAt: new Date(Date.now() - 1728e5)
-          }
-        ]
-      };
-    },
-    getTranscriptions: async () => {
-      console.log("Mock: getTranscriptions called");
-      return [
-        {
-          id: "mock-1",
-          text: "This is a mock transcription for testing purposes.",
-          timestamp: Date.now() - 864e5,
-          // 1 day ago
-          duration: 30,
-          language: "en"
-        },
-        {
-          id: "mock-2",
-          text: "Another mock transcription with different content.",
-          timestamp: Date.now() - 1728e5,
-          // 2 days ago
-          duration: 45,
-          language: "en"
-        }
-      ];
-    },
-    // Event listeners
-    onToggleRecording: (callback) => {
-      console.log("Mock: onToggleRecording listener registered");
-      return () => {
-        console.log("Mock: onToggleRecording listener unregistered");
-      };
-    },
-    onRecordingSourceSelected: (callback) => {
-      console.log("Mock: onRecordingSourceSelected listener registered");
-      return () => {
-        console.log("Mock: onRecordingSourceSelected listener unregistered");
-      };
-    },
-    stopRecording: async () => {
-      console.log("Mock: stopRecording called");
+  // src/renderer/hooks/useAudioRecording.ts
+  var import_react = __toESM(require_react());
+
+  // src/renderer/context/AppContext.tsx
+  var AppContext = (0, import_react2.createContext)(void 0);
+  var useAppContext = () => {
+    const context = (0, import_react2.useContext)(AppContext);
+    if (context === void 0) {
+      throw new Error("useAppContext must be used within an AppContextProvider");
     }
+    return context;
   };
-  if (typeof window !== "undefined" && !window.electronAPI) {
-    console.log("Using mock Electron API");
-    window.electronAPI = mockElectronAPI;
-  }
+
+  // src/renderer/components/features/dictation/DictationPopup/index.tsx
+  var DictationPopup = () => {
+    const { isRecording } = useAppContext();
+    const [visible, setVisible] = (0, import_react3.useState)(false);
+    (0, import_react3.useEffect)(() => {
+      if (isRecording) {
+        setVisible(true);
+      } else {
+        const timer = setTimeout(() => {
+          setVisible(false);
+        }, 300);
+        return () => clearTimeout(timer);
+      }
+    }, [isRecording]);
+    if (!visible) return null;
+    return /* @__PURE__ */ import_react3.default.createElement(
+      "div",
+      {
+        className: "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none transition-opacity duration-300",
+        style: { opacity: isRecording ? 1 : 0 }
+      },
+      /* @__PURE__ */ import_react3.default.createElement("div", { className: "flex flex-col items-center justify-center p-8 rounded-2xl bg-black/80 w-[200px] h-[200px] shadow-lg" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "relative w-[120px] h-[120px] mb-4" }, /* @__PURE__ */ import_react3.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120px] h-[120px] rounded-full bg-transparent border-2 border-primary animate-ping opacity-70" }), /* @__PURE__ */ import_react3.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[110px] h-[110px] rounded-full bg-transparent border-2 border-primary animate-ping opacity-70 [animation-delay:200ms]" }), /* @__PURE__ */ import_react3.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100px] h-[100px] rounded-full bg-transparent border-2 border-primary animate-ping opacity-70 [animation-delay:400ms]" }), /* @__PURE__ */ import_react3.default.createElement("div", { className: "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center w-[60px] h-[60px] rounded-full bg-primary animate-pulse" }, /* @__PURE__ */ import_react3.default.createElement("svg", { className: "w-8 h-8 text-white", xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }, /* @__PURE__ */ import_react3.default.createElement("path", { d: "M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" }), /* @__PURE__ */ import_react3.default.createElement("path", { d: "M19 10v2a7 7 0 0 1-14 0v-2" }), /* @__PURE__ */ import_react3.default.createElement("line", { x1: "12", x2: "12", y1: "19", y2: "22" })))), /* @__PURE__ */ import_react3.default.createElement("h2", { className: "text-white font-bold text-lg mb-2" }, "Recording..."), /* @__PURE__ */ import_react3.default.createElement("p", { className: "text-white/70 text-xs mt-1" }, "Press Home to stop"))
+    );
+  };
+  var DictationPopup_default = DictationPopup;
 
   // src/renderer/popup.tsx
-  var PopupApp = () => {
-    return /* @__PURE__ */ import_react.default.createElement("div", { className: "flex flex-col items-center justify-center h-screen bg-background rounded-lg border border-border shadow-lg overflow-hidden" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "w-24 h-24 relative" }, /* @__PURE__ */ import_react.default.createElement("div", { className: "absolute inset-0 bg-primary/20 rounded-full animate-ping" }), /* @__PURE__ */ import_react.default.createElement("div", { className: "absolute inset-4 bg-primary/40 rounded-full animate-pulse" }), /* @__PURE__ */ import_react.default.createElement("div", { className: "absolute inset-8 bg-primary rounded-full" })), /* @__PURE__ */ import_react.default.createElement("h2", { className: "mt-4 text-lg font-medium text-foreground" }, "Recording..."), /* @__PURE__ */ import_react.default.createElement("p", { className: "text-sm text-muted-foreground mt-2" }, "Press Home key to stop"));
-  };
+  console.log("Popup window started");
   var rootElement = document.getElementById("root");
   if (!rootElement) {
     throw new Error("Root element not found");
   }
   var root = (0, import_client.createRoot)(rootElement);
   root.render(
-    /* @__PURE__ */ import_react.default.createElement(import_react.default.StrictMode, null, /* @__PURE__ */ import_react.default.createElement(ThemeProvider, { defaultTheme: "system" }, /* @__PURE__ */ import_react.default.createElement(PopupApp, null)))
+    /* @__PURE__ */ import_react4.default.createElement(import_react4.default.StrictMode, null, /* @__PURE__ */ import_react4.default.createElement(DictationPopup_default, null))
   );
 })();
 /*! Bundled license information:

@@ -3,10 +3,18 @@ interface AudioSource {
   name: string;
 }
 
+interface AudioDevice {
+  id: string;
+  name: string;
+  isDefault: boolean;
+}
+
 interface Transcription {
+  id: string;
   text: string;
-  language: string;
-  timestamp: Date;
+  timestamp: number;
+  duration: number;
+  language?: string;
 }
 
 interface RecentFile {
@@ -20,16 +28,30 @@ interface RecentFile {
 interface ElectronAPI {
   // Audio recording
   getAudioSources: () => Promise<Array<{ id: string; name: string }>>;
+  getAudioDevices: () => Promise<AudioDevice[]>;
   saveRecording: (arrayBuffer: ArrayBuffer) => Promise<{ success: boolean; filePath?: string; error?: string }>;
   getRecordingPath: () => Promise<string>;
   startRecording: (sourceId: string) => Promise<{ success: boolean; error?: string }>;
   stopRecording: () => Promise<{ success: boolean; error?: string }>;
   
+  // Audio device detection
+  onAudioDevicesRequest: (callback: () => void) => () => void;
+  sendAudioDevicesResult: (devices: AudioDevice[]) => void;
+  
   // Groq API
-  transcribeAudio: (filePath: string, options?: { language?: string; model?: string }) => 
+  transcribeAudio: (filePath: string, options?: { language?: string; model?: string; apiKey?: string }) => 
     Promise<{ success: boolean; text?: string; language?: string; model?: string; error?: string }>;
-  translateAudio: (filePath: string) => 
+  translateAudio: (filePath: string, options?: { apiKey?: string }) => 
     Promise<{ success: boolean; text?: string; model?: string; error?: string }>;
+  transcribeRecording: (language: string, apiKey: string) => Promise<{ 
+    success: boolean; 
+    id: string; 
+    text: string; 
+    timestamp: number; 
+    duration: number; 
+    language?: string; 
+    error?: string 
+  }>;
   
   // File storage
   saveTranscription: (text: string, options?: { filename?: string; format?: string }) => 
@@ -38,6 +60,7 @@ interface ElectronAPI {
     Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
   getRecentTranscriptions: () => 
     Promise<{ success: boolean; files?: Array<{ name: string; path: string; size: number; createdAt: Date; modifiedAt: Date }>; error?: string }>;
+  getTranscriptions: () => Promise<Transcription[]>;
   openFile: (path: string) => 
     Promise<{ success: boolean; error?: string }>;
   

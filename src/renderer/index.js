@@ -19762,147 +19762,6 @@
     autoTranscribe: false
   };
 
-  // src/renderer/mock-electron-api.ts
-  var mockElectronAPI = {
-    // Audio recording
-    getAudioSources: async () => {
-      console.log("Mock: getAudioSources called");
-      return [
-        { id: "mock-device-1", name: "Mock Microphone 1" },
-        { id: "mock-device-2", name: "Mock Microphone 2" }
-      ];
-    },
-    getAudioDevices: async () => {
-      console.log("Mock: getAudioDevices called");
-      return [
-        { id: "mock-device-1", name: "Mock Microphone 1", isDefault: true },
-        { id: "mock-device-2", name: "Mock Microphone 2", isDefault: false }
-      ];
-    },
-    startRecording: async (sourceId) => {
-      console.log(`Mock: startRecording called with sourceId: ${sourceId}`);
-    },
-    saveRecording: async (arrayBuffer) => {
-      console.log(`Mock: saveRecording called with ${arrayBuffer.byteLength} bytes`);
-      return { success: true, filePath: "/mock/path/to/recording.webm" };
-    },
-    getRecordingPath: async () => {
-      console.log("Mock: getRecordingPath called");
-      return "/mock/path/to/recording.webm";
-    },
-    // Groq API
-    transcribeAudio: async (filePath, options) => {
-      console.log(`Mock: transcribeAudio called with filePath: ${filePath}, language: ${options.language}`);
-      return {
-        success: true,
-        text: "This is a mock transcription of the audio file.",
-        language: options.language || "en",
-        model: "mock-model"
-      };
-    },
-    translateAudio: async (filePath) => {
-      console.log(`Mock: translateAudio called with filePath: ${filePath}`);
-      return {
-        success: true,
-        text: "This is a mock translation of the audio file.",
-        model: "mock-model"
-      };
-    },
-    transcribeRecording: async (language) => {
-      console.log(`Mock: transcribeRecording called with language: ${language}`);
-      return {
-        success: true,
-        id: `mock-${Date.now()}`,
-        text: "This is a mock transcription generated for testing purposes.",
-        timestamp: Date.now(),
-        duration: 30,
-        language
-      };
-    },
-    // Settings
-    getSettings: async () => {
-      console.log("Mock: getSettings called");
-      return DEFAULT_SETTINGS;
-    },
-    saveSettings: async (settings) => {
-      console.log(`Mock: saveSettings called with settings:`, settings);
-    },
-    // File storage
-    saveTranscription: async (id) => {
-      console.log(`Mock: saveTranscription called with id: ${id}`);
-      return { success: true };
-    },
-    saveTranscriptionAs: async (text) => {
-      console.log(`Mock: saveTranscriptionAs called with text: ${text.substring(0, 20)}...`);
-      return { success: true, filePath: "/mock/path/to/user-selected-file.txt" };
-    },
-    getRecentTranscriptions: async () => {
-      console.log("Mock: getRecentTranscriptions called");
-      return {
-        success: true,
-        files: [
-          {
-            name: "Mock Transcription 1.txt",
-            path: "/mock/path/to/transcription1.txt",
-            size: 1024,
-            createdAt: new Date(Date.now() - 864e5),
-            // 1 day ago
-            modifiedAt: new Date(Date.now() - 864e5)
-          },
-          {
-            name: "Mock Transcription 2.txt",
-            path: "/mock/path/to/transcription2.txt",
-            size: 2048,
-            createdAt: new Date(Date.now() - 1728e5),
-            // 2 days ago
-            modifiedAt: new Date(Date.now() - 1728e5)
-          }
-        ]
-      };
-    },
-    getTranscriptions: async () => {
-      console.log("Mock: getTranscriptions called");
-      return [
-        {
-          id: "mock-1",
-          text: "This is a mock transcription for testing purposes.",
-          timestamp: Date.now() - 864e5,
-          // 1 day ago
-          duration: 30,
-          language: "en"
-        },
-        {
-          id: "mock-2",
-          text: "Another mock transcription with different content.",
-          timestamp: Date.now() - 1728e5,
-          // 2 days ago
-          duration: 45,
-          language: "en"
-        }
-      ];
-    },
-    // Event listeners
-    onToggleRecording: (callback) => {
-      console.log("Mock: onToggleRecording listener registered");
-      return () => {
-        console.log("Mock: onToggleRecording listener unregistered");
-      };
-    },
-    onRecordingSourceSelected: (callback) => {
-      console.log("Mock: onRecordingSourceSelected listener registered");
-      return () => {
-        console.log("Mock: onRecordingSourceSelected listener unregistered");
-      };
-    },
-    stopRecording: async () => {
-      console.log("Mock: stopRecording called");
-    }
-  };
-  if (typeof window !== "undefined" && !window.electronAPI) {
-    console.log("Using mock Electron API");
-    window.electronAPI = mockElectronAPI;
-  }
-
   // src/renderer/hooks/useAudioRecording.ts
   var import_react = __toESM(require_react());
   var useAudioRecording = ({
@@ -20003,6 +19862,8 @@
       refreshRecentTranscriptions();
       let unsubscribeToggleRecording = () => {
       };
+      let unsubscribeAudioDevicesRequest = () => {
+      };
       try {
         if (window.electronAPI && typeof window.electronAPI.onToggleRecording === "function") {
           unsubscribeToggleRecording = window.electronAPI.onToggleRecording(() => {
@@ -20013,12 +19874,18 @@
             }
           });
         }
+        if (window.electronAPI && typeof window.electronAPI.onAudioDevicesRequest === "function") {
+          unsubscribeAudioDevicesRequest = window.electronAPI.onAudioDevicesRequest(() => {
+            refreshAudioDevices();
+          });
+        }
       } catch (error) {
         console.error("Error setting up event listeners:", error);
       }
       return () => {
         try {
           unsubscribeToggleRecording();
+          unsubscribeAudioDevicesRequest();
         } catch (error) {
           console.error("Error cleaning up event listeners:", error);
         }
@@ -20047,20 +19914,41 @@
     };
     const refreshAudioDevices = async () => {
       try {
-        if (window.electronAPI && typeof window.electronAPI.getAudioDevices === "function") {
-          const devices = await window.electronAPI.getAudioDevices();
-          setAudioDevices(devices);
-          if (devices.length > 0 && !selectedDevice) {
-            setSelectedDevice(devices[0]);
+        const devices = [];
+        const mediaDevices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputDevices = mediaDevices.filter((device) => device.kind === "audioinput");
+        for (const device of audioInputDevices) {
+          devices.push({
+            id: device.deviceId,
+            name: device.label || `Microphone ${devices.length + 1}`,
+            isDefault: device.deviceId === "default" || device.deviceId === ""
+          });
+        }
+        if (devices.length > 0 && devices.every((d) => !d.name || d.name.startsWith("Microphone "))) {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach((track) => track.stop());
+            const devicesWithLabels = await navigator.mediaDevices.enumerateDevices();
+            const audioInputDevicesWithLabels = devicesWithLabels.filter((device) => device.kind === "audioinput");
+            devices.length = 0;
+            for (const device of audioInputDevicesWithLabels) {
+              devices.push({
+                id: device.deviceId,
+                name: device.label || `Microphone ${devices.length + 1}`,
+                isDefault: device.deviceId === "default" || device.deviceId === ""
+              });
+            }
+          } catch (err) {
+            console.error("Failed to get microphone permission:", err);
           }
-        } else {
-          console.warn("getAudioDevices API not available");
-          const mockDevices = [
-            { id: "mock-device-1", name: "Mock Microphone 1", isDefault: true },
-            { id: "mock-device-2", name: "Mock Microphone 2", isDefault: false }
-          ];
-          setAudioDevices(mockDevices);
-          setSelectedDevice(mockDevices[0]);
+        }
+        setAudioDevices(devices);
+        if (devices.length > 0 && !selectedDevice) {
+          const defaultDevice = devices.find((d) => d.isDefault) || devices[0];
+          setSelectedDevice(defaultDevice);
+        }
+        if (window.electronAPI && typeof window.electronAPI.sendAudioDevicesResult === "function") {
+          window.electronAPI.sendAudioDevicesResult(devices);
         }
       } catch (error) {
         console.error("Failed to get audio devices:", error);
@@ -20073,24 +19961,6 @@
           setRecentTranscriptions(transcriptions || []);
         } else {
           console.warn("getTranscriptions API not available");
-          setRecentTranscriptions([
-            {
-              id: "mock-1",
-              text: "This is a mock transcription for testing purposes.",
-              timestamp: Date.now() - 864e5,
-              // 1 day ago
-              duration: 30,
-              language: "en"
-            },
-            {
-              id: "mock-2",
-              text: "Another mock transcription with different content.",
-              timestamp: Date.now() - 1728e5,
-              // 2 days ago
-              duration: 45,
-              language: "en"
-            }
-          ]);
         }
       } catch (error) {
         console.error("Failed to get recent transcriptions:", error);
@@ -20132,7 +20002,10 @@
     const transcribeRecording = async (language) => {
       try {
         if (window.electronAPI && typeof window.electronAPI.transcribeRecording === "function") {
-          const result = await window.electronAPI.transcribeRecording(language || settings.language);
+          const result = await window.electronAPI.transcribeRecording(
+            language || settings.language,
+            settings.apiKey
+          );
           if (result.success) {
             setCurrentTranscription({
               id: result.id,
@@ -20142,16 +20015,11 @@
               language: result.language || settings.language
             });
             refreshRecentTranscriptions();
+          } else if (result.error) {
+            console.error("Transcription error:", result.error);
           }
         } else {
           console.warn("transcribeRecording API not available");
-          setCurrentTranscription({
-            id: `mock-${Date.now()}`,
-            text: "This is a mock transcription generated for testing purposes.",
-            timestamp: Date.now(),
-            duration: recordingTime,
-            language: language || settings.language
-          });
         }
       } catch (error) {
         console.error("Failed to transcribe recording:", error);

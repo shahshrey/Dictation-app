@@ -12,8 +12,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Groq API
   transcribeAudio: (filePath, options) => 
     ipcRenderer.invoke('transcribe-audio', filePath, options),
-  translateAudio: (filePath) => 
-    ipcRenderer.invoke('translate-audio', filePath),
+  translateAudio: (filePath, options) => 
+    ipcRenderer.invoke('translate-audio', filePath, options),
+  transcribeRecording: (language, apiKey) => 
+    ipcRenderer.invoke('transcribe-recording', language, apiKey),
   
   // File storage
   saveTranscription: (text, options) => 

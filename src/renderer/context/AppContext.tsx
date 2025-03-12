@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import '../mock-electron-api'; // Import the mock API at the top of the file
 import { AudioDevice, Transcription, AppSettings, IPC_CHANNELS } from '../../shared/types';
 import { DEFAULT_SETTINGS } from '../../shared/constants';
 import { useAudioRecording } from '../hooks/useAudioRecording';
@@ -67,8 +66,9 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     loadSettings();
     refreshRecentTranscriptions();
     
-    // Set up event listeners for the Home key
+    // Set up event listeners for the Home key and audio device requests
     let unsubscribeToggleRecording = () => {};
+    let unsubscribeAudioDevicesRequest = () => {};
     
     try {
       // Check if the API is available
@@ -81,6 +81,14 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
           }
         });
       }
+      
+      // Set up listener for audio device requests from the main process
+      if (window.electronAPI && typeof window.electronAPI.onAudioDevicesRequest === 'function') {
+        unsubscribeAudioDevicesRequest = window.electronAPI.onAudioDevicesRequest(() => {
+          // When the main process requests audio devices, refresh them
+          refreshAudioDevices();
+        });
+      }
     } catch (error) {
       console.error('Error setting up event listeners:', error);
     }
@@ -88,6 +96,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     return () => {
       try {
         unsubscribeToggleRecording();
+        unsubscribeAudioDevicesRequest();
       } catch (error) {
         console.error('Error cleaning up event listeners:', error);
       }
@@ -123,23 +132,62 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   // Refresh audio devices
   const refreshAudioDevices = async (): Promise<void> => {
     try {
-      if (window.electronAPI && typeof window.electronAPI.getAudioDevices === 'function') {
-        const devices = await window.electronAPI.getAudioDevices();
-        setAudioDevices(devices);
-        
-        // Select the first device if none is selected
-        if (devices.length > 0 && !selectedDevice) {
-          setSelectedDevice(devices[0]);
+      // Use the Web Audio API to enumerate devices directly in the renderer
+      const devices: AudioDevice[] = [];
+      
+      // Get all media devices
+      const mediaDevices = await navigator.mediaDevices.enumerateDevices();
+      
+      // Filter for audio input devices (microphones)
+      const audioInputDevices = mediaDevices.filter(device => device.kind === 'audioinput');
+      
+      // Map to our AudioDevice type
+      for (const device of audioInputDevices) {
+        devices.push({
+          id: device.deviceId,
+          name: device.label || `Microphone ${devices.length + 1}`,
+          isDefault: device.deviceId === 'default' || device.deviceId === ''
+        });
+      }
+      
+      // If no devices have labels, we need to request permission first
+      if (devices.length > 0 && devices.every(d => !d.name || d.name.startsWith('Microphone '))) {
+        try {
+          // Request microphone access to get device labels
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          // Stop the stream immediately after getting labels
+          stream.getTracks().forEach(track => track.stop());
+          
+          // Try enumerating again to get labels
+          const devicesWithLabels = await navigator.mediaDevices.enumerateDevices();
+          const audioInputDevicesWithLabels = devicesWithLabels.filter(device => device.kind === 'audioinput');
+          
+          // Clear and refill the devices array
+          devices.length = 0;
+          for (const device of audioInputDevicesWithLabels) {
+            devices.push({
+              id: device.deviceId,
+              name: device.label || `Microphone ${devices.length + 1}`,
+              isDefault: device.deviceId === 'default' || device.deviceId === ''
+            });
+          }
+        } catch (err) {
+          console.error('Failed to get microphone permission:', err);
         }
-      } else {
-        console.warn('getAudioDevices API not available');
-        // Use mock data
-        const mockDevices: AudioDevice[] = [
-          { id: 'mock-device-1', name: 'Mock Microphone 1', isDefault: true },
-          { id: 'mock-device-2', name: 'Mock Microphone 2', isDefault: false }
-        ];
-        setAudioDevices(mockDevices);
-        setSelectedDevice(mockDevices[0]);
+      }
+      
+      // Update state with the devices
+      setAudioDevices(devices);
+      
+      // Select the default device if none is selected
+      if (devices.length > 0 && !selectedDevice) {
+        const defaultDevice = devices.find(d => d.isDefault) || devices[0];
+        setSelectedDevice(defaultDevice);
+      }
+      
+      // Send the devices back to the main process
+      if (window.electronAPI && typeof window.electronAPI.sendAudioDevicesResult === 'function') {
+        window.electronAPI.sendAudioDevicesResult(devices);
       }
     } catch (error) {
       console.error('Failed to get audio devices:', error);
@@ -154,23 +202,6 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
         setRecentTranscriptions(transcriptions || []);
       } else {
         console.warn('getTranscriptions API not available');
-        // Use mock data
-        setRecentTranscriptions([
-          { 
-            id: 'mock-1',
-            text: 'This is a mock transcription for testing purposes.',
-            timestamp: Date.now() - 86400000, // 1 day ago
-            duration: 30,
-            language: 'en'
-          },
-          { 
-            id: 'mock-2',
-            text: 'Another mock transcription with different content.',
-            timestamp: Date.now() - 172800000, // 2 days ago
-            duration: 45,
-            language: 'en'
-          }
-        ]);
       }
     } catch (error) {
       console.error('Failed to get recent transcriptions:', error);
@@ -222,7 +253,11 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   const transcribeRecording = async (language?: string): Promise<void> => {
     try {
       if (window.electronAPI && typeof window.electronAPI.transcribeRecording === 'function') {
-        const result = await window.electronAPI.transcribeRecording(language || settings.language);
+        const result = await window.electronAPI.transcribeRecording(
+          language || settings.language,
+          settings.apiKey
+        );
+        
         if (result.success) {
           setCurrentTranscription({
             id: result.id,
@@ -234,17 +269,12 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
           
           // Refresh the list of transcriptions
           refreshRecentTranscriptions();
+        } else if (result.error) {
+          console.error('Transcription error:', result.error);
+          // You could add error handling UI here
         }
       } else {
         console.warn('transcribeRecording API not available');
-        // Mock transcription for testing
-        setCurrentTranscription({
-          id: `mock-${Date.now()}`,
-          text: 'This is a mock transcription generated for testing purposes.',
-          timestamp: Date.now(),
-          duration: recordingTime,
-          language: language || settings.language
-        });
       }
     } catch (error) {
       console.error('Failed to transcribe recording:', error);

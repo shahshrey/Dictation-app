@@ -27,18 +27,29 @@ export const setupAudioRecording = (ipcMain: IpcMain, mainWindow: BrowserWindow 
   // Get available audio input devices
   ipcMain.handle(IPC_CHANNELS.GET_AUDIO_DEVICES, async () => {
     try {
-      // Note: desktopCapturer.getSources only supports 'screen' and 'window' types
-      // For audio devices, we need to use navigator.mediaDevices.enumerateDevices() in the renderer
-      // This is a workaround to get some audio sources
-      const sources = await desktopCapturer.getSources({ types: ['window'] });
-      return sources.map(source => ({
-        id: source.id,
-        name: source.name,
-        isDefault: false
-      } as AudioDevice));
+      if (!mainWindow) {
+        throw new Error('Main window not available');
+      }
+      
+      // Request the renderer process to enumerate audio devices
+      // This is more reliable than using desktopCapturer for audio devices
+      mainWindow.webContents.send(IPC_CHANNELS.AUDIO_DEVICES_REQUEST);
+      
+      // The actual device list will be sent back from the renderer process
+      // via a separate IPC channel (AUDIO_DEVICES_RESULT)
+      return { success: true };
     } catch (error) {
-      console.error('Failed to get audio sources:', error);
-      return [];
+      console.error('Failed to request audio devices:', error);
+      return { success: false, error: String(error) };
+    }
+  });
+
+  // Receive audio devices from renderer process
+  ipcMain.on(IPC_CHANNELS.AUDIO_DEVICES_RESULT, (_, devices: AudioDevice[]) => {
+    if (mainWindow) {
+      // Store the devices in the main process if needed
+      // And send them back to any renderer process that might need them
+      mainWindow.webContents.send(IPC_CHANNELS.AUDIO_DEVICES_RESULT, devices);
     }
   });
 

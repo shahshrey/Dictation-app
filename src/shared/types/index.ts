@@ -36,6 +36,7 @@ export const IPC_CHANNELS = {
   STOP_RECORDING: 'stop-recording',
   TRANSCRIPTION_RESULT: 'transcription-result',
   GET_AUDIO_DEVICES: 'get-audio-devices',
+  AUDIO_DEVICES_REQUEST: 'audio-devices-request',
   AUDIO_DEVICES_RESULT: 'audio-devices-result',
   SAVE_SETTINGS: 'save-settings',
   GET_SETTINGS: 'get-settings',

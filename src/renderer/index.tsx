@@ -5,7 +5,6 @@ import { AppContextProvider } from './context/AppContext';
 import { ThemeProvider } from './components/layout/theme-provider';
 // Import only the processed CSS
 import './index.css';
-import './mock-electron-api'; // Import the mock API
 
 console.log('Renderer process started');
 console.log('React version:', React.version);
