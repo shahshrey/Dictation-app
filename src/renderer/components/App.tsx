@@ -3,7 +3,6 @@ import Header from './layout/Header';
 import RecordingControls from './features/dictation/RecordingControls';
 import TranscriptionDisplay from './features/transcription/TranscriptionDisplay';
 import RecentTranscriptions from './features/transcription/RecentTranscriptions';
-import SettingsPanel from './features/settings/SettingsPanel';
 import DictationPopup from './features/dictation/DictationPopup';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
@@ -36,29 +35,16 @@ const App: React.FC = () => {
           </CardContent>
         </Card>
         
-        <div className="flex gap-3">
-          <Card className="flex-1">
-            <CardHeader>
-              <CardTitle>Recent Transcriptions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Suspense fallback={<div className="flex justify-center"><LoadingSpinner /></div>}>
-                <RecentTranscriptions />
-              </Suspense>
-            </CardContent>
-          </Card>
-          
-          <Card className="flex-1">
-            <CardHeader>
-              <CardTitle>Settings</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Suspense fallback={<div className="flex justify-center"><LoadingSpinner /></div>}>
-                <SettingsPanel />
-              </Suspense>
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="w-full">
+          <CardHeader>
+            <CardTitle>Recent Transcriptions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Suspense fallback={<div className="flex justify-center"><LoadingSpinner /></div>}>
+              <RecentTranscriptions />
+            </Suspense>
+          </CardContent>
+        </Card>
       </div>
       
       <DictationPopup />

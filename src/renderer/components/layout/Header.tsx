@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Button } from '../ui/button';
 import { ThemeToggle } from './theme-toggle';
+import SettingsModal from '../features/settings/SettingsModal';
 
 const Header: React.FC = () => {
   const { isRecording } = useAppContext();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   
   return (
     <header className="bg-primary text-primary-foreground">
@@ -23,10 +25,17 @@ const Header: React.FC = () => {
         
         <ThemeToggle />
         
-        <Button variant="ghost" size="icon" className="text-primary-foreground ml-2">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="text-primary-foreground ml-2"
+          onClick={() => setSettingsOpen(true)}
+        >
           <SettingsIcon className="h-5 w-5" />
         </Button>
       </div>
+      
+      <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
     </header>
   );
 };
