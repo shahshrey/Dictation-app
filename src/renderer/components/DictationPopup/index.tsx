@@ -1,68 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Paper, Typography } from '@mui/material';
-import { Mic as MicIcon } from '@mui/icons-material';
-import { THEME_COLORS } from '../../../shared/theme';
 import { useAppContext } from '../../context/AppContext';
-
-// CSS styles for animations
-const styles = {
-  '@keyframes wave': {
-    '0%': {
-      transform: 'scale(1)',
-      opacity: 0.8,
-    },
-    '50%': {
-      transform: 'scale(1.2)',
-      opacity: 0.4,
-    },
-    '100%': {
-      transform: 'scale(1)',
-      opacity: 0.8,
-    },
-  },
-  '@keyframes multiWave0': {
-    '0%': {
-      transform: 'scale(1)',
-      opacity: 0.7,
-    },
-    '50%': {
-      transform: 'scale(1.5)',
-      opacity: 0.3,
-    },
-    '100%': {
-      transform: 'scale(1)',
-      opacity: 0.7,
-    },
-  },
-  '@keyframes multiWave1': {
-    '0%': {
-      transform: 'scale(1)',
-      opacity: 0.7,
-    },
-    '50%': {
-      transform: 'scale(1.5)',
-      opacity: 0.3,
-    },
-    '100%': {
-      transform: 'scale(1)',
-      opacity: 0.7,
-    },
-  },
-  '@keyframes multiWave2': {
-    '0%': {
-      transform: 'scale(1)',
-      opacity: 0.7,
-    },
-    '50%': {
-      transform: 'scale(1.5)',
-      opacity: 0.3,
-    },
-    '100%': {
-      transform: 'scale(1)',
-      opacity: 0.7,
-    },
-  },
-};
 
 const DictationPopup: React.FC = () => {
   const { isRecording } = useAppContext();
@@ -84,115 +21,36 @@ const DictationPopup: React.FC = () => {
   if (!visible) return null;
   
   return (
-    <Box
-      sx={{
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        zIndex: 9999,
-        pointerEvents: 'none', // Allow clicking through the popup
-        transition: 'opacity 0.3s ease-in-out',
-        opacity: isRecording ? 1 : 0,
-      }}
+    <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none transition-opacity duration-300"
+      style={{ opacity: isRecording ? 1 : 0 }}
     >
-      <Paper
-        elevation={8}
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 4,
-          borderRadius: 4,
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
-          width: 200,
-          height: 200,
-        }}
-      >
+      <div className="flex flex-col items-center justify-center p-8 rounded-2xl bg-black/80 w-[200px] h-[200px] shadow-lg">
         {/* Animated waves */}
-        <Box sx={{ position: 'relative', width: 120, height: 120, mb: 2 }}>
+        <div className="relative w-[120px] h-[120px] mb-4">
           {/* Multiple animated circles */}
-          <Box
-            sx={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: 120,
-              height: 120,
-              borderRadius: '50%',
-              backgroundColor: 'transparent',
-              border: `2px solid ${THEME_COLORS.recordingActive}`,
-              animation: 'multiWave0 1.5s infinite ease-in-out',
-              animationDelay: '0s',
-              '@keyframes multiWave0': styles['@keyframes multiWave0'],
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: 110,
-              height: 110,
-              borderRadius: '50%',
-              backgroundColor: 'transparent',
-              border: `2px solid ${THEME_COLORS.recordingActive}`,
-              animation: 'multiWave1 1.5s infinite ease-in-out',
-              animationDelay: '0.2s',
-              '@keyframes multiWave1': styles['@keyframes multiWave1'],
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: 100,
-              height: 100,
-              borderRadius: '50%',
-              backgroundColor: 'transparent',
-              border: `2px solid ${THEME_COLORS.recordingActive}`,
-              animation: 'multiWave2 1.5s infinite ease-in-out',
-              animationDelay: '0.4s',
-              '@keyframes multiWave2': styles['@keyframes multiWave2'],
-            }}
-          />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120px] h-[120px] rounded-full bg-transparent border-2 border-primary animate-ping opacity-70"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[110px] h-[110px] rounded-full bg-transparent border-2 border-primary animate-ping opacity-70 [animation-delay:200ms]"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100px] h-[100px] rounded-full bg-transparent border-2 border-primary animate-ping opacity-70 [animation-delay:400ms]"></div>
           
           {/* Mic icon in the center */}
-          <Box
-            sx={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 60,
-              height: 60,
-              borderRadius: '50%',
-              backgroundColor: THEME_COLORS.recordingActive,
-              animation: 'wave 2s infinite ease-in-out',
-              '@keyframes wave': styles['@keyframes wave'],
-            }}
-          >
-            <MicIcon sx={{ fontSize: 32, color: 'white' }} />
-          </Box>
-        </Box>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center w-[60px] h-[60px] rounded-full bg-primary animate-pulse">
+            <svg className="w-8 h-8 text-white" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" x2="12" y1="19" y2="22"></line>
+            </svg>
+          </div>
+        </div>
         
-        <Typography variant="h6" color="white" fontWeight="bold">
+        <h2 className="text-white font-bold text-lg mb-2">
           Recording...
-        </Typography>
+        </h2>
         
-        <Typography variant="caption" color="white" sx={{ mt: 1, opacity: 0.7 }}>
+        <p className="text-white/70 text-xs mt-1">
           Press Home to stop
-        </Typography>
-      </Paper>
-    </Box>
+        </p>
+      </div>
+    </div>
   );
 };
 

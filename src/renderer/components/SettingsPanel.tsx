@@ -1,18 +1,15 @@
 import React, { useState } from 'react';
+import { Button } from './ui/button';
+import { Switch } from './ui/switch';
 import { 
-  Box, 
-  FormControl, 
-  InputLabel, 
-  Select, 
-  MenuItem, 
-  TextField,
-  Typography,
-  Switch,
-  FormControlLabel,
-  Button,
-  Divider
-} from '@mui/material';
-import { THEME_COLORS } from '../../shared/theme';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
+import { Label } from './ui/label';
+import { Input } from './ui/input';
 
 // Language options for transcription
 const LANGUAGE_OPTIONS = [
@@ -47,72 +44,64 @@ const SettingsPanel: React.FC = () => {
   };
   
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <FormControl fullWidth>
-        <InputLabel id="default-language-label">Default Language</InputLabel>
-        <Select
-          labelId="default-language-label"
-          id="default-language-select"
-          value={defaultLanguage}
-          label="Default Language"
-          onChange={(e) => setDefaultLanguage(e.target.value as string)}
-        >
-          {LANGUAGE_OPTIONS.map((language) => (
-            <MenuItem key={language.code} value={language.code}>
-              {language.name}
-            </MenuItem>
-          ))}
+    <div className="flex flex-col space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="language">Default Language</Label>
+        <Select value={defaultLanguage} onValueChange={setDefaultLanguage}>
+          <SelectTrigger id="language">
+            <SelectValue placeholder="Select language" />
+          </SelectTrigger>
+          <SelectContent>
+            {LANGUAGE_OPTIONS.map((language) => (
+              <SelectItem key={language.code} value={language.code}>
+                {language.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
         </Select>
-      </FormControl>
+      </div>
       
-      <TextField
-        fullWidth
-        label="Groq API Key"
-        type="password"
-        value={apiKey}
-        onChange={(e) => setApiKey(e.target.value)}
-        helperText="Enter your Groq API key for transcription services"
-      />
+      <div className="space-y-2">
+        <Label htmlFor="api-key">Groq API Key</Label>
+        <Input
+          id="api-key"
+          type="password"
+          value={apiKey}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApiKey(e.target.value)}
+        />
+        <p className="text-sm text-muted-foreground">
+          Enter your Groq API key for transcription services
+        </p>
+      </div>
       
-      <Divider sx={{ my: 1 }} />
+      <div className="h-px bg-border my-4" />
       
-      <Typography variant="subtitle2" gutterBottom>
-        Application Settings
-      </Typography>
+      <h3 className="text-sm font-medium">Application Settings</h3>
       
-      <FormControlLabel
-        control={
-          <Switch
-            checked={showNotifications}
-            onChange={(e) => setShowNotifications(e.target.checked)}
-            color="primary"
-          />
-        }
-        label="Show Notifications"
-      />
+      <div className="flex items-center space-x-2">
+        <Switch
+          id="notifications"
+          checked={showNotifications}
+          onCheckedChange={setShowNotifications}
+        />
+        <Label htmlFor="notifications">Show Notifications</Label>
+      </div>
       
-      <FormControlLabel
-        control={
-          <Switch
-            checked={saveTranscriptionsAutomatically}
-            onChange={(e) => setSaveTranscriptionsAutomatically(e.target.checked)}
-            color="primary"
-          />
-        }
-        label="Save Transcriptions Automatically"
-      />
+      <div className="flex items-center space-x-2">
+        <Switch
+          id="auto-save"
+          checked={saveTranscriptionsAutomatically}
+          onCheckedChange={setSaveTranscriptionsAutomatically}
+        />
+        <Label htmlFor="auto-save">Save Transcriptions Automatically</Label>
+      </div>
       
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={saveSettings}
-          sx={{ bgcolor: THEME_COLORS.primary }}
-        >
+      <div className="flex justify-end mt-4">
+        <Button onClick={saveSettings}>
           Save Settings
         </Button>
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 };
 

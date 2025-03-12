@@ -1,62 +1,37 @@
 import React from 'react';
-import { Box, Typography, Paper, Chip } from '@mui/material';
-import { THEME_COLORS } from '../../shared/theme';
 import { useAppContext } from '../context/AppContext';
+import { Card } from './ui/card';
 
 const TranscriptionDisplay: React.FC = () => {
   const { currentTranscription } = useAppContext();
   
   if (!currentTranscription) {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100%',
-          minHeight: 200,
-          p: 3,
-        }}
-      >
-        <Typography variant="body1" color="textSecondary" align="center">
+      <div className="flex flex-col items-center justify-center h-full min-h-[200px] p-6">
+        <p className="text-muted-foreground text-center">
           No transcription available. Record and transcribe audio to see results here.
-        </Typography>
-      </Box>
+        </p>
+      </div>
     );
   }
   
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-        <Chip 
-          label={`Language: ${currentTranscription.language}`} 
-          size="small" 
-          color="primary"
-        />
-        <Chip 
-          label={new Date(currentTranscription.timestamp).toLocaleString()} 
-          size="small" 
-          variant="outlined"
-        />
-      </Box>
+    <div className="flex flex-col h-full">
+      <div className="flex justify-between mb-4">
+        <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-primary text-primary-foreground">
+          Language: {currentTranscription.language}
+        </span>
+        <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">
+          {new Date(currentTranscription.timestamp).toLocaleString()}
+        </span>
+      </div>
       
-      <Paper
-        elevation={0}
-        sx={{
-          p: 2,
-          flex: 1,
-          overflow: 'auto',
-          bgcolor: THEME_COLORS.background,
-          border: `1px solid ${THEME_COLORS.divider}`,
-          borderRadius: 1,
-        }}
-      >
-        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+      <Card className="p-4 flex-1 overflow-auto bg-muted/50 border rounded">
+        <p className="whitespace-pre-wrap">
           {currentTranscription.text}
-        </Typography>
-      </Paper>
-    </Box>
+        </p>
+      </Card>
+    </div>
   );
 };
 

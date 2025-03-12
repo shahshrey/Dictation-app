@@ -32,6 +32,14 @@ module.exports = {
               js: './src/preload/preload.ts',
             },
           },
+          {
+            html: './src/renderer/popup.html',
+            js: './src/renderer/popup.tsx',
+            name: 'popup_window',
+            preload: {
+              js: './src/preload/preload.ts',
+            },
+          }
         ],
       },
     }),

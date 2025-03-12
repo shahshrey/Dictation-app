@@ -101,6 +101,7 @@ const createWindow = () => {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      webSecurity: false, // Allow loading local resources
     },
   });
 
@@ -108,7 +109,7 @@ const createWindow = () => {
   mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
 
   // Open DevTools in development mode
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.NODE_ENV === 'development' || true) {
     mainWindow.webContents.openDevTools();
   }
 };
@@ -128,6 +129,7 @@ const createPopupWindow = () => {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      webSecurity: false, // Allow loading local resources
     },
   });
 

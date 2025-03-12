@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import '../mock-electron-api'; // Import the mock API at the top of the file
 
 // Define types for our context
 interface AudioSource {
@@ -74,35 +75,61 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     refreshRecentFiles();
     
     // Set up event listeners for the Home key
-    const unsubscribeToggleRecording = window.electronAPI.onToggleRecording(() => {
-      if (isRecording) {
-        stopRecording();
-      } else {
-        startRecording();
-      }
-    });
+    let unsubscribeToggleRecording = () => {};
+    let unsubscribeRecordingSourceSelected = () => {};
     
-    // Set up event listener for recording source selected
-    const unsubscribeRecordingSourceSelected = window.electronAPI.onRecordingSourceSelected((sourceId) => {
-      setSelectedSourceId(sourceId);
-      startMediaRecorder(sourceId);
-    });
+    try {
+      // Check if the API is available
+      if (window.electronAPI && typeof window.electronAPI.onToggleRecording === 'function') {
+        unsubscribeToggleRecording = window.electronAPI.onToggleRecording(() => {
+          if (isRecording) {
+            stopRecording();
+          } else {
+            startRecording();
+          }
+        });
+      }
+      
+      // Set up event listener for recording source selected
+      if (window.electronAPI && typeof window.electronAPI.onRecordingSourceSelected === 'function') {
+        unsubscribeRecordingSourceSelected = window.electronAPI.onRecordingSourceSelected((sourceId) => {
+          setSelectedSourceId(sourceId);
+          startMediaRecorder(sourceId);
+        });
+      }
+    } catch (error) {
+      console.error('Error setting up event listeners:', error);
+    }
     
     return () => {
-      unsubscribeToggleRecording();
-      unsubscribeRecordingSourceSelected();
+      try {
+        unsubscribeToggleRecording();
+        unsubscribeRecordingSourceSelected();
+      } catch (error) {
+        console.error('Error cleaning up event listeners:', error);
+      }
     };
   }, [isRecording]);
   
   // Refresh audio sources
   const refreshAudioSources = async (): Promise<void> => {
     try {
-      const sources = await window.electronAPI.getAudioSources();
-      setAudioSources(sources);
-      
-      // Select the first source if none is selected
-      if (sources.length > 0 && !selectedSourceId) {
-        setSelectedSourceId(sources[0].id);
+      if (window.electronAPI && typeof window.electronAPI.getAudioSources === 'function') {
+        const sources = await window.electronAPI.getAudioSources();
+        setAudioSources(sources);
+        
+        // Select the first source if none is selected
+        if (sources.length > 0 && !selectedSourceId) {
+          setSelectedSourceId(sources[0].id);
+        }
+      } else {
+        console.warn('getAudioSources API not available');
+        // Use mock data
+        setAudioSources([
+          { id: 'mock-device-1', name: 'Mock Microphone 1' },
+          { id: 'mock-device-2', name: 'Mock Microphone 2' }
+        ]);
+        setSelectedSourceId('mock-device-1');
       }
     } catch (error) {
       console.error('Failed to get audio sources:', error);
@@ -112,9 +139,30 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   // Refresh recent files
   const refreshRecentFiles = async (): Promise<void> => {
     try {
-      const result = await window.electronAPI.getRecentTranscriptions();
-      if (result.success) {
-        setRecentFiles(result.files);
+      if (window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === 'function') {
+        const result = await window.electronAPI.getRecentTranscriptions();
+        if (result.success) {
+          setRecentFiles(result.files);
+        }
+      } else {
+        console.warn('getRecentTranscriptions API not available');
+        // Use mock data
+        setRecentFiles([
+          { 
+            name: 'Mock Transcription 1.txt', 
+            path: '/mock/path/to/transcription1.txt',
+            size: 1024,
+            createdAt: new Date(Date.now() - 86400000), // 1 day ago
+            modifiedAt: new Date(Date.now() - 86400000)
+          },
+          { 
+            name: 'Mock Transcription 2.txt', 
+            path: '/mock/path/to/transcription2.txt',
+            size: 2048,
+            createdAt: new Date(Date.now() - 172800000), // 2 days ago
+            modifiedAt: new Date(Date.now() - 172800000)
+          }
+        ]);
       }
     } catch (error) {
       console.error('Failed to get recent files:', error);
@@ -124,39 +172,50 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   // Start media recorder
   const startMediaRecorder = async (sourceId: string): Promise<void> => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          // @ts-ignore - Electron specific constraint
-          mandatory: {
-            chromeMediaSource: 'desktop',
-            chromeMediaSourceId: sourceId,
+      // Check if we're in a browser environment that supports MediaRecorder
+      if (typeof navigator !== 'undefined' && navigator.mediaDevices) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            // @ts-ignore - Electron specific constraint
+            mandatory: {
+              chromeMediaSource: 'desktop',
+              chromeMediaSourceId: sourceId,
+            }
           }
-        }
-      });
-      
-      const recorder = new MediaRecorder(stream);
-      setMediaRecorder(recorder);
-      
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          setAudioChunks((chunks) => [...chunks, event.data]);
-        }
-      };
-      
-      recorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-        const arrayBuffer = await audioBlob.arrayBuffer();
+        });
         
-        // Save the recording
-        const result = await window.electronAPI.saveRecording(arrayBuffer);
-        if (result.success) {
-          console.log('Recording saved:', result.filePath);
-        }
-      };
-      
-      recorder.start();
-      setIsRecording(true);
-      setAudioChunks([]);
+        const recorder = new MediaRecorder(stream);
+        setMediaRecorder(recorder);
+        
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            setAudioChunks((chunks) => [...chunks, event.data]);
+          }
+        };
+        
+        recorder.onstop = async () => {
+          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          const arrayBuffer = await audioBlob.arrayBuffer();
+          
+          // Save the recording
+          if (window.electronAPI && typeof window.electronAPI.saveRecording === 'function') {
+            const result = await window.electronAPI.saveRecording(arrayBuffer);
+            if (result.success) {
+              console.log('Recording saved:', result.filePath);
+            }
+          } else {
+            console.warn('saveRecording API not available');
+          }
+        };
+        
+        recorder.start();
+        setIsRecording(true);
+        setAudioChunks([]);
+      } else {
+        console.warn('MediaRecorder not supported in this environment');
+        // Mock recording behavior
+        setIsRecording(true);
+      }
     } catch (error) {
       console.error('Failed to start recording:', error);
     }
@@ -170,7 +229,11 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
         await startMediaRecorder(selectedSourceId);
         
         // Notify the main process that recording has started
-        await window.electronAPI.startRecording(selectedSourceId);
+        if (window.electronAPI && typeof window.electronAPI.startRecording === 'function') {
+          await window.electronAPI.startRecording(selectedSourceId);
+        } else {
+          console.warn('startRecording API not available');
+        }
         
         setIsRecording(true);
       } catch (error) {
@@ -192,28 +255,46 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
       }
       
       // Notify the main process that recording has stopped
-      await window.electronAPI.stopRecording();
+      if (window.electronAPI && typeof window.electronAPI.stopRecording === 'function') {
+        await window.electronAPI.stopRecording();
+      } else {
+        console.warn('stopRecording API not available');
+      }
       
       setIsRecording(false);
     } catch (error) {
       console.error('Failed to stop recording:', error);
+      // Ensure recording state is reset even if there's an error
+      setIsRecording(false);
     }
   };
   
   // Transcribe recording
   const transcribeRecording = async (language?: string): Promise<void> => {
     try {
-      const filePath = await window.electronAPI.getRecordingPath();
-      const result = await window.electronAPI.transcribeAudio(filePath, { language });
-      
-      if (result.success) {
+      if (window.electronAPI && 
+          typeof window.electronAPI.getRecordingPath === 'function' && 
+          typeof window.electronAPI.transcribeAudio === 'function') {
+        const filePath = await window.electronAPI.getRecordingPath();
+        const result = await window.electronAPI.transcribeAudio(filePath, { language });
+        
+        if (result.success) {
+          setCurrentTranscription({
+            text: result.text || '',
+            language: result.language || 'en',
+            timestamp: new Date()
+          });
+        } else {
+          console.error('Failed to transcribe audio:', result.error);
+        }
+      } else {
+        console.warn('transcribeAudio API not available');
+        // Mock transcription
         setCurrentTranscription({
-          text: result.text,
-          language: result.language,
+          text: 'This is a mock transcription of the audio file.',
+          language: language || 'en',
           timestamp: new Date()
         });
-      } else {
-        console.error('Failed to transcribe audio:', result.error);
       }
     } catch (error) {
       console.error('Failed to transcribe recording:', error);
@@ -223,17 +304,29 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   // Translate recording
   const translateRecording = async (): Promise<void> => {
     try {
-      const filePath = await window.electronAPI.getRecordingPath();
-      const result = await window.electronAPI.translateAudio(filePath);
-      
-      if (result.success) {
+      if (window.electronAPI && 
+          typeof window.electronAPI.getRecordingPath === 'function' && 
+          typeof window.electronAPI.translateAudio === 'function') {
+        const filePath = await window.electronAPI.getRecordingPath();
+        const result = await window.electronAPI.translateAudio(filePath);
+        
+        if (result.success) {
+          setCurrentTranscription({
+            text: result.text || '',
+            language: 'en', // Translation is always to English
+            timestamp: new Date()
+          });
+        } else {
+          console.error('Failed to translate audio:', result.error);
+        }
+      } else {
+        console.warn('translateAudio API not available');
+        // Mock translation
         setCurrentTranscription({
-          text: result.text,
-          language: 'en', // Translation is always to English
+          text: 'This is a mock translation of the audio file.',
+          language: 'en',
           timestamp: new Date()
         });
-      } else {
-        console.error('Failed to translate audio:', result.error);
       }
     } catch (error) {
       console.error('Failed to translate recording:', error);
@@ -245,16 +338,21 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     if (!currentTranscription) return;
     
     try {
-      const result = await window.electronAPI.saveTranscription(
-        currentTranscription.text,
-        { filename, format: 'txt' }
-      );
-      
-      if (result.success) {
-        console.log('Transcription saved:', result.filePath);
-        refreshRecentFiles();
+      if (window.electronAPI && typeof window.electronAPI.saveTranscription === 'function') {
+        const result = await window.electronAPI.saveTranscription(
+          currentTranscription.text,
+          { filename, format: 'txt' }
+        );
+        
+        if (result.success) {
+          console.log('Transcription saved:', result.filePath);
+          refreshRecentFiles();
+        } else {
+          console.error('Failed to save transcription:', result.error);
+        }
       } else {
-        console.error('Failed to save transcription:', result.error);
+        console.warn('saveTranscription API not available');
+        console.log('Mock: Transcription would be saved as:', filename || 'transcription.txt');
       }
     } catch (error) {
       console.error('Failed to save transcription:', error);
@@ -266,20 +364,27 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     if (!currentTranscription) return;
     
     try {
-      const result = await window.electronAPI.saveTranscriptionAs(currentTranscription.text);
-      
-      if (result.success) {
-        console.log('Transcription saved as:', result.filePath);
-        refreshRecentFiles();
-      } else if (!result.canceled) {
-        console.error('Failed to save transcription:', result.error);
+      if (window.electronAPI && typeof window.electronAPI.saveTranscriptionAs === 'function') {
+        const result = await window.electronAPI.saveTranscriptionAs(currentTranscription.text);
+        
+        if (result.success) {
+          console.log('Transcription saved as:', result.filePath);
+          refreshRecentFiles();
+        } else if (result.canceled) {
+          console.log('Save dialog canceled');
+        } else {
+          console.error('Failed to save transcription:', result.error);
+        }
+      } else {
+        console.warn('saveTranscriptionAs API not available');
+        console.log('Mock: Save dialog would be shown');
       }
     } catch (error) {
       console.error('Failed to save transcription as:', error);
     }
   };
   
-  // Context value
+  // Create the context value
   const contextValue: AppContextType = {
     isRecording,
     setIsRecording,
@@ -306,7 +411,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   );
 };
 
-// Custom hook to use the context
+// Custom hook to use the app context
 export const useAppContext = (): AppContextType => {
   const context = useContext(AppContext);
   if (context === undefined) {

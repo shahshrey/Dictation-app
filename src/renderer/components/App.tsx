@@ -1,110 +1,74 @@
 import React, { Suspense } from 'react';
-import { Box, Container, Paper, Typography, CircularProgress } from '@mui/material';
-import { THEME_COLORS } from '../../shared/theme';
 import Header from './Header';
 import RecordingControls from './RecordingControls';
 import TranscriptionDisplay from './TranscriptionDisplay';
 import RecentTranscriptions from './RecentTranscriptions';
 import SettingsPanel from './SettingsPanel';
 import DictationPopup from './DictationPopup';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
 
 const App: React.FC = () => {
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100vh',
-        bgcolor: THEME_COLORS.background,
-      }}
-    >
+    <div className="flex flex-col h-screen bg-background">
       <Header />
       
-      <Container maxWidth="lg" sx={{ flex: 1, py: 3, display: 'flex', flexDirection: 'column' }}>
-        <Paper
-          elevation={3}
-          sx={{
-            p: 3,
-            mb: 3,
-            display: 'flex',
-            flexDirection: 'column',
-            bgcolor: THEME_COLORS.paper,
-          }}
-        >
-          <Typography variant="h5" component="h2" gutterBottom>
-            Dictation
-          </Typography>
-          
-          <Suspense fallback={<CircularProgress />}>
-            <RecordingControls />
-          </Suspense>
-        </Paper>
-        
-        <Paper
-          elevation={3}
-          sx={{
-            p: 3,
-            mb: 3,
-            display: 'flex',
-            flexDirection: 'column',
-            flex: 1,
-            overflow: 'hidden',
-            bgcolor: THEME_COLORS.paper,
-          }}
-        >
-          <Typography variant="h5" component="h2" gutterBottom>
-            Transcription
-          </Typography>
-          
-          <Suspense fallback={<CircularProgress />}>
-            <TranscriptionDisplay />
-          </Suspense>
-        </Paper>
-        
-        <Box sx={{ display: 'flex', gap: 3 }}>
-          <Paper
-            elevation={3}
-            sx={{
-              p: 3,
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              bgcolor: THEME_COLORS.paper,
-            }}
-          >
-            <Typography variant="h5" component="h2" gutterBottom>
-              Recent Transcriptions
-            </Typography>
-            
-            <Suspense fallback={<CircularProgress />}>
-              <RecentTranscriptions />
+      <div className="container mx-auto flex-1 py-3 flex flex-col">
+        <Card className="mb-3">
+          <CardHeader>
+            <CardTitle>Dictation</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Suspense fallback={<div className="flex justify-center"><LoadingSpinner /></div>}>
+              <RecordingControls />
             </Suspense>
-          </Paper>
-          
-          <Paper
-            elevation={3}
-            sx={{
-              p: 3,
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              bgcolor: THEME_COLORS.paper,
-            }}
-          >
-            <Typography variant="h5" component="h2" gutterBottom>
-              Settings
-            </Typography>
-            
-            <Suspense fallback={<CircularProgress />}>
-              <SettingsPanel />
+          </CardContent>
+        </Card>
+        
+        <Card className="mb-3 flex-1 overflow-hidden">
+          <CardHeader>
+            <CardTitle>Transcription</CardTitle>
+          </CardHeader>
+          <CardContent className="h-full overflow-auto">
+            <Suspense fallback={<div className="flex justify-center"><LoadingSpinner /></div>}>
+              <TranscriptionDisplay />
             </Suspense>
-          </Paper>
-        </Box>
-      </Container>
+          </CardContent>
+        </Card>
+        
+        <div className="flex gap-3">
+          <Card className="flex-1">
+            <CardHeader>
+              <CardTitle>Recent Transcriptions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Suspense fallback={<div className="flex justify-center"><LoadingSpinner /></div>}>
+                <RecentTranscriptions />
+              </Suspense>
+            </CardContent>
+          </Card>
+          
+          <Card className="flex-1">
+            <CardHeader>
+              <CardTitle>Settings</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Suspense fallback={<div className="flex justify-center"><LoadingSpinner /></div>}>
+                <SettingsPanel />
+              </Suspense>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
       
       <DictationPopup />
-    </Box>
+    </div>
   );
 };
+
+// Simple loading spinner component
+const LoadingSpinner: React.FC = () => (
+  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+);
 
 export default App; 
