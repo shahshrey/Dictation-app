@@ -19773,7 +19773,7 @@
     const [recordingTime, setRecordingTime] = (0, import_react.useState)(0);
     const [error, setError] = (0, import_react.useState)(null);
     const [timer, setTimer] = (0, import_react.useState)(null);
-    const [audioChunks, setAudioChunks] = (0, import_react.useState)([]);
+    const audioChunksRef = (0, import_react.useRef)([]);
     (0, import_react.useEffect)(() => {
       return () => {
         if (timer) {
@@ -19787,20 +19787,34 @@
     const startRecording = (0, import_react.useCallback)(async () => {
       try {
         setError(null);
-        setAudioChunks([]);
+        audioChunksRef.current = [];
+        console.log("Starting recording with device:", selectedDevice?.name || "default");
         const constraints = {
           audio: selectedDevice ? { deviceId: { exact: selectedDevice.id } } : true,
           video: false
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        const recorder = new MediaRecorder(stream);
+        const recorder = new MediaRecorder(stream, {
+          mimeType: "audio/webm"
+          // Explicitly set the MIME type
+        });
         recorder.ondataavailable = (event) => {
           if (event.data.size > 0) {
-            setAudioChunks((chunks) => [...chunks, event.data]);
+            console.log("Received audio chunk of size:", event.data.size);
+            audioChunksRef.current.push(event.data);
+          } else {
+            console.warn("Received empty audio chunk");
           }
         };
         recorder.onstop = () => {
-          const audioBlob = new Blob(audioChunks, { type: "audio/webm" });
+          console.log(`Recording stopped, collected ${audioChunksRef.current.length} chunks`);
+          if (audioChunksRef.current.length === 0) {
+            console.error("No audio chunks collected during recording");
+            setError("No audio data was captured during recording");
+            return;
+          }
+          const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+          console.log("Created audio blob of size:", audioBlob.size);
           if (onRecordingComplete) {
             onRecordingComplete(audioBlob);
           }
@@ -19812,7 +19826,8 @@
             setTimer(null);
           }
         };
-        recorder.start();
+        recorder.start(1e3);
+        console.log("MediaRecorder started");
         setMediaRecorder(recorder);
         setIsRecording(true);
         const intervalId = setInterval(() => {
@@ -19823,10 +19838,14 @@
         setError(`Failed to start recording: ${err instanceof Error ? err.message : String(err)}`);
         console.error("Recording error:", err);
       }
-    }, [selectedDevice, onRecordingComplete, audioChunks, timer]);
+    }, [selectedDevice, onRecordingComplete, timer]);
     const stopRecording = (0, import_react.useCallback)(() => {
       if (mediaRecorder && isRecording) {
+        console.log("Stopping recording...");
+        mediaRecorder.requestData();
         mediaRecorder.stop();
+      } else {
+        console.warn("Attempted to stop recording, but no active recorder found");
       }
     }, [mediaRecorder, isRecording]);
     return {
@@ -19956,9 +19975,41 @@
     };
     const refreshRecentTranscriptions = async () => {
       try {
+        console.log("Attempting to refresh recent transcriptions...");
+        console.log("electronAPI available:", !!window.electronAPI);
+        console.log("getTranscriptions method available:", !!(window.electronAPI && typeof window.electronAPI.getTranscriptions === "function"));
+        console.log("getRecentTranscriptions method available:", !!(window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === "function"));
         if (window.electronAPI && typeof window.electronAPI.getTranscriptions === "function") {
-          const transcriptions = await window.electronAPI.getTranscriptions();
-          setRecentTranscriptions(transcriptions || []);
+          console.log("Calling getTranscriptions IPC method...");
+          try {
+            const transcriptions = await window.electronAPI.getTranscriptions();
+            console.log("Transcriptions received:", transcriptions);
+            setRecentTranscriptions(transcriptions || []);
+          } catch (error) {
+            console.error("Failed to get recent transcriptions:", error);
+          }
+        } else if (window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === "function") {
+          console.log("Falling back to getRecentTranscriptions IPC method...");
+          try {
+            const result = await window.electronAPI.getRecentTranscriptions();
+            console.log("Recent transcriptions result:", result);
+            if (result && result.success && Array.isArray(result.files)) {
+              const transcriptions = result.files.map((file) => ({
+                id: file.name.replace(/\.txt$/, ""),
+                text: "",
+                // We don't have the content here
+                timestamp: file.modifiedAt instanceof Date ? file.modifiedAt.getTime() : file.createdAt instanceof Date ? file.createdAt.getTime() : Date.now(),
+                duration: 0,
+                language: "en"
+              }));
+              setRecentTranscriptions(transcriptions);
+            } else {
+              console.warn("getRecentTranscriptions returned invalid data:", result);
+              setRecentTranscriptions([]);
+            }
+          } catch (error) {
+            console.error("Failed to get recent transcriptions (fallback):", error);
+          }
         } else {
           console.warn("getTranscriptions API not available");
         }
@@ -19968,18 +20019,36 @@
     };
     function handleRecordingComplete(audioBlob) {
       try {
+        console.log("Recording complete, blob size:", audioBlob.size, "bytes, type:", audioBlob.type);
+        if (audioBlob.size === 0) {
+          console.error("Error: Empty audio blob received");
+          return;
+        }
         audioBlob.arrayBuffer().then(async (arrayBuffer) => {
+          console.log("Array buffer size:", arrayBuffer.byteLength, "bytes");
+          if (arrayBuffer.byteLength === 0) {
+            console.error("Error: Empty array buffer converted from blob");
+            return;
+          }
           if (window.electronAPI && typeof window.electronAPI.saveRecording === "function") {
+            console.log("Sending recording to main process...");
             const result = await window.electronAPI.saveRecording(arrayBuffer);
             if (result.success) {
-              console.log("Recording saved:", result.filePath);
+              console.log("Recording saved:", result.filePath, "size:", result.size || "unknown");
               if (settings.autoTranscribe) {
+                console.log("Auto-transcribe enabled, transcribing with language:", settings.language);
                 transcribeRecording(settings.language);
+              } else {
+                console.log("Auto-transcribe disabled, not transcribing automatically");
               }
+            } else {
+              console.error("Failed to save recording:", result.error);
             }
           } else {
             console.warn("saveRecording API not available");
           }
+        }).catch((error) => {
+          console.error("Failed to convert blob to array buffer:", error);
         });
       } catch (error) {
         console.error("Failed to handle recording complete:", error);
@@ -20001,11 +20070,16 @@
     };
     const transcribeRecording = async (language) => {
       try {
+        console.log("Attempting to transcribe recording with language:", language || settings.language);
+        console.log("API key available:", !!settings.apiKey);
+        console.log("transcribeRecording API available:", !!(window.electronAPI && typeof window.electronAPI.transcribeRecording === "function"));
         if (window.electronAPI && typeof window.electronAPI.transcribeRecording === "function") {
+          console.log("Calling transcribeRecording IPC method...");
           const result = await window.electronAPI.transcribeRecording(
             language || settings.language,
             settings.apiKey
           );
+          console.log("Transcription result:", result);
           if (result.success) {
             setCurrentTranscription({
               id: result.id,

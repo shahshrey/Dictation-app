@@ -197,9 +197,44 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   // Refresh recent transcriptions
   const refreshRecentTranscriptions = async (): Promise<void> => {
     try {
+      console.log('Attempting to refresh recent transcriptions...');
+      console.log('electronAPI available:', !!window.electronAPI);
+      console.log('getTranscriptions method available:', !!(window.electronAPI && typeof window.electronAPI.getTranscriptions === 'function'));
+      console.log('getRecentTranscriptions method available:', !!(window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === 'function'));
+      
       if (window.electronAPI && typeof window.electronAPI.getTranscriptions === 'function') {
-        const transcriptions = await window.electronAPI.getTranscriptions();
-        setRecentTranscriptions(transcriptions || []);
+        console.log('Calling getTranscriptions IPC method...');
+        try {
+          const transcriptions = await window.electronAPI.getTranscriptions();
+          console.log('Transcriptions received:', transcriptions);
+          setRecentTranscriptions(transcriptions || []);
+        } catch (error) {
+          console.error('Failed to get recent transcriptions:', error);
+        }
+      } else if (window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === 'function') {
+        console.log('Falling back to getRecentTranscriptions IPC method...');
+        try {
+          const result = await window.electronAPI.getRecentTranscriptions();
+          console.log('Recent transcriptions result:', result);
+          if (result && result.success && Array.isArray(result.files)) {
+            // Convert file objects to transcription objects
+            const transcriptions = result.files.map(file => ({
+              id: file.name.replace(/\.txt$/, ''),
+              text: '', // We don't have the content here
+              timestamp: file.modifiedAt instanceof Date ? file.modifiedAt.getTime() : 
+                         file.createdAt instanceof Date ? file.createdAt.getTime() : 
+                         Date.now(),
+              duration: 0,
+              language: 'en'
+            }));
+            setRecentTranscriptions(transcriptions);
+          } else {
+            console.warn('getRecentTranscriptions returned invalid data:', result);
+            setRecentTranscriptions([]);
+          }
+        } catch (error) {
+          console.error('Failed to get recent transcriptions (fallback):', error);
+        }
       } else {
         console.warn('getTranscriptions API not available');
       }
@@ -211,20 +246,43 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   // Handle recording complete
   function handleRecordingComplete(audioBlob: Blob): void {
     try {
+      console.log('Recording complete, blob size:', audioBlob.size, 'bytes, type:', audioBlob.type);
+      
+      if (audioBlob.size === 0) {
+        console.error('Error: Empty audio blob received');
+        return;
+      }
+      
       // Convert blob to array buffer for sending to main process
       audioBlob.arrayBuffer().then(async (arrayBuffer) => {
+        console.log('Array buffer size:', arrayBuffer.byteLength, 'bytes');
+        
+        if (arrayBuffer.byteLength === 0) {
+          console.error('Error: Empty array buffer converted from blob');
+          return;
+        }
+        
         if (window.electronAPI && typeof window.electronAPI.saveRecording === 'function') {
+          console.log('Sending recording to main process...');
           const result = await window.electronAPI.saveRecording(arrayBuffer);
+          
           if (result.success) {
-            console.log('Recording saved:', result.filePath);
+            console.log('Recording saved:', result.filePath, 'size:', (result as any).size || 'unknown');
             // Auto-transcribe if enabled in settings
             if (settings.autoTranscribe) {
+              console.log('Auto-transcribe enabled, transcribing with language:', settings.language);
               transcribeRecording(settings.language);
+            } else {
+              console.log('Auto-transcribe disabled, not transcribing automatically');
             }
+          } else {
+            console.error('Failed to save recording:', result.error);
           }
         } else {
           console.warn('saveRecording API not available');
         }
+      }).catch(error => {
+        console.error('Failed to convert blob to array buffer:', error);
       });
     } catch (error) {
       console.error('Failed to handle recording complete:', error);
@@ -252,11 +310,17 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   // Transcribe recording
   const transcribeRecording = async (language?: string): Promise<void> => {
     try {
+      console.log('Attempting to transcribe recording with language:', language || settings.language);
+      console.log('API key available:', !!settings.apiKey);
+      console.log('transcribeRecording API available:', !!(window.electronAPI && typeof window.electronAPI.transcribeRecording === 'function'));
+      
       if (window.electronAPI && typeof window.electronAPI.transcribeRecording === 'function') {
+        console.log('Calling transcribeRecording IPC method...');
         const result = await window.electronAPI.transcribeRecording(
           language || settings.language,
           settings.apiKey
         );
+        console.log('Transcription result:', result);
         
         if (result.success) {
           setCurrentTranscription({

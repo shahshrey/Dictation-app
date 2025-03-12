@@ -17,7 +17,14 @@ if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
 }
 
 export const setupFileStorage = (ipcMain: IpcMain): void => {
+  console.log('Setting up file storage handlers...');
+  
+  // Check if ipcMain is valid
+  console.log('ipcMain object type:', typeof ipcMain);
+  console.log('ipcMain.handle method available:', typeof ipcMain.handle === 'function');
+  
   // Save transcription to a file
+  console.log('Registering save-transcription handler...');
   ipcMain.handle(
     "save-transcription",
     async (
@@ -25,6 +32,7 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
       text: string,
       options: { filename?: string; format?: string }
     ) => {
+      console.log('save-transcription handler called');
       try {
         const filename = options.filename || DEFAULT_FILENAME;
         const format = options.format || "txt";
@@ -43,7 +51,9 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
   );
 
   // Save transcription with file dialog
+  console.log('Registering save-transcription-as handler...');
   ipcMain.handle("save-transcription-as", async (_, text: string) => {
+    console.log('save-transcription-as handler called');
     try {
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
       const defaultPath = path.join(
@@ -74,7 +84,9 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
   });
 
   // Get recent transcriptions
+  console.log('Registering get-recent-transcriptions handler...');
   ipcMain.handle("get-recent-transcriptions", async () => {
+    console.log('get-recent-transcriptions handler called');
     try {
       if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
         return { success: true, files: [] };
@@ -103,4 +115,57 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
       return { success: false, error: String(error) };
     }
   });
+  
+  // Add handler for get-transcriptions (alias for get-recent-transcriptions)
+  console.log('Registering get-transcriptions handler...');
+  try {
+    ipcMain.handle("get-transcriptions", async () => {
+      console.log('Main process: get-transcriptions handler called');
+      
+      if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
+        return [];
+      }
+
+      const files = fs
+        .readdirSync(DEFAULT_SAVE_DIR)
+        .filter((file) => file.endsWith(".txt"))
+        .map((file) => {
+          const filePath = path.join(DEFAULT_SAVE_DIR, file);
+          const stats = fs.statSync(filePath);
+          const content = fs.readFileSync(filePath, { encoding: "utf-8" });
+          
+          // Extract timestamp from filename or use file creation time
+          let timestamp = stats.birthtime.getTime();
+          const timestampMatch = file.match(/(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})/);
+          if (timestampMatch) {
+            const dateStr = timestampMatch[1].replace(/-/g, (m, i) => i > 9 ? ':' : '-');
+            const date = new Date(dateStr);
+            if (!isNaN(date.getTime())) {
+              timestamp = date.getTime();
+            }
+          }
+          
+          return {
+            id: path.basename(file, '.txt'),
+            text: content,
+            timestamp,
+            duration: 0, // Duration not available from saved files
+            language: 'en' // Default language
+          };
+        })
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, 10); // Get only the 10 most recent files
+
+      console.log(`Main process: Found ${files.length} transcriptions`);
+      return files;
+    });
+    console.log('get-transcriptions handler registered successfully');
+  } catch (error) {
+    console.error('Error registering get-transcriptions handler:', error);
+  }
+  
+  // Log all registered IPC handlers for debugging
+  console.log('File storage handlers registered. Current IPC handlers:');
+  const registeredChannels = (ipcMain as any)._events ? Object.keys((ipcMain as any)._events) : [];
+  console.log(registeredChannels);
 };

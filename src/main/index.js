@@ -1,3 +1,5 @@
+// Remove the warning message
+// console.log('WARNING: Using index.js instead of index.ts');
 const { app, BrowserWindow, ipcMain, globalShortcut, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
@@ -184,9 +186,39 @@ const setupIpcHandlers = () => {
   // Save the recorded audio blob sent from the renderer
   ipcMain.handle('save-recording', async (_, arrayBuffer) => {
     try {
+      console.log('Saving recording, buffer size:', arrayBuffer.byteLength);
+      
+      // Validate that we have actual data
+      if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+        console.error('Error: Empty audio buffer received');
+        return { success: false, error: 'Empty audio buffer received' };
+      }
+      
       const buffer = Buffer.from(arrayBuffer);
+      
+      // Ensure the temp directory exists
+      if (!fs.existsSync(TEMP_DIR)) {
+        fs.mkdirSync(TEMP_DIR, { recursive: true });
+      }
+      
+      // Write the file
       fs.writeFileSync(AUDIO_FILE_PATH, buffer, { encoding: 'binary' });
-      return { success: true, filePath: AUDIO_FILE_PATH };
+      
+      // Verify the file was written correctly
+      if (fs.existsSync(AUDIO_FILE_PATH)) {
+        const stats = fs.statSync(AUDIO_FILE_PATH);
+        console.log(`Recording saved successfully: ${AUDIO_FILE_PATH}, size: ${stats.size} bytes`);
+        
+        if (stats.size === 0) {
+          console.error('Error: File was saved but is empty');
+          return { success: false, error: 'File was saved but is empty', filePath: AUDIO_FILE_PATH };
+        }
+        
+        return { success: true, filePath: AUDIO_FILE_PATH, size: stats.size };
+      } else {
+        console.error('Error: File was not saved');
+        return { success: false, error: 'File was not saved' };
+      }
     } catch (error) {
       console.error('Failed to save recording:', error);
       return { success: false, error: String(error) };
@@ -350,6 +382,163 @@ const setupIpcHandlers = () => {
     } catch (error) {
       console.error('Failed to get recent transcriptions:', error);
       return { success: false, error: String(error) };
+    }
+  });
+
+  // Get transcriptions (alias for get-recent-transcriptions)
+  // This handler returns transcriptions in a format compatible with the renderer's expectations
+  ipcMain.handle('get-transcriptions', async () => {
+    console.log('Main process: get-transcriptions handler called');
+    try {
+      if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
+        return [];
+      }
+
+      const files = fs
+        .readdirSync(DEFAULT_SAVE_DIR)
+        .filter((file) => file.endsWith(".txt"))
+        .map((file) => {
+          const filePath = path.join(DEFAULT_SAVE_DIR, file);
+          const stats = fs.statSync(filePath);
+          const content = fs.readFileSync(filePath, { encoding: "utf-8" });
+          
+          // Extract timestamp from filename or use file creation time
+          let timestamp = stats.birthtime.getTime();
+          const timestampMatch = file.match(/(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})/);
+          if (timestampMatch) {
+            const dateStr = timestampMatch[1].replace(/-/g, (m, i) => i > 9 ? ':' : '-');
+            const date = new Date(dateStr);
+            if (!isNaN(date.getTime())) {
+              timestamp = date.getTime();
+            }
+          }
+          
+          return {
+            id: path.basename(file, '.txt'),
+            text: content,
+            timestamp,
+            duration: 0, // Duration not available from saved files
+            language: 'en' // Default language
+          };
+        })
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, 10); // Get only the 10 most recent files
+
+      console.log(`Main process: Found ${files.length} transcriptions`);
+      return files;
+    } catch (error) {
+      console.error("Failed to get transcriptions:", error);
+      return [];
+    }
+  });
+
+  // Transcribe the most recent recording using Groq API
+  // This handler takes the language and API key from the renderer
+  // and returns a transcription object with the transcribed text
+  ipcMain.handle('transcribe-recording', async (_, language, apiKey) => {
+    console.log('Main process: transcribe-recording handler called with language:', language);
+    console.log('Main process: API key available:', !!apiKey);
+    
+    try {
+      // Initialize Groq client with the provided API key
+      if (!apiKey) {
+        console.error('Error: No API key provided');
+        return { 
+          success: false, 
+          error: 'No API key provided',
+          id: '',
+          text: '',
+          timestamp: 0,
+          duration: 0
+        };
+      }
+      
+      const client = new Groq({ apiKey });
+      
+      // Get the path to the most recent recording
+      if (!fs.existsSync(AUDIO_FILE_PATH)) {
+        console.error('Error: Recording file not found at', AUDIO_FILE_PATH);
+        return { 
+          success: false, 
+          error: 'Recording file not found',
+          id: '',
+          text: '',
+          timestamp: 0,
+          duration: 0
+        };
+      }
+      
+      // Validate the file size
+      const fileStats = fs.statSync(AUDIO_FILE_PATH);
+      console.log(`Audio file size: ${fileStats.size} bytes`);
+      
+      if (fileStats.size === 0) {
+        console.error('Error: Audio file is empty');
+        return { 
+          success: false, 
+          error: 'Audio file is empty',
+          id: '',
+          text: '',
+          timestamp: 0,
+          duration: 0
+        };
+      }
+      
+      // Create a read stream for the audio file
+      const audioFile = fs.createReadStream(AUDIO_FILE_PATH);
+      
+      // Choose the appropriate model based on language
+      let model = language === 'en' ? GROQ_MODELS.TRANSCRIPTION.ENGLISH : GROQ_MODELS.TRANSCRIPTION.MULTILINGUAL;
+      
+      console.log(`Using Groq model: ${model} for transcription with language: ${language || 'auto'}`);
+      
+      // Transcribe the audio
+      const transcription = await client.audio.transcriptions.create({
+        file: audioFile,
+        model: model,
+        language: language || 'auto',
+      });
+      
+      console.log('Transcription successful, text length:', transcription.text.length);
+      
+      // Generate a unique ID for the transcription
+      const id = `transcription-${Date.now()}`;
+      const timestamp = Date.now();
+      const duration = Math.floor((fileStats.mtime.getTime() - fileStats.birthtime.getTime()) / 1000);
+      
+      // Save the transcription to a file
+      try {
+        const filename = 'transcription';
+        const format = 'txt';
+        const timestampStr = new Date().toISOString().replace(/[:.]/g, '-');
+        const fullFilename = `${filename}_${timestampStr}.${format}`;
+        const filePath = path.join(DEFAULT_SAVE_DIR, fullFilename);
+        
+        fs.writeFileSync(filePath, transcription.text, { encoding: 'utf-8' });
+        console.log(`Transcription saved to: ${filePath}`);
+      } catch (saveError) {
+        console.error('Failed to save transcription to file:', saveError);
+        // Continue even if saving fails
+      }
+      
+      return { 
+        success: true,
+        id,
+        text: transcription.text,
+        timestamp,
+        duration,
+        language: language || 'auto'
+      };
+    } catch (error) {
+      console.error('Failed to transcribe recording:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error),
+        id: '',
+        text: '',
+        timestamp: 0,
+        duration: 0
+      };
     }
   });
 
