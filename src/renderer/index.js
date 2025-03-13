@@ -19860,6 +19860,23 @@
   };
 
   // src/renderer/context/AppContext.tsx
+  var logger = {
+    info: (message) => {
+      console.log(`[INFO] ${message}`);
+    },
+    error: (message, error) => {
+      console.error(`[ERROR] ${message}`, error);
+    },
+    debug: (message) => {
+      console.log(`[DEBUG] ${message}`);
+    },
+    warn: (message) => {
+      console.warn(`[WARN] ${message}`);
+    },
+    exception: (message, error) => {
+      console.error(`[EXCEPTION] ${message}`, error);
+    }
+  };
   var AppContext = (0, import_react2.createContext)(void 0);
   var AppContextProvider = ({ children }) => {
     const [settings, setSettings] = (0, import_react2.useState)(DEFAULT_SETTINGS);
@@ -19977,19 +19994,19 @@
     };
     const refreshRecentTranscriptions = async () => {
       try {
-        console.log("Attempting to refresh recent transcriptions...");
-        console.log("electronAPI available:", !!window.electronAPI);
-        console.log("getTranscriptions method available:", !!(window.electronAPI && typeof window.electronAPI.getTranscriptions === "function"));
-        console.log("getRecentTranscriptions method available:", !!(window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === "function"));
+        logger.info("Attempting to refresh recent transcriptions...");
+        logger.debug(`electronAPI available: ${!!window.electronAPI}`);
+        logger.debug(`getTranscriptions method available: ${!!(window.electronAPI && typeof window.electronAPI.getTranscriptions === "function")}`);
+        logger.debug(`getRecentTranscriptions method available: ${!!(window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === "function")}`);
         if (window.electronAPI && typeof window.electronAPI.getTranscriptions === "function") {
-          console.log("Calling getTranscriptions IPC method...");
+          logger.info("Calling getTranscriptions IPC method...");
           try {
             const transcriptions = await window.electronAPI.getTranscriptions();
-            console.log("Transcriptions received:", transcriptions);
+            logger.debug(`Transcriptions received: ${JSON.stringify(transcriptions, null, 2)}`);
             if (Array.isArray(transcriptions) && transcriptions.length > 0) {
               setRecentTranscriptions(transcriptions);
             } else if (!transcriptions || transcriptions.length === 0) {
-              console.log("No transcriptions received, will try again with getRecentTranscriptions");
+              logger.info("No transcriptions received, will try again with getRecentTranscriptions");
               if (window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === "function") {
                 const result = await window.electronAPI.getRecentTranscriptions();
                 if (result && result.success && Array.isArray(result.files) && result.files.length > 0) {
@@ -20008,13 +20025,13 @@
               setRecentTranscriptions([]);
             }
           } catch (error) {
-            console.error("Failed to get recent transcriptions:", error);
+            logger.exception("Failed to get recent transcriptions", error);
           }
         } else if (window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === "function") {
-          console.log("Falling back to getRecentTranscriptions IPC method...");
+          logger.info("Falling back to getRecentTranscriptions IPC method...");
           try {
             const result = await window.electronAPI.getRecentTranscriptions();
-            console.log("Recent transcriptions result:", result);
+            logger.debug(`Recent transcriptions result: ${JSON.stringify(result, null, 2)}`);
             if (result && result.success && Array.isArray(result.files)) {
               const transcriptions = result.files.map((file) => ({
                 id: file.name.replace(/\.txt$/, ""),
@@ -20026,54 +20043,54 @@
               }));
               setRecentTranscriptions(transcriptions);
             } else {
-              console.warn("getRecentTranscriptions returned invalid data:", result);
+              logger.warn(`getRecentTranscriptions returned invalid data: ${JSON.stringify(result, null, 2)}`);
               setRecentTranscriptions([]);
             }
           } catch (error) {
-            console.error("Failed to get recent transcriptions (fallback):", error);
+            logger.exception("Failed to get recent transcriptions (fallback)", error);
           }
         } else {
-          console.warn("getTranscriptions API not available");
+          logger.warn("getTranscriptions API not available");
         }
       } catch (error) {
-        console.error("Failed to get recent transcriptions:", error);
+        logger.exception("Failed to get recent transcriptions", error);
       }
     };
     function handleRecordingComplete(audioBlob) {
       try {
-        console.log("Recording complete, blob size:", audioBlob.size, "bytes, type:", audioBlob.type);
+        logger.info(`Recording complete, blob size: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
         if (audioBlob.size === 0) {
-          console.error("Error: Empty audio blob received");
+          logger.error("Empty audio blob received", null);
           return;
         }
         audioBlob.arrayBuffer().then(async (arrayBuffer) => {
-          console.log("Array buffer size:", arrayBuffer.byteLength, "bytes");
+          logger.debug(`Array buffer size: ${arrayBuffer.byteLength} bytes`);
           if (arrayBuffer.byteLength === 0) {
-            console.error("Error: Empty array buffer converted from blob");
+            logger.error("Empty array buffer converted from blob", null);
             return;
           }
           if (window.electronAPI && typeof window.electronAPI.saveRecording === "function") {
-            console.log("Sending recording to main process...");
+            logger.info("Sending recording to main process...");
             const result = await window.electronAPI.saveRecording(arrayBuffer);
             if (result.success) {
-              console.log("Recording saved:", result.filePath, "size:", result.size || "unknown");
+              logger.info(`Recording saved: ${result.filePath}, size: ${result.size || "unknown"}`);
               if (settings.autoTranscribe) {
-                console.log("Auto-transcribe enabled, transcribing with language:", settings.language);
+                logger.info(`Auto-transcribe enabled, transcribing with language: ${settings.language}`);
                 transcribeRecording(settings.language);
               } else {
-                console.log("Auto-transcribe disabled, not transcribing automatically");
+                logger.debug("Auto-transcribe disabled, not transcribing automatically");
               }
             } else {
-              console.error("Failed to save recording:", result.error);
+              logger.error(`Failed to save recording: ${result.error}`, null);
             }
           } else {
-            console.warn("saveRecording API not available");
+            logger.warn("saveRecording API not available");
           }
         }).catch((error) => {
-          console.error("Failed to convert blob to array buffer:", error);
+          logger.exception("Failed to convert blob to array buffer", error);
         });
       } catch (error) {
-        console.error("Failed to handle recording complete:", error);
+        logger.exception("Failed to handle recording complete", error);
       }
     }
     const startRecording = async () => {
@@ -20092,37 +20109,43 @@
     };
     const transcribeRecording = async (language) => {
       try {
-        console.log("Attempting to transcribe recording with language:", language || settings.language);
-        console.log("API key available:", !!settings.apiKey);
-        console.log("transcribeRecording API available:", !!(window.electronAPI && typeof window.electronAPI.transcribeRecording === "function"));
+        logger.info(`Attempting to transcribe recording with language: ${language || settings.language}`);
+        logger.debug(`API key available: ${!!settings.apiKey}`);
+        logger.debug(`transcribeRecording API available: ${!!(window.electronAPI && typeof window.electronAPI.transcribeRecording === "function")}`);
         if (window.electronAPI && typeof window.electronAPI.transcribeRecording === "function") {
-          console.log("Calling transcribeRecording IPC method...");
+          logger.info("Calling transcribeRecording IPC method...");
           const result = await window.electronAPI.transcribeRecording(
             language || settings.language,
             settings.apiKey
           );
-          console.log("Transcription result:", result);
+          logger.debug(`Transcription result: ${JSON.stringify(result, null, 2)}`);
           if (result.success) {
             setCurrentTranscription({
               id: result.id,
               text: result.text,
               timestamp: result.timestamp,
               duration: result.duration,
-              language: result.language || settings.language
+              language: result.language || settings.language,
+              pastedAtCursor: result.pastedAtCursor
             });
+            if (result.pastedAtCursor) {
+              logger.info("Transcribed text was pasted at cursor position");
+            } else {
+              logger.info("Transcribed text was not pasted at cursor position");
+            }
             await refreshRecentTranscriptions();
             setTimeout(async () => {
-              console.log("Performing delayed refresh of transcriptions");
+              logger.debug("Performing delayed refresh of transcriptions");
               await refreshRecentTranscriptions();
             }, 2e3);
           } else if (result.error) {
-            console.error("Transcription error:", result.error);
+            logger.error(`Transcription error: ${result.error}`, null);
           }
         } else {
-          console.warn("transcribeRecording API not available");
+          logger.warn("transcribeRecording API not available");
         }
       } catch (error) {
-        console.error("Failed to transcribe recording:", error);
+        logger.exception("Failed to transcribe recording", error);
       }
     };
     const saveTranscription = async (id) => {

@@ -1,15 +1,32 @@
 // Remove the warning message
 // console.log('WARNING: Using index.js instead of index.ts');
-const { app, BrowserWindow, ipcMain, globalShortcut, dialog, systemPreferences } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, dialog, systemPreferences, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { Groq } = require('groq-sdk');
+const { exec } = require('child_process');
 
 // Define constants
 const TEMP_DIR = path.join(os.tmpdir(), 'dictation-app');
 const AUDIO_FILE_PATH = path.join(TEMP_DIR, 'recording.webm');
 const DEFAULT_SAVE_DIR = path.join(os.homedir(), 'Documents', 'Dictation App');
+
+// Define logger
+const logger = {
+  info: (message) => {
+    console.log(`[INFO] ${message}`);
+  },
+  error: (message, error) => {
+    console.error(`[ERROR] ${message}`, error);
+  },
+  debug: (message) => {
+    console.log(`[DEBUG] ${message}`);
+  },
+  exception: (message, error) => {
+    console.error(`[EXCEPTION] ${message}`, error);
+  }
+};
 
 // Define Groq API models
 const GROQ_MODELS = {
@@ -19,6 +36,66 @@ const GROQ_MODELS = {
     ENGLISH: 'distil-whisper-large-v3-en'
   },
   TRANSLATION: 'whisper-large-v3'
+};
+
+// Function to paste text at the current cursor position
+const pasteTextAtCursor = async (text) => {
+  try {
+    logger.info('Attempting to paste text at cursor position');
+    logger.debug(`Text to paste (first 50 chars): ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`);
+    
+    // Save the original clipboard content
+    const originalClipboardContent = clipboard.readText();
+    logger.debug('Saved original clipboard content');
+    
+    // Set the clipboard to the transcribed text
+    clipboard.writeText(text);
+    logger.debug('Set clipboard to transcribed text');
+    
+    // Use platform-specific commands to paste at the current cursor position
+    if (process.platform === 'darwin') {
+      logger.debug('Using macOS paste command (Command+V)');
+      // On macOS, use AppleScript to simulate Command+V
+      exec('osascript -e \'tell application "System Events" to keystroke "v" using command down\'', (error) => {
+        if (error) {
+          logger.exception('Error executing AppleScript paste command', error);
+        } else {
+          logger.info('Successfully pasted text at cursor position');
+        }
+        
+        // Restore the original clipboard content after a short delay
+        setTimeout(() => {
+          clipboard.writeText(originalClipboardContent);
+          logger.debug('Restored original clipboard content');
+        }, 500);
+      });
+    } else if (process.platform === 'win32') {
+      logger.debug('Using Windows paste command (Ctrl+V)');
+      // On Windows, use PowerShell to simulate Ctrl+V
+      exec('powershell -command "$wshell = New-Object -ComObject wscript.shell; $wshell.SendKeys(\'^v\')"', (error) => {
+        if (error) {
+          logger.exception('Error executing PowerShell paste command', error);
+        } else {
+          logger.info('Successfully pasted text at cursor position');
+        }
+        
+        // Restore the original clipboard content after a short delay
+        setTimeout(() => {
+          clipboard.writeText(originalClipboardContent);
+          logger.debug('Restored original clipboard content');
+        }, 500);
+      });
+    } else {
+      logger.error('Unsupported platform for paste operation', { platform: process.platform });
+      // Restore the original clipboard content
+      clipboard.writeText(originalClipboardContent);
+    }
+    
+    return true;
+  } catch (error) {
+    logger.exception('Failed to paste text at cursor position', error);
+    return false;
+  }
 };
 
 // Check for macOS accessibility permissions
@@ -701,13 +778,13 @@ const setupIpcHandlers = () => {
   // This handler takes the language and API key from the renderer
   // and returns a transcription object with the transcribed text
   ipcMain.handle('transcribe-recording', async (_, language, apiKey) => {
-    console.log('Main process: transcribe-recording handler called with language:', language);
-    console.log('Main process: API key available:', !!apiKey);
+    logger.info('transcribe-recording handler called with language: ' + language);
+    logger.debug('API key available: ' + !!apiKey);
     
     try {
       // Initialize Groq client with the provided API key
       if (!apiKey) {
-        console.error('Error: No API key provided');
+        logger.error('No API key provided', null);
         return { 
           success: false, 
           error: 'No API key provided',
@@ -722,7 +799,7 @@ const setupIpcHandlers = () => {
       
       // Get the path to the most recent recording
       if (!fs.existsSync(AUDIO_FILE_PATH)) {
-        console.error('Error: Recording file not found at', AUDIO_FILE_PATH);
+        logger.error('Recording file not found at ' + AUDIO_FILE_PATH, null);
         return { 
           success: false, 
           error: 'Recording file not found',
@@ -735,10 +812,10 @@ const setupIpcHandlers = () => {
       
       // Validate the file size
       const fileStats = fs.statSync(AUDIO_FILE_PATH);
-      console.log(`Audio file size: ${fileStats.size} bytes`);
+      logger.debug(`Audio file size: ${fileStats.size} bytes`);
       
       if (fileStats.size === 0) {
-        console.error('Error: Audio file is empty');
+        logger.error('Audio file is empty', null);
         return { 
           success: false, 
           error: 'Audio file is empty',
@@ -755,7 +832,7 @@ const setupIpcHandlers = () => {
       // Choose the appropriate model based on language
       let model = language === 'en' ? GROQ_MODELS.TRANSCRIPTION.ENGLISH : GROQ_MODELS.TRANSCRIPTION.MULTILINGUAL;
       
-      console.log(`Using Groq model: ${model} for transcription with language: ${language || 'auto'}`);
+      logger.info(`Using Groq model: ${model} for transcription with language: ${language || 'auto'}`);
       
       // Transcribe the audio
       const transcription = await client.audio.transcriptions.create({
@@ -764,7 +841,7 @@ const setupIpcHandlers = () => {
         language: language || 'auto',
       });
       
-      console.log('Transcription successful, text length:', transcription.text.length);
+      logger.info('Transcription successful, text length: ' + transcription.text.length);
       
       // Generate a unique ID for the transcription
       const id = `transcription-${Date.now()}`;
@@ -780,24 +857,40 @@ const setupIpcHandlers = () => {
         const fullFilename = `${filename}_${timestampStr}.${format}`;
         filePath = path.join(DEFAULT_SAVE_DIR, fullFilename);
         
+        // Ensure the save directory exists
+        if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
+          logger.debug(`Creating save directory: ${DEFAULT_SAVE_DIR}`);
+          fs.mkdirSync(DEFAULT_SAVE_DIR, { recursive: true });
+        }
+        
         // Write the file synchronously to ensure it's fully written before returning
         fs.writeFileSync(filePath, transcription.text, { encoding: 'utf-8' });
-        console.log(`Transcription saved to: ${filePath}`);
+        logger.info(`Transcription saved to: ${filePath}`);
         
         // Verify the file was written correctly
         if (fs.existsSync(filePath)) {
           const fileContent = fs.readFileSync(filePath, { encoding: 'utf-8' });
           if (fileContent !== transcription.text) {
-            console.error('Error: File content does not match transcription text');
+            logger.error('File content does not match transcription text', null);
           } else {
-            console.log('File content verified successfully');
+            logger.debug('File content verified successfully');
           }
         } else {
-          console.error('Error: File was not created');
+          logger.error('File was not created', null);
         }
       } catch (saveError) {
-        console.error('Failed to save transcription to file:', saveError);
+        logger.exception('Failed to save transcription to file', saveError);
         // Continue even if saving fails
+      }
+      
+      // Paste the transcribed text at the current cursor position
+      logger.info('Attempting to paste transcribed text at cursor position');
+      try {
+        await pasteTextAtCursor(transcription.text);
+        logger.info('Paste operation initiated');
+      } catch (pasteError) {
+        logger.exception('Failed to paste text at cursor position', pasteError);
+        // Continue even if pasting fails
       }
       
       // Add a small delay to ensure file system operations are complete
@@ -810,10 +903,11 @@ const setupIpcHandlers = () => {
         timestamp,
         duration,
         language: language || 'auto',
-        filePath // Include the file path for debugging
+        filePath, // Include the file path for debugging
+        pastedAtCursor: true // Indicate that the text was pasted at the cursor
       };
     } catch (error) {
-      console.error('Failed to transcribe recording:', error);
+      logger.exception('Failed to transcribe recording', error);
       return { 
         success: false, 
         error: error instanceof Error ? error.message : String(error),

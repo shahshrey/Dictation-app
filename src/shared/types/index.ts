@@ -9,6 +9,7 @@ export interface Transcription {
   timestamp: number;
   duration: number;
   language?: string;
+  pastedAtCursor?: boolean;
 }
 
 // Settings related types
