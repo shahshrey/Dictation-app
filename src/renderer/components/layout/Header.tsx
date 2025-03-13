@@ -7,7 +7,7 @@ import SettingsModal from '../features/settings/SettingsModal';
 const Header: React.FC = () => {
   const { isRecording } = useAppContext();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  
+
   return (
     <header className="bg-primary text-primary-foreground">
       <div className="container mx-auto px-4 py-3 flex items-center">
@@ -15,26 +15,26 @@ const Header: React.FC = () => {
           <MicIcon className="h-5 w-5" />
         </div>
         <h1 className="text-xl font-semibold flex-grow">Dictation App</h1>
-        
+
         {isRecording && (
           <div className="flex items-center mr-4">
             <div className="w-3 h-3 rounded-full bg-destructive mr-2 animate-pulse" />
             <span className="text-sm">Recording</span>
           </div>
         )}
-        
+
         <ThemeToggle />
-        
-        <Button 
-          variant="ghost" 
-          size="icon" 
+
+        <Button
+          variant="ghost"
+          size="icon"
           className="text-primary-foreground ml-2"
           onClick={() => setSettingsOpen(true)}
         >
           <SettingsIcon className="h-5 w-5" />
         </Button>
       </div>
-      
+
       <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
     </header>
   );
@@ -74,4 +74,4 @@ const SettingsIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
-export default Header; 
+export default Header;

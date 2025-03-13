@@ -4,7 +4,7 @@ import { Card } from '../../ui/card';
 
 const TranscriptionDisplay: React.FC = () => {
   const { currentTranscription } = useAppContext();
-  
+
   if (!currentTranscription) {
     return (
       <div className="flex items-center justify-center h-full text-muted-foreground">
@@ -12,7 +12,7 @@ const TranscriptionDisplay: React.FC = () => {
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-4">
       <Card className="p-4">
@@ -22,7 +22,7 @@ const TranscriptionDisplay: React.FC = () => {
               {new Date(currentTranscription.timestamp).toLocaleString()}
             </span>
             <span className="text-sm text-muted-foreground">
-              Language: {currentTranscription.language || 'auto'}
+              Language: {currentTranscription.language ?? 'auto'}
             </span>
           </div>
           <div className="whitespace-pre-wrap">{currentTranscription.text}</div>
@@ -32,4 +32,4 @@ const TranscriptionDisplay: React.FC = () => {
   );
 };
 
-export default TranscriptionDisplay; 
+export default TranscriptionDisplay;

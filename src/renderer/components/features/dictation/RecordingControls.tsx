@@ -7,8 +7,8 @@ import { Card } from '../../ui/card';
 import { AudioDevice } from '../../../../shared/types';
 
 const RecordingControls: React.FC = () => {
-  const { 
-    isRecording, 
+  const {
+    isRecording,
     recordingTime,
     audioDevices,
     selectedDevice,
@@ -18,7 +18,7 @@ const RecordingControls: React.FC = () => {
     stopRecording,
     transcribeRecording,
     currentTranscription,
-    saveTranscription
+    saveTranscription,
   } = useAppContext();
 
   // Format recording time as MM:SS
@@ -40,10 +40,7 @@ const RecordingControls: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-col space-y-2">
         <Label htmlFor="microphone-select">Select Microphone</Label>
-        <Select 
-          value={selectedDevice?.id || ''} 
-          onValueChange={handleDeviceChange}
-        >
+        <Select value={selectedDevice?.id ?? ''} onValueChange={handleDeviceChange}>
           <SelectTrigger id="microphone-select" className="w-full">
             <SelectValue placeholder="Select a microphone" />
           </SelectTrigger>
@@ -55,27 +52,27 @@ const RecordingControls: React.FC = () => {
             ))}
           </SelectContent>
         </Select>
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => refreshAudioDevices()}
           className="self-end mt-1"
         >
           Refresh Devices
         </Button>
       </div>
-      
+
       <div className="flex flex-col space-y-4">
         <div className="flex space-x-2">
           <Button
-            variant={isRecording ? "destructive" : "default"}
+            variant={isRecording ? 'destructive' : 'default'}
             className="flex-1"
             onClick={isRecording ? stopRecording : startRecording}
             disabled={!selectedDevice}
           >
-            {isRecording ? "Stop Recording" : "Start Recording"}
+            {isRecording ? 'Stop Recording' : 'Start Recording'}
           </Button>
-          
+
           <Button
             variant="outline"
             className="flex-1"
@@ -85,7 +82,7 @@ const RecordingControls: React.FC = () => {
             Transcribe
           </Button>
         </div>
-        
+
         {isRecording && (
           <Card className="p-4 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
             <div className="flex items-center justify-between">
@@ -97,7 +94,7 @@ const RecordingControls: React.FC = () => {
             </div>
           </Card>
         )}
-        
+
         {currentTranscription && (
           <div className="flex space-x-2">
             <Button
@@ -115,4 +112,4 @@ const RecordingControls: React.FC = () => {
   );
 };
 
-export default RecordingControls; 
+export default RecordingControls;

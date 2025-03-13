@@ -2,13 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '../../ui/button';
 import { Switch } from '../../ui/switch';
 import { useAppContext } from '../../../context/AppContext';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../../ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 import { Label } from '../../ui/label';
 import { Input } from '../../ui/input';
 
@@ -23,13 +17,13 @@ const SettingsPanel: React.FC = () => {
 
     const handleKeyDown = (e: KeyboardEvent) => {
       e.preventDefault();
-      
+
       // Get the key name
       let keyName = e.key;
-      
+
       // Handle special keys
       if (e.key === ' ') keyName = 'Space';
-      
+
       // Update settings with the new hotkey
       updateSettings({ hotkey: keyName });
       setListeningForHotkey(false);
@@ -62,7 +56,7 @@ const SettingsPanel: React.FC = () => {
             id="api-key"
             type="password"
             value={settings.apiKey}
-            onChange={(e) => updateSettings({ apiKey: e.target.value })}
+            onChange={e => updateSettings({ apiKey: e.target.value })}
             placeholder="Enter your Groq API key"
             className="flex-1"
           />
@@ -84,7 +78,7 @@ const SettingsPanel: React.FC = () => {
         </Label>
         <Select
           value={settings.language}
-          onValueChange={(value) => updateSettings({ language: value })}
+          onValueChange={value => updateSettings({ language: value })}
         >
           <SelectTrigger id="language">
             <SelectValue placeholder="Select language" />
@@ -112,16 +106,13 @@ const SettingsPanel: React.FC = () => {
           <Input
             id="hotkey"
             ref={hotkeyInputRef}
-            value={listeningForHotkey ? "Press any key..." : settings.hotkey}
+            value={listeningForHotkey ? 'Press any key...' : settings.hotkey}
             readOnly
             placeholder="Click to set hotkey"
             className="flex-1"
             onClick={startListeningForHotkey}
           />
-          <Button
-            variant="outline"
-            onClick={startListeningForHotkey}
-          >
+          <Button variant="outline" onClick={startListeningForHotkey}>
             Change
           </Button>
         </div>
@@ -140,7 +131,7 @@ const SettingsPanel: React.FC = () => {
           <Input
             id="save-path"
             value={settings.transcriptionSavePath}
-            onChange={(e) => updateSettings({ transcriptionSavePath: e.target.value })}
+            onChange={e => updateSettings({ transcriptionSavePath: e.target.value })}
             placeholder="Default path"
             className="flex-1"
           />
@@ -171,7 +162,7 @@ const SettingsPanel: React.FC = () => {
         <Switch
           id="auto-transcribe"
           checked={settings.autoTranscribe}
-          onCheckedChange={(checked) => updateSettings({ autoTranscribe: checked })}
+          onCheckedChange={checked => updateSettings({ autoTranscribe: checked })}
         />
       </div>
 
@@ -180,18 +171,16 @@ const SettingsPanel: React.FC = () => {
           <Label htmlFor="save-transcriptions" className="text-sm font-medium">
             Save Transcriptions
           </Label>
-          <p className="text-xs text-muted-foreground">
-            Automatically save transcriptions to disk
-          </p>
+          <p className="text-xs text-muted-foreground">Automatically save transcriptions to disk</p>
         </div>
         <Switch
           id="save-transcriptions"
           checked={settings.saveTranscriptions}
-          onCheckedChange={(checked) => updateSettings({ saveTranscriptions: checked })}
+          onCheckedChange={checked => updateSettings({ saveTranscriptions: checked })}
         />
       </div>
     </div>
   );
 };
 
-export default SettingsPanel; 
+export default SettingsPanel;

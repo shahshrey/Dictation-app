@@ -1,10 +1,5 @@
 import React from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '../../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../ui/dialog';
 import SettingsPanel from './SettingsPanel';
 
 interface SettingsModalProps {
@@ -25,4 +20,4 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onOpenChange }) => 
   );
 };
 
-export default SettingsModal; 
+export default SettingsModal;

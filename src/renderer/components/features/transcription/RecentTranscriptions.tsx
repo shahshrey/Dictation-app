@@ -28,16 +28,16 @@ const RecentTranscriptions: React.FC = () => {
 
   return (
     <div className="space-y-3 max-h-[300px] overflow-auto pr-1">
-      {recentTranscriptions.map((transcription) => (
+      {recentTranscriptions.map(transcription => (
         <Card key={transcription.id} className="p-3 hover:bg-accent/50 transition-colors">
           <div className="flex justify-between items-start mb-2">
             <div className="text-sm font-medium truncate flex-1">
               {transcription.text.substring(0, 50)}
               {transcription.text.length > 50 ? '...' : ''}
             </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setCurrentTranscription(transcription)}
               className="ml-2 shrink-0"
             >
@@ -54,4 +54,4 @@ const RecentTranscriptions: React.FC = () => {
   );
 };
 
-export default RecentTranscriptions; 
+export default RecentTranscriptions;
