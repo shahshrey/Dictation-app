@@ -45,5 +45,5 @@ export const IPC_CHANNELS = {
   SETTINGS_RESULT: 'settings-result',
   GET_TRANSCRIPTIONS: 'get-transcriptions',
   TRANSCRIPTIONS_RESULT: 'transcriptions-result',
-  ERROR: 'error-message'
-}; 
+  ERROR: 'error-message',
+};
