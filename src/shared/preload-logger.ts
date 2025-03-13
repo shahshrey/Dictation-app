@@ -16,8 +16,11 @@ class PreloadLogger {
 
   constructor(processType: string) {
     this.processType = processType;
-    // Default to debug in development, info in production
-    this.logLevel = process.env.NODE_ENV === 'production' ? LOG_LEVELS.INFO : LOG_LEVELS.DEBUG;
+    // Force debug level for troubleshooting
+    // TODO: Revert this to use NODE_ENV after debugging is complete
+    // this.logLevel = process.env.NODE_ENV === 'production' ? LOG_LEVELS.INFO : LOG_LEVELS.DEBUG;
+    this.logLevel = LOG_LEVELS.DEBUG;
+    console.log(`[${processType}] Logger initialized with level: ${this.logLevel}`);
   }
 
   private shouldLog(level: string): boolean {

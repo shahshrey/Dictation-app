@@ -52,6 +52,21 @@ interface ElectronAPI {
     language?: string; 
     error?: string 
   }>;
+  testGroqAPI: (apiKey: string) => Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+    text?: string;
+  }>;
+  saveGroqApiKey: (apiKey: string) => Promise<{
+    success: boolean;
+    error?: string;
+  }>;
+  getGroqApiKey: () => Promise<{
+    success: boolean;
+    apiKey: string;
+    error?: string;
+  }>;
   
   // File storage
   saveTranscription: (text: string, options?: { filename?: string; format?: string }) => 

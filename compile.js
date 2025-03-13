@@ -118,6 +118,37 @@ async function buildSharedModules() {
       });
     }
     
+    // Also build the types directory
+    const typesDir = path.join(sharedDir, 'types');
+    const typesOutputDir = path.join(outputDir, 'types');
+    
+    if (fs.existsSync(typesDir)) {
+      ensureDirectoryExists(typesOutputDir);
+      
+      // Get all TypeScript files in the types directory
+      const typesFiles = fs.readdirSync(typesDir)
+        .filter(file => file.endsWith('.ts'))
+        .map(file => path.join(typesDir, file));
+      
+      // Build each file
+      for (const file of typesFiles) {
+        const filename = path.basename(file, '.ts');
+        await build({
+          entryPoints: [file],
+          bundle: false,
+          outfile: path.join(typesOutputDir, `${filename}.js`),
+          platform: 'node',
+          format: 'cjs',
+          target: 'node16',
+          sourcemap: true,
+          allowOverwrite: true,
+          loader: {
+            '.ts': 'ts',
+          },
+        });
+      }
+    }
+    
     buildLogger.info('Shared modules built successfully!');
   } catch (error) {
     buildLogger.error('Error building shared modules:', error);

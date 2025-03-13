@@ -26,6 +26,18 @@ try {
       preloadLogger.debug('Transcribe recording called', { language: language, hasApiKey: !!apiKey });
       return ipcRenderer.invoke('transcribe-recording', language, apiKey);
     },
+    testGroqAPI: (apiKey) => {
+      preloadLogger.debug('Test Groq API called', { hasApiKey: !!apiKey });
+      return ipcRenderer.invoke('test-groq-api', apiKey);
+    },
+    saveGroqApiKey: (apiKey) => {
+      preloadLogger.debug('Save Groq API key called', { hasApiKey: !!apiKey });
+      return ipcRenderer.invoke('save-groq-api-key', apiKey);
+    },
+    getGroqApiKey: () => {
+      preloadLogger.debug('Get Groq API key called');
+      return ipcRenderer.invoke('get-groq-api-key');
+    },
     
     // File storage
     saveTranscription: (text, options) => 

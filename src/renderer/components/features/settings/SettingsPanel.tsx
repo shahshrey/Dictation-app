@@ -15,12 +15,25 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { LANGUAGES } from '../../../../shared/constants';
 import { rendererLogger } from '../../../../shared/preload-logger';
+import GroqAPITest from './GroqAPITest';
 
-const SettingsPanel: React.FC = () => {
+interface SettingsPanelProps {
+  onSave?: () => void;
+}
+
+const SettingsPanel: React.FC<SettingsPanelProps> = ({ onSave }) => {
   const { settings, updateSettings, audioDevices, selectedDevice, setSelectedDevice } = useAppContext();
+  const [localSettings, setLocalSettings] = useState({ ...settings });
   const [listeningForHotkey, setListeningForHotkey] = useState(false);
   const hotkeyInputRef = useRef<HTMLInputElement>(null);
   const [hotkeyDisplay, setHotkeyDisplay] = useState(settings.hotkey || 'Home');
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Update local settings when app settings change
+  useEffect(() => {
+    setLocalSettings({ ...settings });
+    setHotkeyDisplay(settings.hotkey || 'Home');
+  }, [settings]);
 
   // Handle hotkey recording
   useEffect(() => {
@@ -37,9 +50,9 @@ const SettingsPanel: React.FC = () => {
       if (e.key === 'Control') keyName = 'Ctrl';
       if (e.key === 'Meta') keyName = 'Command';
       
-      // Update settings with the new hotkey
+      // Update local settings with the new hotkey
       setHotkeyDisplay(keyName);
-      updateSettings({ hotkey: keyName });
+      setLocalSettings(prev => ({ ...prev, hotkey: keyName }));
       setListeningForHotkey(false);
     };
 
@@ -47,7 +60,7 @@ const SettingsPanel: React.FC = () => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [listeningForHotkey, updateSettings]);
+  }, [listeningForHotkey]);
 
   // Start listening for hotkey
   const startListeningForHotkey = () => {
@@ -55,6 +68,25 @@ const SettingsPanel: React.FC = () => {
     setHotkeyDisplay('Press any key...');
     if (hotkeyInputRef.current) {
       hotkeyInputRef.current.focus();
+    }
+  };
+
+  // Handle local settings changes
+  const handleSettingChange = (key: string, value: any) => {
+    setLocalSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  // Save settings to store
+  const handleSaveSettings = async () => {
+    try {
+      setIsSaving(true);
+      await updateSettings(localSettings);
+      rendererLogger.info('Settings saved successfully');
+      if (onSave) onSave();
+    } catch (error) {
+      rendererLogger.exception(error as Error, 'Failed to save settings');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -83,8 +115,8 @@ const SettingsPanel: React.FC = () => {
                 </Label>
                 <Switch
                   id="auto-transcribe"
-                  checked={settings.autoTranscribe}
-                  onCheckedChange={(checked) => updateSettings({ autoTranscribe: checked })}
+                  checked={localSettings.autoTranscribe}
+                  onCheckedChange={(checked) => handleSettingChange('autoTranscribe', checked)}
                 />
               </div>
               
@@ -139,8 +171,8 @@ const SettingsPanel: React.FC = () => {
                 <Input
                   id="api-key"
                   type="password"
-                  value={settings.apiKey || ''}
-                  onChange={(e) => updateSettings({ apiKey: e.target.value })}
+                  value={localSettings.apiKey || ''}
+                  onChange={(e) => handleSettingChange('apiKey', e.target.value)}
                   placeholder="Enter your Groq API key"
                 />
               </div>
@@ -148,8 +180,8 @@ const SettingsPanel: React.FC = () => {
               <div className="flex flex-col space-y-1.5">
                 <Label htmlFor="language">Language</Label>
                 <Select
-                  value={settings.language}
-                  onValueChange={(value) => updateSettings({ language: value })}
+                  value={localSettings.language}
+                  onValueChange={(value) => handleSettingChange('language', value)}
                 >
                   <SelectTrigger id="language">
                     <SelectValue placeholder="Select language" />
@@ -169,8 +201,8 @@ const SettingsPanel: React.FC = () => {
                 <div className="flex gap-2">
                   <Input
                     id="save-path"
-                    value={settings.transcriptionSavePath}
-                    onChange={(e) => updateSettings({ transcriptionSavePath: e.target.value })}
+                    value={localSettings.transcriptionSavePath}
+                    onChange={(e) => handleSettingChange('transcriptionSavePath', e.target.value)}
                     placeholder="Default path"
                     className="flex-1"
                   />
@@ -188,9 +220,23 @@ const SettingsPanel: React.FC = () => {
                   </Button>
                 </div>
               </div>
+              
+              <div className="mt-6">
+                <GroqAPITest />
+              </div>
             </div>
           </TabsContent>
         </Tabs>
+        
+        <div className="mt-6 flex justify-end">
+          <Button 
+            onClick={handleSaveSettings} 
+            disabled={isSaving}
+            className="w-24"
+          >
+            {isSaving ? 'Saving...' : 'Save'}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

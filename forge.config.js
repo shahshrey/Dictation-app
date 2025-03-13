@@ -29,7 +29,7 @@ module.exports = {
             js: './src/renderer/index.tsx',
             name: 'main_window',
             preload: {
-              js: './src/preload/preload.ts',
+              js: './src/main/preload.js',
             },
           },
           {
@@ -37,7 +37,7 @@ module.exports = {
             js: './src/renderer/popup.tsx',
             name: 'popup_window',
             preload: {
-              js: './src/preload/preload.ts',
+              js: './src/main/preload.js',
             },
           }
         ],
@@ -45,3 +45,4 @@ module.exports = {
     }),
   ],
 }; 
+

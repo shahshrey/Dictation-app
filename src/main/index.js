@@ -1,12 +1,20 @@
 // Remove the warning message
 // console.log('WARNING: Using index.js instead of index.ts');
-const { app, BrowserWindow, ipcMain, globalShortcut, dialog, systemPreferences } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, dialog, systemPreferences, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { Groq } = require('groq-sdk');
 // Import the logger
 const { getLogger, initLoggers, LOG_LEVELS } = require('../../dist/shared/logger');
+// Import the cursor service
+const { insertTextAtCursor, insertTextAtCursorViaClipboard } = require('../../dist/main/services/cursor');
+// Import the groq service
+const { setupGroqAPI } = require('../../dist/main/services/groq');
+// Import the storage service
+const { setupFileStorage } = require('../../dist/main/services/storage');
+// Import the audio service
+const { setupAudioRecording } = require('../../dist/main/services/audio');
 
 // Initialize the logger
 let logger;
@@ -80,7 +88,8 @@ const DEFAULT_SETTINGS = {
   defaultLanguage: 'auto',
   transcriptionModel: GROQ_MODELS.TRANSCRIPTION.MULTILINGUAL,
   showNotifications: true,
-  saveTranscriptionsAutomatically: false
+  saveTranscriptionsAutomatically: false,
+  insertAtCursor: true // Default to inserting text at cursor position
 };
 
 // Settings object
@@ -90,13 +99,119 @@ let settings = { ...DEFAULT_SETTINGS };
 async function initStore() {
   try {
     const { default: Store } = await import('electron-store');
+    logger.info('Creating electron-store instance');
+    
     store = new Store({
+      name: 'dictation-app-settings',
       defaults: DEFAULT_SETTINGS
     });
+    
+    logger.info('Store created successfully', {
+      storeType: typeof store,
+      hasStore: !!store.store,
+      storeKeys: Object.keys(store.store || {})
+    });
+    
     settings = store.store;
+    logger.info('Settings loaded from store', {
+      hasApiKey: !!settings.apiKey,
+      apiKeyLength: settings.apiKey ? settings.apiKey.length : 0,
+      settingsKeys: Object.keys(settings)
+    });
+    
     return true;
   } catch (error) {
     logger.exception(error, 'Failed to initialize store');
+    return false;
+  }
+}
+
+// Test Groq API connection
+async function testGroqAPIConnection() {
+  try {
+    logger.info('Testing Groq API connection');
+    
+    // Get API key from settings
+    const apiKey = settings.apiKey;
+    logger.info('API key from settings', { 
+      hasApiKey: !!apiKey,
+      apiKeyLength: apiKey ? apiKey.length : 0
+    });
+    
+    // Also try to get API key directly from store
+    let storeApiKey = '';
+    if (store && store.store) {
+      storeApiKey = store.store.apiKey || '';
+      logger.info('API key from store', { 
+        hasApiKey: !!storeApiKey,
+        apiKeyLength: storeApiKey ? storeApiKey.length : 0,
+        matchesSettings: storeApiKey === apiKey
+      });
+    }
+    
+    // Also try to get API key from Groq service
+    let groqApiKey = '';
+    try {
+      // Import the getApiKey function from groq.ts
+      const { getApiKey } = require('../../dist/main/services/groq');
+      if (typeof getApiKey === 'function') {
+        groqApiKey = getApiKey();
+        logger.info('API key from Groq service', { 
+          hasApiKey: !!groqApiKey,
+          apiKeyLength: groqApiKey ? groqApiKey.length : 0,
+          matchesSettings: groqApiKey === apiKey,
+          matchesStore: groqApiKey === storeApiKey
+        });
+      } else {
+        logger.warn('getApiKey function not available from Groq service');
+      }
+    } catch (importError) {
+      logger.exception(importError, 'Failed to import getApiKey from Groq service');
+    }
+    
+    // Use the API key from settings
+    if (!apiKey) {
+      logger.warn('No API key found in settings, skipping Groq API test');
+      return false;
+    }
+    
+    logger.debug('Initializing Groq client for testing');
+    const client = new Groq({ apiKey });
+    
+    // Create a simple test file with text content
+    const testDir = path.join(TEMP_DIR, 'test');
+    if (!fs.existsSync(testDir)) {
+      fs.mkdirSync(testDir, { recursive: true });
+    }
+    
+    // Check if we have a test audio file
+    const testAudioPath = path.join(testDir, 'test-audio.webm');
+    let testFileExists = fs.existsSync(testAudioPath);
+    
+    if (!testFileExists) {
+      logger.info('No test audio file found, will use first recording for testing');
+    } else {
+      logger.info('Test audio file found, using for API test');
+      
+      try {
+        const audioFile = fs.createReadStream(testAudioPath);
+        const result = await client.audio.transcriptions.create({
+          file: audioFile,
+          model: GROQ_MODELS.TRANSCRIPTION.ENGLISH,
+          language: 'en',
+        });
+        
+        logger.info('Groq API test successful', { textLength: result.text.length });
+        return true;
+      } catch (error) {
+        logger.exception(error, 'Groq API test failed');
+        return false;
+      }
+    }
+    
+    return { success: true, message: 'API key accepted' };
+  } catch (error) {
+    logger.exception(error, 'Failed to test Groq API connection');
     return false;
   }
 }
@@ -422,6 +537,57 @@ const hidePopupWindow = () => {
 
 // Set up IPC handlers
 const setupIpcHandlers = () => {
+  // Test Groq API connection
+  ipcMain.handle('test-groq-api', async (_, apiKey) => {
+    try {
+      logger.info('Testing Groq API connection via IPC');
+      
+      if (!apiKey) {
+        logger.warn('No API key provided for test');
+        return { success: false, error: 'No API key provided' };
+      }
+      
+      logger.debug('Initializing Groq client for testing with provided API key');
+      const client = new Groq({ apiKey });
+      
+      // Create a simple test file with text content
+      const testDir = path.join(TEMP_DIR, 'test');
+      if (!fs.existsSync(testDir)) {
+        fs.mkdirSync(testDir, { recursive: true });
+      }
+      
+      // Check if we have a test audio file
+      const testAudioPath = path.join(testDir, 'test-audio.webm');
+      let testFileExists = fs.existsSync(testAudioPath);
+      
+      if (!testFileExists) {
+        logger.info('No test audio file found, will use first recording for testing');
+      } else {
+        logger.info('Test audio file found, using for API test');
+        
+        try {
+          const audioFile = fs.createReadStream(testAudioPath);
+          const result = await client.audio.transcriptions.create({
+            file: audioFile,
+            model: GROQ_MODELS.TRANSCRIPTION.ENGLISH,
+            language: 'en',
+          });
+          
+          logger.info('Groq API test successful', { textLength: result.text.length });
+          return { success: true, text: result.text };
+        } catch (error) {
+          logger.exception(error, 'Groq API test failed');
+          return { success: false, error: error.message };
+        }
+      }
+      
+      return { success: true, message: 'API key accepted' };
+    } catch (error) {
+      logger.exception(error, 'Failed to test Groq API connection');
+      return { success: false, error: error.message };
+    }
+  });
+
   // Get available audio input devices
   ipcMain.handle('get-audio-sources', async () => {
     try {
@@ -436,400 +602,21 @@ const setupIpcHandlers = () => {
     }
   });
 
-  // Save the recorded audio blob sent from the renderer
-  ipcMain.handle('save-recording', async (_, arrayBuffer) => {
+  // Insert text at cursor position
+  ipcMain.handle('insert-text-at-cursor', async (_, text) => {
     try {
-      logger.debug('Saving recording, buffer size:', arrayBuffer.byteLength);
+      logger.info('Received request to insert text at cursor position', { textLength: text.length });
       
-      // Validate that we have actual data
-      if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-        logger.error('Error: Empty audio buffer received');
-        return { success: false, error: 'Empty audio buffer received' };
-      }
+      // Use only the clipboard method since we removed RobotJS
+      const success = await insertTextAtCursor(text, clipboard);
       
-      const buffer = Buffer.from(arrayBuffer);
-      
-      // Ensure the temp directory exists
-      if (!fs.existsSync(TEMP_DIR)) {
-        fs.mkdirSync(TEMP_DIR, { recursive: true });
-      }
-      
-      // Write the file
-      fs.writeFileSync(AUDIO_FILE_PATH, buffer, { encoding: 'binary' });
-      
-      // Verify the file was written correctly
-      if (fs.existsSync(AUDIO_FILE_PATH)) {
-        const stats = fs.statSync(AUDIO_FILE_PATH);
-        logger.info(`Recording saved successfully: ${AUDIO_FILE_PATH}, size: ${stats.size} bytes`);
-        
-        if (stats.size === 0) {
-          logger.error('Error: File was saved but is empty');
-          return { success: false, error: 'File was saved but is empty', filePath: AUDIO_FILE_PATH };
-        }
-        
-        return { success: true, filePath: AUDIO_FILE_PATH, size: stats.size };
-      } else {
-        logger.error('Error: File was not saved');
-        return { success: false, error: 'File was not saved' };
-      }
+      return { success };
     } catch (error) {
-      logger.exception(error, 'Failed to save recording');
-      return { success: false, error: String(error) };
-    }
-  });
-
-  // Get the path to the saved recording
-  ipcMain.handle('get-recording-path', () => {
-    return AUDIO_FILE_PATH;
-  });
-
-  // Transcribe audio file
-  ipcMain.handle('transcribe-audio', async (_, filePath, options) => {
-    try {
-      groqClient = initGroqClient();
-      
-      if (!groqClient) {
-        return { success: false, error: 'Groq API key not set' };
-      }
-      
-      if (!fs.existsSync(filePath)) {
-        return { success: false, error: 'Audio file not found' };
-      }
-      
-      const audioFile = fs.createReadStream(filePath);
-      
-      // Choose the appropriate model based on options or settings
-      let model = options?.model || settings.transcriptionModel || GROQ_MODELS.TRANSCRIPTION.MULTILINGUAL;
-      
-      // Force English model if language is English
-      if (options?.language === 'en') {
-        model = GROQ_MODELS.TRANSCRIPTION.ENGLISH;
-      }
-      
-      // Default to English if no language is specified or if 'auto' is specified
-      const language = (options?.language === 'auto' || !options?.language) ? 'en' : options?.language;
-      
-      logger.info(`Using Groq model: ${model} for transcription with language: ${language}`);
-      
-      const transcription = await groqClient.audio.transcriptions.create({
-        file: audioFile,
-        model: model,
-        language: language,
-      });
-      
-      return { 
-        success: true, 
-        text: transcription.text,
-        language: language,
-        model: model
-      };
-    } catch (error) {
-      logger.exception(error, 'Failed to transcribe audio');
+      logger.exception(error, 'Failed to insert text at cursor position');
       return { success: false, error: String(error) };
     }
   });
   
-  // Translate audio file to English
-  ipcMain.handle('translate-audio', async (_, filePath) => {
-    try {
-      groqClient = initGroqClient();
-      
-      if (!groqClient) {
-        return { success: false, error: 'Groq API key not set' };
-      }
-      
-      if (!fs.existsSync(filePath)) {
-        return { success: false, error: 'Audio file not found' };
-      }
-      
-      const audioFile = fs.createReadStream(filePath);
-      
-      logger.info(`Using Groq model: ${GROQ_MODELS.TRANSLATION} for translation`);
-      
-      const translation = await groqClient.audio.translations.create({
-        file: audioFile,
-        model: GROQ_MODELS.TRANSLATION
-      });
-      
-      return { 
-        success: true, 
-        text: translation.text,
-        model: GROQ_MODELS.TRANSLATION
-      };
-    } catch (error) {
-      logger.exception(error, 'Failed to translate audio');
-      return { success: false, error: String(error) };
-    }
-  });
-
-  // Save transcription to a file
-  ipcMain.handle('save-transcription', async (_, text, options) => {
-    try {
-      const filename = options?.filename || 'transcription';
-      const format = options?.format || 'txt';
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const fullFilename = `${filename}_${timestamp}.${format}`;
-      const filePath = path.join(DEFAULT_SAVE_DIR, fullFilename);
-      
-      fs.writeFileSync(filePath, text, { encoding: 'utf-8' });
-      
-      return { success: true, filePath };
-    } catch (error) {
-      logger.exception(error, 'Failed to save transcription');
-      return { success: false, error: String(error) };
-    }
-  });
-  
-  // Save transcription with file dialog
-  ipcMain.handle('save-transcription-as', async (_, text) => {
-    try {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const defaultPath = path.join(DEFAULT_SAVE_DIR, `transcription_${timestamp}.txt`);
-      
-      const { canceled, filePath } = await dialog.showSaveDialog({
-        title: 'Save Transcription',
-        defaultPath,
-        filters: [
-          { name: 'Text Files', extensions: ['txt'] },
-          { name: 'All Files', extensions: ['*'] }
-        ]
-      });
-      
-      if (canceled || !filePath) {
-        return { success: false, canceled: true };
-      }
-      
-      fs.writeFileSync(filePath, text, { encoding: 'utf-8' });
-      
-      return { success: true, filePath };
-    } catch (error) {
-      logger.exception(error, 'Failed to save transcription');
-      return { success: false, error: String(error) };
-    }
-  });
-  
-  // Get recent transcriptions
-  ipcMain.handle('get-recent-transcriptions', async () => {
-    try {
-      if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
-        return { success: true, files: [] };
-      }
-      
-      const files = fs.readdirSync(DEFAULT_SAVE_DIR)
-        .filter(file => file.endsWith('.txt'))
-        .map(file => {
-          const filePath = path.join(DEFAULT_SAVE_DIR, file);
-          const stats = fs.statSync(filePath);
-          return {
-            name: file,
-            path: filePath,
-            size: stats.size,
-            createdAt: stats.birthtime,
-            modifiedAt: stats.mtime
-          };
-        })
-        .sort((a, b) => b.modifiedAt.getTime() - a.modifiedAt.getTime())
-        .slice(0, 10); // Get only the 10 most recent files
-      
-      return { success: true, files };
-    } catch (error) {
-      logger.exception(error, 'Failed to get recent transcriptions');
-      return { success: false, error: String(error) };
-    }
-  });
-
-  // Get transcriptions (alias for get-recent-transcriptions)
-  // This handler returns transcriptions in a format compatible with the renderer's expectations
-  ipcMain.handle('get-transcriptions', async () => {
-    logger.debug('Main process: get-transcriptions handler called');
-    try {
-      if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
-        logger.debug('Main process: Save directory does not exist');
-        return [];
-      }
-
-      // Force a directory read to get the latest files
-      const files = fs
-        .readdirSync(DEFAULT_SAVE_DIR, { withFileTypes: true })
-        .filter((dirent) => dirent.isFile() && dirent.name.endsWith(".txt"))
-        .map((dirent) => {
-          const filePath = path.join(DEFAULT_SAVE_DIR, dirent.name);
-          
-          try {
-            // Get file stats
-            const stats = fs.statSync(filePath);
-            
-            // Read file content
-            let content = '';
-            try {
-              content = fs.readFileSync(filePath, { encoding: "utf-8" });
-            } catch (readError) {
-              logger.exception(readError, `Failed to read file ${filePath}`);
-              content = ''; // Default to empty string if read fails
-            }
-            
-            // Extract timestamp from filename or use file creation time
-            let timestamp = stats.birthtime.getTime();
-            const timestampMatch = dirent.name.match(/(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})/);
-            if (timestampMatch) {
-              const dateStr = timestampMatch[1].replace(/-/g, (m, i) => i > 9 ? ':' : '-');
-              const date = new Date(dateStr);
-              if (!isNaN(date.getTime())) {
-                timestamp = date.getTime();
-              }
-            }
-            
-            return {
-              id: path.basename(dirent.name, '.txt'),
-              text: content,
-              timestamp,
-              duration: 0, // Duration not available from saved files
-              language: 'en' // Default language
-            };
-          } catch (error) {
-            logger.exception(error, `Failed to process file ${dirent.name}`);
-            return null;
-          }
-        })
-        .filter(Boolean) // Remove any null entries from errors
-        .sort((a, b) => b.timestamp - a.timestamp);
-
-      logger.debug(`Main process: Found ${files.length} transcriptions`);
-      return files;
-    } catch (error) {
-      logger.exception(error, "Failed to get transcriptions");
-      return [];
-    }
-  });
-
-  // Transcribe the most recent recording using Groq API
-  // This handler takes the language and API key from the renderer
-  // and returns a transcription object with the transcribed text
-  ipcMain.handle('transcribe-recording', async (_, language, apiKey) => {
-    logger.debug('Main process: transcribe-recording handler called with language:', language);
-    logger.debug('Main process: API key available:', !!apiKey);
-    
-    try {
-      // Initialize Groq client with the provided API key
-      if (!apiKey) {
-        logger.error('Error: No API key provided');
-        return { 
-          success: false, 
-          error: 'No API key provided',
-          id: '',
-          text: '',
-          timestamp: 0,
-          duration: 0
-        };
-      }
-      
-      const client = new Groq({ apiKey });
-      
-      // Get the path to the most recent recording
-      if (!fs.existsSync(AUDIO_FILE_PATH)) {
-        logger.error('Error: Recording file not found at', AUDIO_FILE_PATH);
-        return { 
-          success: false, 
-          error: 'Recording file not found',
-          id: '',
-          text: '',
-          timestamp: 0,
-          duration: 0
-        };
-      }
-      
-      // Validate the file size
-      const fileStats = fs.statSync(AUDIO_FILE_PATH);
-      logger.debug(`Audio file size: ${fileStats.size} bytes`);
-      
-      if (fileStats.size === 0) {
-        logger.error('Error: Audio file is empty');
-        return { 
-          success: false, 
-          error: 'Audio file is empty',
-          id: '',
-          text: '',
-          timestamp: 0,
-          duration: 0
-        };
-      }
-      
-      // Create a read stream for the audio file
-      const audioFile = fs.createReadStream(AUDIO_FILE_PATH);
-      
-      // Choose the appropriate model based on language
-      let model = language === 'en' ? GROQ_MODELS.TRANSCRIPTION.ENGLISH : GROQ_MODELS.TRANSCRIPTION.MULTILINGUAL;
-      
-      logger.info(`Using Groq model: ${model} for transcription with language: ${language || 'auto'}`);
-      
-      // Transcribe the audio
-      const transcription = await client.audio.transcriptions.create({
-        file: audioFile,
-        model: model,
-        language: language || 'auto',
-      });
-      
-      logger.debug('Transcription successful, text length:', transcription.text.length);
-      
-      // Generate a unique ID for the transcription
-      const id = `transcription-${Date.now()}`;
-      const timestamp = Date.now();
-      const duration = Math.floor((fileStats.mtime.getTime() - fileStats.birthtime.getTime()) / 1000);
-      
-      // Save the transcription to a file
-      let filePath = '';
-      try {
-        const filename = 'transcription';
-        const format = 'txt';
-        const timestampStr = new Date().toISOString().replace(/[:.]/g, '-');
-        const fullFilename = `${filename}_${timestampStr}.${format}`;
-        filePath = path.join(DEFAULT_SAVE_DIR, fullFilename);
-        
-        // Write the file synchronously to ensure it's fully written before returning
-        fs.writeFileSync(filePath, transcription.text, { encoding: 'utf-8' });
-        logger.info(`Transcription saved to: ${filePath}`);
-        
-        // Verify the file was written correctly
-        if (fs.existsSync(filePath)) {
-          const fileContent = fs.readFileSync(filePath, { encoding: 'utf-8' });
-          if (fileContent !== transcription.text) {
-            logger.error('Error: File content does not match transcription text');
-          } else {
-            logger.debug('File content verified successfully');
-          }
-        } else {
-          logger.error('Error: File was not created');
-        }
-      } catch (saveError) {
-        logger.exception(saveError, 'Failed to save transcription to file');
-        // Continue even if saving fails
-      }
-      
-      // Add a small delay to ensure file system operations are complete
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      return { 
-        success: true,
-        id,
-        text: transcription.text,
-        timestamp,
-        duration,
-        language: language || 'auto',
-        filePath // Include the file path for debugging
-      };
-    } catch (error) {
-      logger.exception(error, 'Failed to transcribe recording');
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : String(error),
-        id: '',
-        text: '',
-        timestamp: 0,
-        duration: 0
-      };
-    }
-  });
-
   // Open file
   ipcMain.handle('open-file', (_, filePath) => {
     try {
@@ -850,14 +637,43 @@ const setupIpcHandlers = () => {
   // Save settings
   ipcMain.handle('save-settings', (_, newSettings) => {
     try {
+      logger.info('Saving settings', { 
+        hasApiKey: !!newSettings.apiKey,
+        apiKeyLength: newSettings.apiKey ? newSettings.apiKey.length : 0,
+        settingsKeys: Object.keys(newSettings)
+      });
+      
       if (store) {
+        // Save to electron-store
         store.set(newSettings);
+        logger.info('Settings saved to electron-store');
+        
+        // Update local settings object
         settings = { ...newSettings };
+        
+        // If API key is included, also save it via the Groq service
+        if (newSettings.apiKey !== undefined) {
+          try {
+            // Import the saveApiKey function from groq.ts
+            const { saveApiKey } = require('../../dist/main/services/groq');
+            if (typeof saveApiKey === 'function') {
+              const saved = saveApiKey(newSettings.apiKey);
+              logger.info('API key saved via Groq service', { success: saved });
+            } else {
+              logger.warn('saveApiKey function not available from Groq service');
+            }
+          } catch (importError) {
+            logger.exception(importError, 'Failed to import saveApiKey from Groq service');
+          }
+        }
       } else {
+        // Update local settings object
         settings = { ...newSettings };
+        
         // Save to a JSON file as fallback
         const settingsPath = path.join(app.getPath('userData'), 'settings.json');
         fs.writeFileSync(settingsPath, JSON.stringify(settings), { encoding: 'utf-8' });
+        logger.info('Settings saved to file', { filePath: settingsPath });
       }
       
       // Re-register the global hotkey with the new settings
@@ -866,29 +682,6 @@ const setupIpcHandlers = () => {
       return { success: true };
     } catch (error) {
       logger.exception(error, 'Failed to save settings');
-      return { success: false, error: String(error) };
-    }
-  });
-
-  // Add handlers for recording state
-  ipcMain.handle('start-recording', async (_, sourceId) => {
-    try {
-      isRecording = true;
-      showPopupWindow();
-      return { success: true };
-    } catch (error) {
-      logger.exception(error, 'Failed to start recording');
-      return { success: false, error: String(error) };
-    }
-  });
-  
-  ipcMain.handle('stop-recording', async () => {
-    try {
-      isRecording = false;
-      hidePopupWindow();
-      return { success: true };
-    } catch (error) {
-      logger.exception(error, 'Failed to stop recording');
       return { success: false, error: String(error) };
     }
   });
@@ -956,127 +749,76 @@ const setupDockMenu = () => {
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
+// Some APIs can only be used after this event occurs.
 app.whenReady().then(async () => {
-  // Initialize the logger first
-  initLoggers();
-  logger = getLogger('main');
-  logger.info('Application starting', { version: app.getVersion(), platform: process.platform });
-  
-  // Check for macOS permissions needed for system-wide overlay
-  logger.info('Checking macOS permissions for system-wide overlay');
-  checkMacOSPermissions();
-  
-  // Ensure the app stays in the dock on macOS, but the popup doesn't
-  if (process.platform === 'darwin') {
-    logger.debug('On macOS, setting app to stay in dock');
-    app.dock.show();
+  try {
+    // Initialize loggers
+    initLoggers(LOG_LEVELS.DEBUG);
+    logger = getLogger('main');
+    logger.info('App starting up');
     
-    // Set up the dock menu
+    // Initialize store
+    const storeInitialized = await initStore();
+    logger.info('Store initialized', { success: storeInitialized });
+    
+    if (!storeInitialized) {
+      logger.warn('Store initialization failed, some features may not work correctly');
+    }
+    
+    // Log store state before setting up services
+    logger.info('Store state before service setup', {
+      storeExists: !!store,
+      storeType: typeof store,
+      hasStoreMethod: store && typeof store.store === 'object',
+      apiKeyExists: store && store.store && !!store.store.apiKey,
+      apiKeyLength: store && store.store && store.store.apiKey ? store.store.apiKey.length : 0
+    });
+    
+    // Set up services with the store instance
+    logger.info('Setting up Groq API service');
+    setupGroqAPI(ipcMain, store);
+    
+    logger.info('Setting up File Storage service');
+    setupFileStorage(ipcMain);
+    
+    logger.info('Setting up Audio Recording service');
+    setupAudioRecording(ipcMain, mainWindow);
+    
+    logger.info('Services initialized');
+    
+    // Test Groq API connection
+    logger.info('Testing Groq API connection');
+    const apiTestResult = await testGroqAPIConnection();
+    logger.info('Groq API test result:', apiTestResult);
+    
+    // Create main window
+    createWindow();
+    
+    // Create popup window
+    createPopupWindow();
+    
+    // Set up IPC handlers
+    setupIpcHandlers();
+    
+    // Set up dock menu (macOS only)
     setupDockMenu();
     
-    // Set the app's activation policy to show in dock but hide popup
-    try {
-      // This is a macOS specific API to control dock behavior
-      if (app.dock && typeof app.dock.setMenu === 'function') {
-        // Create a dock menu that allows controlling the popup
-        const dockMenu = require('electron').Menu.buildFromTemplate([
-          {
-            label: 'Show Dictation Popup',
-            click: () => {
-              if (!popupWindow || popupWindow.isDestroyed()) {
-                createPopupWindow();
-              }
-              showPopupWindow();
-            }
-          },
-          {
-            label: 'Hide Dictation Popup',
-            click: () => {
-              if (popupWindow && !popupWindow.isDestroyed()) {
-                hidePopupWindow();
-              }
-            }
-          }
-        ]);
-        
-        app.dock.setMenu(dockMenu);
-      }
-    } catch (error) {
-      logger.exception(error, 'Error setting dock menu');
-    }
-  }
-  
-  logger.info('Initializing store');
-  await initStore();
-  
-  logger.info('Creating main window');
-  createWindow();
-  
-  logger.info('Setting up IPC handlers');
-  setupIpcHandlers();
-  
-  logger.info('Creating and showing the floating popup window');
-  // Create and show the floating popup window
-  createPopupWindow();
-  showPopupWindow();
-  
-  // Ensure the popup window doesn't appear in the app switcher
-  if (popupWindow && process.platform === 'darwin') {
-    try {
-      // This is a macOS specific trick to hide from the app switcher
-      popupWindow.setWindowButtonVisibility(false);
-      popupWindow.setSkipTaskbar(true);
-      
-      // Call the function to hide popup from dock
-      hidePopupFromDock();
-      
-      // For macOS Sequoia (15.1), we need an additional step to hide from dock
-      if (process.platform === 'darwin') {
-        // Get the macOS version
-        const osVersion = require('os').release();
-        logger.debug('macOS version:', osVersion);
-        
-        // If it's macOS Sequoia or newer
-        if (osVersion.startsWith('24.')) { // macOS Sequoia is Darwin 24.x
-          logger.debug('Using macOS Sequoia specific settings to hide popup from dock');
-          
-          // Set the window to be a utility window
-          if (typeof popupWindow.setWindowButtonVisibility === 'function') {
-            popupWindow.setWindowButtonVisibility(false);
-          }
-          
-          // Set the window to be an accessory window
-          if (typeof popupWindow.setAccessoryView === 'function') {
-            popupWindow.setAccessoryView(true);
-          }
-        }
-      }
-    } catch (error) {
-      logger.exception(error, 'Error configuring popup window visibility');
-    }
-  }
-  
-  logger.info('Registering global hotkey');
-  // Register the global shortcut with the current hotkey from settings
-  registerGlobalHotkey();
-  
-  app.on('activate', () => {
-    logger.info('App activate event triggered');
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
-    logger.debug('Number of open windows:', BrowserWindow.getAllWindows().length);
+    // Register global hotkey
+    registerGlobalHotkey();
     
-    if (BrowserWindow.getAllWindows().length === 0) {
-      logger.debug('No windows open, creating main window');
-      createWindow();
-      logger.debug('Showing popup window');
-      showPopupWindow();
-    } else {
-      logger.debug('Windows already open, not creating new ones');
-    }
-  });
-  
-  logger.info('App initialization complete');
+    // Check macOS permissions
+    checkMacOSPermissions();
+    
+    app.on('activate', () => {
+      // On macOS it's common to re-create a window in the app when the
+      // dock icon is clicked and there are no other windows open.
+      if (BrowserWindow.getAllWindows().length === 0) {
+        createWindow();
+      }
+    });
+  } catch (error) {
+    logger.exception(error, 'Error during app initialization');
+  }
 });
 
 // Quit when all windows are closed, except on macOS.
@@ -1295,3 +1037,4 @@ const registerGlobalHotkey = () => {
     }
   }
 }; 
+

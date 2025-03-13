@@ -107,9 +107,21 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   // Load settings from storage
   const loadSettings = async (): Promise<void> => {
     try {
+      // First try to get settings from the main settings store
       if (window.electronAPI && typeof window.electronAPI.getSettings === 'function') {
         const loadedSettings = await window.electronAPI.getSettings();
         setSettings(loadedSettings || DEFAULT_SETTINGS);
+      }
+      
+      // Then try to get the Groq API key specifically (this will override the one from settings)
+      if (window.electronAPI && typeof window.electronAPI.getGroqApiKey === 'function') {
+        const result = await window.electronAPI.getGroqApiKey();
+        if (result.success && result.apiKey) {
+          setSettings(prevSettings => ({
+            ...prevSettings,
+            apiKey: result.apiKey
+          }));
+        }
       }
     } catch (error) {
       rendererLogger.exception(error as Error, 'Failed to load settings');
@@ -122,8 +134,14 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
       const updatedSettings = { ...settings, ...newSettings };
       setSettings(updatedSettings);
       
+      // Save to the main settings store
       if (window.electronAPI && typeof window.electronAPI.saveSettings === 'function') {
         await window.electronAPI.saveSettings(updatedSettings);
+      }
+      
+      // If the API key is being updated, also save it specifically
+      if (newSettings.apiKey !== undefined && window.electronAPI && typeof window.electronAPI.saveGroqApiKey === 'function') {
+        await window.electronAPI.saveGroqApiKey(newSettings.apiKey);
       }
     } catch (error) {
       rendererLogger.exception(error as Error, 'Failed to update settings');
@@ -310,20 +328,44 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   
   // Start recording
   const startRecording = async (): Promise<void> => {
+    rendererLogger.info('Start recording requested in AppContext', { 
+      hasSelectedDevice: !!selectedDevice,
+      deviceInfo: selectedDevice ? { id: selectedDevice.id, name: selectedDevice.name } : null
+    });
+    
     if (selectedDevice) {
       try {
+        rendererLogger.info('Calling startAudioRecording with selected device', { 
+          deviceId: selectedDevice.id, 
+          deviceName: selectedDevice.name 
+        });
         await startAudioRecording();
+        rendererLogger.info('startAudioRecording completed');
       } catch (error) {
-        rendererLogger.exception(error as Error, 'Failed to start recording');
+        rendererLogger.exception(error as Error, 'Failed to start recording in AppContext');
       }
     } else {
-      rendererLogger.error('No audio device selected');
+      rendererLogger.error('No audio device selected for recording');
+      // Attempt to refresh audio devices in case they weren't loaded properly
+      try {
+        rendererLogger.info('Attempting to refresh audio devices');
+        await refreshAudioDevices();
+        rendererLogger.info('Audio devices refreshed', { deviceCount: audioDevices.length });
+      } catch (refreshError) {
+        rendererLogger.exception(refreshError as Error, 'Failed to refresh audio devices');
+      }
     }
   };
   
   // Stop recording
   const stopRecording = (): void => {
-    stopAudioRecording();
+    rendererLogger.info('Stop recording requested in AppContext', { isRecording });
+    try {
+      stopAudioRecording();
+      rendererLogger.info('stopAudioRecording called successfully');
+    } catch (error) {
+      rendererLogger.exception(error as Error, 'Error stopping recording in AppContext');
+    }
   };
   
   // Transcribe recording
