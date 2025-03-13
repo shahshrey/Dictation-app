@@ -22,7 +22,12 @@ const getLogPath = () => {
       fs.mkdirSync(logDir, { recursive: true });
     }
   } catch (error) {
-    console.error('Failed to create log directory:', error);
+    // Use a simple error log since the logger isn't initialized yet
+    const timestamp = new Date().toISOString();
+    const errorMessage = `[${timestamp}] ERROR: Failed to create log directory: ${error instanceof Error ? error.message : String(error)}`;
+    
+    // Log to stderr
+    process.stderr.write(errorMessage + '\n');
   }
   
   return logDir;

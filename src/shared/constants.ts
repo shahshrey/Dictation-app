@@ -18,6 +18,20 @@ export const DEFAULT_SETTINGS = {
   hotkey: 'Home' // Default hotkey is Home
 };
 
+// Language options
+export const LANGUAGES: Record<string, string> = {
+  'en': 'English',
+  'es': 'Spanish',
+  'fr': 'French',
+  'de': 'German',
+  'it': 'Italian',
+  'pt': 'Portuguese',
+  'ja': 'Japanese',
+  'zh': 'Chinese',
+  'ru': 'Russian',
+  'ko': 'Korean'
+};
+
 // File paths
 export const STORAGE_PATHS = {
   SETTINGS: 'settings.json',

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../../../context/AppContext';
+import { rendererLogger } from '../../../../../shared/preload-logger';
 
 const DictationPopup: React.FC = () => {
-  console.log('DictationPopup component rendering');
   const { isRecording, startRecording, stopRecording, refreshRecentTranscriptions } = useAppContext();
   const [isDragging, setIsDragging] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
@@ -10,23 +10,20 @@ const DictationPopup: React.FC = () => {
   
   // Ensure the popup is always interactive when mounted
   useEffect(() => {
-    console.log('DictationPopup mounted or updated');
-    console.log('Current recording state:', isRecording);
+    rendererLogger.debug('DictationPopup mounted or updated', { isRecording });
     
     // Make sure the popup is interactive when it first appears
     if (window.electronAPI && typeof window.electronAPI.setIgnoreMouseEvents === 'function') {
-      console.log('Setting ignore mouse events to false on mount');
       window.electronAPI.setIgnoreMouseEvents(false)
-        .catch(error => console.error('Error in setIgnoreMouseEvents on mount:', error));
+        .catch(error => rendererLogger.exception(error, 'Error in setIgnoreMouseEvents on mount'));
     }
     
     // Track recording state changes to refresh transcriptions when recording stops
     if (wasRecording && !isRecording) {
-      console.log('Recording stopped, refreshing transcriptions after delay');
+      rendererLogger.debug('Recording stopped, refreshing transcriptions after delay');
       // Add a delay to ensure the transcription is saved before refreshing
       const timeoutId = setTimeout(() => {
         refreshRecentTranscriptions();
-        console.log('Transcriptions refreshed after recording stopped');
       }, 2000); // 2 second delay to ensure transcription is processed
       
       return () => clearTimeout(timeoutId);
@@ -35,70 +32,56 @@ const DictationPopup: React.FC = () => {
     setWasRecording(isRecording);
     
     return () => {
-      console.log('DictationPopup unmounting');
+      rendererLogger.debug('DictationPopup unmounting');
     };
   }, [isRecording, wasRecording, refreshRecentTranscriptions]);
   
   const handleToggleRecording = () => {
-    console.log('Toggle recording clicked');
-    console.log('Current recording state:', isRecording);
-    
     try {
       if (isRecording) {
-        console.log('Stopping recording');
+        rendererLogger.debug('Stopping recording');
         stopRecording();
         // We'll refresh transcriptions after a delay in the useEffect
       } else {
-        console.log('Starting recording');
+        rendererLogger.debug('Starting recording');
         startRecording();
       }
-      console.log('Toggle recording action completed');
     } catch (error) {
-      console.error('Error toggling recording:', error);
+      rendererLogger.exception(error as Error, 'Error toggling recording');
     }
   };
   
   // Handle mouse events for dragging
   const handleMouseEnter = () => {
-    console.log('Mouse entered popup');
     setIsHovering(true);
     
     try {
       if (window.electronAPI && typeof window.electronAPI.setIgnoreMouseEvents === 'function') {
-        console.log('Setting ignore mouse events to false');
         window.electronAPI.setIgnoreMouseEvents(false)
-          .then(result => console.log('setIgnoreMouseEvents result:', result))
-          .catch(error => console.error('Error in setIgnoreMouseEvents:', error));
-      } else {
-        console.warn('setIgnoreMouseEvents not available');
+          .catch(error => rendererLogger.exception(error as Error, 'Error in setIgnoreMouseEvents'));
       }
     } catch (error) {
-      console.error('Error in handleMouseEnter:', error);
+      rendererLogger.exception(error as Error, 'Error in handleMouseEnter');
     }
   };
   
   const handleMouseLeave = () => {
-    console.log('Mouse left popup');
-    console.log('isDragging:', isDragging);
     setIsHovering(false);
     
     // Set ignore mouse events to true with forward=true when leaving
     // This allows clicks to pass through but still shows the overlay
     if (!isDragging && window.electronAPI && typeof window.electronAPI.setIgnoreMouseEvents === 'function') {
-      console.log('Setting ignore mouse events to true with forward=true');
       window.electronAPI.setIgnoreMouseEvents(true, { forward: true })
-        .catch(error => console.error('Error in setIgnoreMouseEvents on mouse leave:', error));
+        .catch(error => rendererLogger.exception(error as Error, 'Error in setIgnoreMouseEvents on mouse leave'));
     }
   };
   
   // Ensure we can click on the pill
   const handleMouseDown = (e: React.MouseEvent) => {
-    console.log('Mouse down on popup');
     // Make sure we can interact with the popup when clicking
     if (window.electronAPI && typeof window.electronAPI.setIgnoreMouseEvents === 'function') {
-      console.log('Setting ignore mouse events to false on mouse down');
       window.electronAPI.setIgnoreMouseEvents(false)
-        .catch(error => console.error('Error in setIgnoreMouseEvents on mouse down:', error));
+        .catch(error => rendererLogger.exception(error as Error, 'Error in setIgnoreMouseEvents on mouse down'));
     }
     
     // Start dragging if not clicking on the pill itself
@@ -108,12 +91,8 @@ const DictationPopup: React.FC = () => {
   };
   
   const handleMouseUp = () => {
-    console.log('Mouse up on popup');
     setIsDragging(false);
   };
-  
-  console.log('Rendering DictationPopup UI');
-  console.log('isHovering:', isHovering);
   
   return (
     <div 
@@ -138,7 +117,6 @@ const DictationPopup: React.FC = () => {
             : 'bg-black/50 text-white hover:bg-black/70'
         }`}
         onClick={(e) => {
-          console.log('Pill clicked');
           e.stopPropagation(); // Prevent event bubbling
           handleToggleRecording();
         }}

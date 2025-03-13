@@ -5,18 +5,30 @@ const postcss = require('postcss');
 const tailwindcss = require('tailwindcss');
 const autoprefixer = require('autoprefixer');
 
+// Simple build logger
+const buildLogger = {
+  info: (message) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] INFO: ${message}`);
+  },
+  error: (message, error) => {
+    const timestamp = new Date().toISOString();
+    console.error(`[${timestamp}] ERROR: ${message}`, error);
+  }
+};
+
 // Ensure output directories exist
 function ensureDirectoryExists(dirPath) {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
-    console.log(`Created directory: ${dirPath}`);
+    buildLogger.info(`Created directory: ${dirPath}`);
   }
 }
 
 // Process CSS with Tailwind and copy to output
 async function processCss() {
   try {
-    console.log('Processing CSS with Tailwind...');
+    buildLogger.info('Processing CSS with Tailwind...');
     const cssSource = path.join(__dirname, 'src/renderer/styles/globals.css');
     const outputDir = path.join(__dirname, 'dist/renderer');
     
@@ -41,10 +53,10 @@ async function processCss() {
     fs.writeFileSync(cssDestIndex, result.css, 'utf8');
     fs.writeFileSync(cssDestPopup, result.css, 'utf8');
     
-    console.log('CSS files processed and copied successfully!');
+    buildLogger.info('CSS files processed and copied successfully!');
     return result.css;
   } catch (error) {
-    console.error('Error processing CSS:', error);
+    buildLogger.error('Error processing CSS:', error);
     throw error;
   }
 }
@@ -67,9 +79,9 @@ function copyHtmlFiles() {
       path.join(outputDir, 'popup.html')
     );
     
-    console.log('HTML files copied successfully!');
+    buildLogger.info('HTML files copied successfully!');
   } catch (error) {
-    console.error('Error copying HTML files:', error);
+    buildLogger.error('Error copying HTML files:', error);
     throw error;
   }
 }
@@ -77,7 +89,7 @@ function copyHtmlFiles() {
 // Build shared modules
 async function buildSharedModules() {
   try {
-    console.log('Building shared modules...');
+    buildLogger.info('Building shared modules...');
     const sharedDir = path.join(__dirname, 'src/shared');
     const outputDir = path.join(__dirname, 'dist/shared');
     
@@ -106,9 +118,9 @@ async function buildSharedModules() {
       });
     }
     
-    console.log('Shared modules built successfully!');
+    buildLogger.info('Shared modules built successfully!');
   } catch (error) {
-    console.error('Error building shared modules:', error);
+    buildLogger.error('Error building shared modules:', error);
     throw error;
   }
 }
@@ -133,7 +145,7 @@ async function buildFiles() {
     fs.writeFileSync(tempCssPath, processedCss, 'utf8');
     
     // Build the main renderer file
-    console.log('Building renderer...');
+    buildLogger.info('Building renderer...');
     await build({
       entryPoints: [path.join(__dirname, 'src/renderer/index.tsx')],
       bundle: true,
@@ -155,10 +167,10 @@ async function buildFiles() {
       // Inject the CSS into the bundle
       inject: [path.join(__dirname, 'src/renderer/css-inject.js')],
     });
-    console.log('Renderer built successfully!');
+    buildLogger.info('Renderer built successfully!');
 
     // Build the popup file
-    console.log('Building popup...');
+    buildLogger.info('Building popup...');
     await build({
       entryPoints: [path.join(__dirname, 'src/renderer/popup.tsx')],
       bundle: true,
@@ -180,18 +192,18 @@ async function buildFiles() {
       // Inject the CSS into the bundle
       inject: [path.join(__dirname, 'src/renderer/css-inject.js')],
     });
-    console.log('Popup built successfully!');
+    buildLogger.info('Popup built successfully!');
     
     // Clean up temporary files
     try {
       fs.unlinkSync(tempCssPath);
     } catch (error) {
-      console.error('Error cleaning up temporary CSS file:', error);
+      buildLogger.error('Error cleaning up temporary CSS file:', error);
     }
     
-    console.log('Build completed successfully!');
+    buildLogger.info('Build completed successfully!');
   } catch (error) {
-    console.error('Build failed:', error);
+    buildLogger.error('Build failed:', error);
     process.exit(1);
   }
 }

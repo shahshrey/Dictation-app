@@ -1,12 +1,13 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const { preloadLogger } = require('../shared/preload-logger');
 
-console.log('Main preload script starting...');
-console.log('ipcRenderer available:', !!ipcRenderer);
-console.log('contextBridge available:', !!contextBridge);
+preloadLogger.info('Main preload script starting...');
+preloadLogger.debug('ipcRenderer available:', { available: !!ipcRenderer });
+preloadLogger.debug('contextBridge available:', { available: !!contextBridge });
 
 // Expose a minimal API to the renderer process
 try {
-  console.log('Exposing electronAPI to renderer process from main preload...');
+  preloadLogger.debug('Exposing electronAPI to renderer process from main preload...');
   
   const api = {
     // Audio recording
@@ -22,8 +23,7 @@ try {
     translateAudio: (filePath, options) => 
       ipcRenderer.invoke('translate-audio', filePath, options),
     transcribeRecording: (language, apiKey) => {
-      console.log('Main preload: transcribeRecording called with language:', language);
-      console.log('Main preload: API key available:', !!apiKey);
+      preloadLogger.debug('Transcribe recording called', { language: language, hasApiKey: !!apiKey });
       return ipcRenderer.invoke('transcribe-recording', language, apiKey);
     },
     
@@ -35,7 +35,7 @@ try {
     getRecentTranscriptions: () => 
       ipcRenderer.invoke('get-recent-transcriptions'),
     getTranscriptions: () => {
-      console.log('Main preload: getTranscriptions called');
+      preloadLogger.debug('getTranscriptions called');
       return ipcRenderer.invoke('get-transcriptions');
     },
     openFile: (path) => 
@@ -61,9 +61,9 @@ try {
     }
   };
   
-  console.log('API methods being exposed from main preload:', Object.keys(api));
+  preloadLogger.debug('Exposing API methods', { methods: Object.keys(api) });
   contextBridge.exposeInMainWorld('electronAPI', api);
-  console.log('electronAPI successfully exposed to renderer process from main preload');
+  preloadLogger.info('electronAPI successfully exposed to renderer process');
 } catch (error) {
-  console.error('Error in main preload script:', error);
+  preloadLogger.exception(error, 'Error in main preload script');
 } 

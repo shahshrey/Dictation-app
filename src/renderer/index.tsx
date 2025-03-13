@@ -3,12 +3,11 @@ import { createRoot } from 'react-dom/client';
 import App from './components/App';
 import { AppContextProvider } from './context/AppContext';
 import { ThemeProvider } from './components/layout/theme-provider';
+import { rendererLogger } from '../shared/preload-logger';
 // Import styles
 import './styles/globals.css';
 
-console.log('Renderer process started');
-console.log('React version:', React.version);
-console.log('Using shadcn/ui components');
+rendererLogger.info('Renderer process started');
 
 // Get the root element
 const rootElement = document.getElementById('root');
