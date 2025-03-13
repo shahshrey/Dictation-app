@@ -30,8 +30,8 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
     async (_, text: string, options: { filename?: string; format?: string }) => {
       console.log('save-transcription handler called');
       try {
-        const filename = options.filename || DEFAULT_FILENAME;
-        const format = options.format || 'txt';
+        const filename = options.filename ?? DEFAULT_FILENAME;
+        const format = options.format ?? 'txt';
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const fullFilename = `${filename}_${timestamp}.${format}`;
         const filePath = path.join(DEFAULT_SAVE_DIR, fullFilename);
@@ -129,7 +129,8 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
 
           // Extract timestamp from filename or use file creation time
           let timestamp = stats.birthtime.getTime();
-          const timestampMatch = file.match(/(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})/);
+          const timestampRegex = /(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})/;
+          const timestampMatch = timestampRegex.exec(file);
           if (timestampMatch) {
             const dateStr = timestampMatch[1].replace(/-/g, (m, i) => (i > 9 ? ':' : '-'));
             const date = new Date(dateStr);

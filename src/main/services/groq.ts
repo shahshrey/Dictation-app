@@ -49,7 +49,7 @@ export const setupGroqAPI = (ipcMain: IpcMain): void => {
     async (_, filePath: string, options: { language?: string; apiKey?: string }) => {
       console.log('transcribe-audio handler called with filePath:', filePath);
       try {
-        const apiKey = options.apiKey || '';
+        const apiKey = options.apiKey ?? '';
         const client = initGroqClient(apiKey);
 
         if (!fs.existsSync(filePath)) {
@@ -67,7 +67,7 @@ export const setupGroqAPI = (ipcMain: IpcMain): void => {
         return {
           success: true,
           text: transcription.text,
-          language: options.language || 'auto',
+          language: options.language ?? 'auto',
         };
       } catch (error) {
         console.error('Failed to transcribe audio:', error);
@@ -84,7 +84,7 @@ export const setupGroqAPI = (ipcMain: IpcMain): void => {
   ipcMain.handle('translate-audio', async (_, filePath: string, options: { apiKey?: string }) => {
     console.log('translate-audio handler called with filePath:', filePath);
     try {
-      const apiKey = options.apiKey || '';
+      const apiKey = options.apiKey ?? '';
       const client = initGroqClient(apiKey);
 
       if (!fs.existsSync(filePath)) {
