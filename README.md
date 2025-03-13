@@ -76,6 +76,44 @@ Where `type` is one of:
 
 Example: `feat(audio): add support for multiple microphones`
 
+## Testing
+
+The application includes a comprehensive test suite:
+
+```bash
+# Run all tests (unit and integration)
+pnpm test:all
+
+# Run only unit tests
+pnpm test
+
+# Run only integration tests
+pnpm test:integration
+
+# Run only mock integration tests
+pnpm test:integration:mock
+
+# Run only Spectron tests (after enabling them)
+pnpm test:integration:spectron
+
+# Run end-to-end tests with Playwright
+pnpm test:e2e
+```
+
+### Helper Scripts
+
+The project includes helper scripts to make testing easier:
+
+```bash
+# Enable Spectron tests
+node scripts/prepare-spectron-tests.js
+
+# Restore original test file (skip tests)
+node scripts/restore-spectron-tests.js
+```
+
+For more details about the tests, see the [Tests README](tests/README.md).
+
 ## Building
 
 Build the app for production:
@@ -126,6 +164,11 @@ dictation-app/
 │   └── shared/                # Shared code between processes
 │       ├── constants.ts       # Shared constants
 │       └── types/             # Shared TypeScript interfaces
+├── tests/                     # Test files
+│   ├── unit/                  # Unit tests
+│   ├── integration/           # Integration tests
+│   └── setup.js               # Test setup
+├── scripts/                   # Helper scripts
 ├── package.json               # Project metadata and dependencies
 ├── tsconfig.json              # TypeScript configuration
 ├── forge.config.js            # Electron Forge configuration
