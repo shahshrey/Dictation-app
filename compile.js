@@ -11,23 +11,23 @@ async function processCss() {
     const cssSource = path.join(__dirname, 'src/renderer/styles/globals.css');
     const cssDestIndex = path.join(__dirname, 'src/renderer/index.css');
     const cssDestPopup = path.join(__dirname, 'src/renderer/popup.css');
-    
+
     // Read the CSS file
     const css = fs.readFileSync(cssSource, 'utf8');
-    
+
     // Process with PostCSS (Tailwind + Autoprefixer)
     const result = await postcss([
       tailwindcss(path.join(__dirname, 'tailwind.config.js')),
-      autoprefixer
-    ]).process(css, { 
+      autoprefixer,
+    ]).process(css, {
       from: cssSource,
-      to: cssDestIndex
+      to: cssDestIndex,
     });
-    
+
     // Write the processed CSS to the output files
     fs.writeFileSync(cssDestIndex, result.css);
     fs.writeFileSync(cssDestPopup, result.css);
-    
+
     console.log('CSS files processed and copied successfully!');
   } catch (error) {
     console.error('Error processing CSS:', error);
@@ -40,7 +40,7 @@ async function buildFiles() {
   try {
     // Process CSS first
     await processCss();
-    
+
     // Build the main renderer file
     console.log('Building renderer...');
     await build({
@@ -86,7 +86,7 @@ async function buildFiles() {
       },
     });
     console.log('Popup built successfully!');
-    
+
     console.log('Build completed successfully!');
   } catch (error) {
     console.error('Build failed:', error);
@@ -94,4 +94,4 @@ async function buildFiles() {
   }
 }
 
-buildFiles(); 
+buildFiles();

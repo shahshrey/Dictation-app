@@ -12,12 +12,7 @@ module.exports = {
     asar: true,
   },
   rebuildConfig: {},
-  makers: [
-    new MakerSquirrel({}),
-    new MakerZIP({}, ['darwin']),
-    new MakerRpm({}),
-    new MakerDeb({})
-  ],
+  makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],
   plugins: [
     new WebpackPlugin({
       mainConfig,
@@ -39,9 +34,9 @@ module.exports = {
             preload: {
               js: './src/preload/preload.ts',
             },
-          }
+          },
         ],
       },
     }),
   ],
-}; 
+};
