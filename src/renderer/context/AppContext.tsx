@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { AudioDevice, Transcription, AppSettings, IPC_CHANNELS } from '../../shared/types';
+import { AudioDevice, Transcription, AppSettings } from '../../shared/types';
 import { DEFAULT_SETTINGS } from '../../shared/constants';
 import { useAudioRecording } from '../hooks/useAudioRecording';
 
@@ -8,7 +8,7 @@ const logger = {
   info: (message: string): void => {
     console.log(`[INFO] ${message}`);
   },
-  error: (message: string, error: any): void => {
+  error: (message: string, error: unknown): void => {
     console.error(`[ERROR] ${message}`, error);
   },
   debug: (message: string): void => {
@@ -17,9 +17,9 @@ const logger = {
   warn: (message: string): void => {
     console.warn(`[WARN] ${message}`);
   },
-  exception: (message: string, error: any): void => {
+  exception: (message: string, error: unknown): void => {
     console.error(`[EXCEPTION] ${message}`, error);
-  }
+  },
 };
 
 // Define types for our context
@@ -27,23 +27,23 @@ interface AppContextType {
   // Settings
   settings: AppSettings;
   updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
-  
+
   // Recording state
   isRecording: boolean;
   recordingTime: number;
-  
+
   // Audio sources
   audioDevices: AudioDevice[];
   selectedDevice: AudioDevice | null;
   setSelectedDevice: (device: AudioDevice) => void;
   refreshAudioDevices: () => Promise<void>;
-  
+
   // Transcription
   currentTranscription: Transcription | null;
   setCurrentTranscription: React.Dispatch<React.SetStateAction<Transcription | null>>;
   recentTranscriptions: Transcription[];
   refreshRecentTranscriptions: () => Promise<void>;
-  
+
   // Actions
   startRecording: () => Promise<void>;
   stopRecording: () => void;
@@ -58,37 +58,36 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Settings state
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
-  
+
   // Audio devices state
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<AudioDevice | null>(null);
-  
+
   // Transcription state
   const [currentTranscription, setCurrentTranscription] = useState<Transcription | null>(null);
   const [recentTranscriptions, setRecentTranscriptions] = useState<Transcription[]>([]);
-  
+
   // Use our custom hook for audio recording
-  const { 
-    isRecording, 
-    startRecording: startAudioRecording, 
+  const {
+    isRecording,
+    startRecording: startAudioRecording,
     stopRecording: stopAudioRecording,
     recordingTime,
-    error: recordingError
   } = useAudioRecording({
     selectedDevice: selectedDevice || undefined,
-    onRecordingComplete: handleRecordingComplete
+    onRecordingComplete: handleRecordingComplete,
   });
-  
+
   // Fetch audio devices and settings on component mount
   useEffect(() => {
     refreshAudioDevices();
     loadSettings();
     refreshRecentTranscriptions();
-    
+
     // Set up event listeners for the Home key and audio device requests
     let unsubscribeToggleRecording = () => {};
     let unsubscribeAudioDevicesRequest = () => {};
-    
+
     try {
       // Check if the API is available
       if (window.electronAPI && typeof window.electronAPI.onToggleRecording === 'function') {
@@ -100,7 +99,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
           }
         });
       }
-      
+
       // Set up listener for audio device requests from the main process
       if (window.electronAPI && typeof window.electronAPI.onAudioDevicesRequest === 'function') {
         unsubscribeAudioDevicesRequest = window.electronAPI.onAudioDevicesRequest(() => {
@@ -111,7 +110,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
     } catch (error) {
       console.error('Error setting up event listeners:', error);
     }
-    
+
     return () => {
       try {
         unsubscribeToggleRecording();
@@ -121,7 +120,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
       }
     };
   }, [isRecording]);
-  
+
   // Load settings from storage
   const loadSettings = async (): Promise<void> => {
     try {
@@ -133,13 +132,13 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
       console.error('Failed to load settings:', error);
     }
   };
-  
+
   // Update settings
   const updateSettings = async (newSettings: Partial<AppSettings>): Promise<void> => {
     try {
       const updatedSettings = { ...settings, ...newSettings };
       setSettings(updatedSettings);
-      
+
       if (window.electronAPI && typeof window.electronAPI.saveSettings === 'function') {
         await window.electronAPI.saveSettings(updatedSettings);
       }
@@ -147,28 +146,28 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
       console.error('Failed to update settings:', error);
     }
   };
-  
+
   // Refresh audio devices
   const refreshAudioDevices = async (): Promise<void> => {
     try {
       // Use the Web Audio API to enumerate devices directly in the renderer
       const devices: AudioDevice[] = [];
-      
+
       // Get all media devices
       const mediaDevices = await navigator.mediaDevices.enumerateDevices();
-      
+
       // Filter for audio input devices (microphones)
       const audioInputDevices = mediaDevices.filter(device => device.kind === 'audioinput');
-      
+
       // Map to our AudioDevice type
       for (const device of audioInputDevices) {
         devices.push({
           id: device.deviceId,
           name: device.label || `Microphone ${devices.length + 1}`,
-          isDefault: device.deviceId === 'default' || device.deviceId === ''
+          isDefault: device.deviceId === 'default' || device.deviceId === '',
         });
       }
-      
+
       // If no devices have labels, we need to request permission first
       if (devices.length > 0 && devices.every(d => !d.name || d.name.startsWith('Microphone '))) {
         try {
@@ -176,34 +175,36 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
           const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           // Stop the stream immediately after getting labels
           stream.getTracks().forEach(track => track.stop());
-          
+
           // Try enumerating again to get labels
           const devicesWithLabels = await navigator.mediaDevices.enumerateDevices();
-          const audioInputDevicesWithLabels = devicesWithLabels.filter(device => device.kind === 'audioinput');
-          
+          const audioInputDevicesWithLabels = devicesWithLabels.filter(
+            device => device.kind === 'audioinput'
+          );
+
           // Clear and refill the devices array
           devices.length = 0;
           for (const device of audioInputDevicesWithLabels) {
             devices.push({
               id: device.deviceId,
               name: device.label || `Microphone ${devices.length + 1}`,
-              isDefault: device.deviceId === 'default' || device.deviceId === ''
+              isDefault: device.deviceId === 'default' || device.deviceId === '',
             });
           }
         } catch (err) {
           console.error('Failed to get microphone permission:', err);
         }
       }
-      
+
       // Update state with the devices
       setAudioDevices(devices);
-      
+
       // Select the default device if none is selected
       if (devices.length > 0 && !selectedDevice) {
         const defaultDevice = devices.find(d => d.isDefault) || devices[0];
         setSelectedDevice(defaultDevice);
       }
-      
+
       // Send the devices back to the main process
       if (window.electronAPI && typeof window.electronAPI.sendAudioDevicesResult === 'function') {
         window.electronAPI.sendAudioDevicesResult(devices);
@@ -212,38 +213,53 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
       console.error('Failed to get audio devices:', error);
     }
   };
-  
+
   // Refresh recent transcriptions
   const refreshRecentTranscriptions = async (): Promise<void> => {
     try {
       logger.info('Attempting to refresh recent transcriptions...');
       logger.debug(`electronAPI available: ${!!window.electronAPI}`);
-      logger.debug(`getTranscriptions method available: ${!!(window.electronAPI && typeof window.electronAPI.getTranscriptions === 'function')}`);
-      logger.debug(`getRecentTranscriptions method available: ${!!(window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === 'function')}`);
-      
+      logger.debug(
+        `getTranscriptions method available: ${!!(window.electronAPI && typeof window.electronAPI.getTranscriptions === 'function')}`
+      );
+      logger.debug(
+        `getRecentTranscriptions method available: ${!!(window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === 'function')}`
+      );
+
       if (window.electronAPI && typeof window.electronAPI.getTranscriptions === 'function') {
         logger.info('Calling getTranscriptions IPC method...');
         try {
           const transcriptions = await window.electronAPI.getTranscriptions();
           logger.debug(`Transcriptions received: ${JSON.stringify(transcriptions, null, 2)}`);
-          
+
           // Only update if we actually got transcriptions
           if (Array.isArray(transcriptions) && transcriptions.length > 0) {
             setRecentTranscriptions(transcriptions);
           } else if (!transcriptions || transcriptions.length === 0) {
             logger.info('No transcriptions received, will try again with getRecentTranscriptions');
             // Try the fallback method if no transcriptions were found
-            if (window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === 'function') {
+            if (
+              window.electronAPI &&
+              typeof window.electronAPI.getRecentTranscriptions === 'function'
+            ) {
               const result = await window.electronAPI.getRecentTranscriptions();
-              if (result && result.success && Array.isArray(result.files) && result.files.length > 0) {
+              if (
+                result &&
+                result.success &&
+                Array.isArray(result.files) &&
+                result.files.length > 0
+              ) {
                 const fallbackTranscriptions = result.files.map(file => ({
                   id: file.name.replace(/\.txt$/, ''),
                   text: '', // We don't have the content here
-                  timestamp: file.modifiedAt instanceof Date ? file.modifiedAt.getTime() : 
-                           file.createdAt instanceof Date ? file.createdAt.getTime() : 
-                           Date.now(),
+                  timestamp:
+                    file.modifiedAt instanceof Date
+                      ? file.modifiedAt.getTime()
+                      : file.createdAt instanceof Date
+                        ? file.createdAt.getTime()
+                        : Date.now(),
                   duration: 0,
-                  language: 'en'
+                  language: 'en',
                 }));
                 setRecentTranscriptions(fallbackTranscriptions);
               }
@@ -254,7 +270,10 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
         } catch (error) {
           logger.exception('Failed to get recent transcriptions', error);
         }
-      } else if (window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === 'function') {
+      } else if (
+        window.electronAPI &&
+        typeof window.electronAPI.getRecentTranscriptions === 'function'
+      ) {
         logger.info('Falling back to getRecentTranscriptions IPC method...');
         try {
           const result = await window.electronAPI.getRecentTranscriptions();
@@ -264,15 +283,20 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
             const transcriptions = result.files.map(file => ({
               id: file.name.replace(/\.txt$/, ''),
               text: '', // We don't have the content here
-              timestamp: file.modifiedAt instanceof Date ? file.modifiedAt.getTime() : 
-                         file.createdAt instanceof Date ? file.createdAt.getTime() : 
-                         Date.now(),
+              timestamp:
+                file.modifiedAt instanceof Date
+                  ? file.modifiedAt.getTime()
+                  : file.createdAt instanceof Date
+                    ? file.createdAt.getTime()
+                    : Date.now(),
               duration: 0,
-              language: 'en'
+              language: 'en',
             }));
             setRecentTranscriptions(transcriptions);
           } else {
-            logger.warn(`getRecentTranscriptions returned invalid data: ${JSON.stringify(result, null, 2)}`);
+            logger.warn(
+              `getRecentTranscriptions returned invalid data: ${JSON.stringify(result, null, 2)}`
+            );
             setRecentTranscriptions([]);
           }
         } catch (error) {
@@ -285,53 +309,62 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
       logger.exception('Failed to get recent transcriptions', error);
     }
   };
-  
+
   // Handle recording complete
   function handleRecordingComplete(audioBlob: Blob): void {
     try {
-      logger.info(`Recording complete, blob size: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
-      
+      logger.info(
+        `Recording complete, blob size: ${audioBlob.size} bytes, type: ${audioBlob.type}`
+      );
+
       if (audioBlob.size === 0) {
         logger.error('Empty audio blob received', null);
         return;
       }
-      
+
       // Convert blob to array buffer for sending to main process
-      audioBlob.arrayBuffer().then(async (arrayBuffer) => {
-        logger.debug(`Array buffer size: ${arrayBuffer.byteLength} bytes`);
-        
-        if (arrayBuffer.byteLength === 0) {
-          logger.error('Empty array buffer converted from blob', null);
-          return;
-        }
-        
-        if (window.electronAPI && typeof window.electronAPI.saveRecording === 'function') {
-          logger.info('Sending recording to main process...');
-          const result = await window.electronAPI.saveRecording(arrayBuffer);
-          
-          if (result.success) {
-            logger.info(`Recording saved: ${result.filePath}, size: ${(result as any).size || 'unknown'}`);
-            // Auto-transcribe if enabled in settings
-            if (settings.autoTranscribe) {
-              logger.info(`Auto-transcribe enabled, transcribing with language: ${settings.language}`);
-              transcribeRecording(settings.language);
+      audioBlob
+        .arrayBuffer()
+        .then(async arrayBuffer => {
+          logger.debug(`Array buffer size: ${arrayBuffer.byteLength} bytes`);
+
+          if (arrayBuffer.byteLength === 0) {
+            logger.error('Empty array buffer converted from blob', null);
+            return;
+          }
+
+          if (window.electronAPI && typeof window.electronAPI.saveRecording === 'function') {
+            logger.info('Sending recording to main process...');
+            const result = await window.electronAPI.saveRecording(arrayBuffer);
+
+            if (result.success) {
+              logger.info(
+                `Recording saved: ${result.filePath}, size: ${(result as { size?: number }).size || 'unknown'}`
+              );
+              // Auto-transcribe if enabled in settings
+              if (settings.autoTranscribe) {
+                logger.info(
+                  `Auto-transcribe enabled, transcribing with language: ${settings.language}`
+                );
+                transcribeRecording(settings.language);
+              } else {
+                logger.debug('Auto-transcribe disabled, not transcribing automatically');
+              }
             } else {
-              logger.debug('Auto-transcribe disabled, not transcribing automatically');
+              logger.error(`Failed to save recording: ${result.error}`, null);
             }
           } else {
-            logger.error(`Failed to save recording: ${result.error}`, null);
+            logger.warn('saveRecording API not available');
           }
-        } else {
-          logger.warn('saveRecording API not available');
-        }
-      }).catch(error => {
-        logger.exception('Failed to convert blob to array buffer', error);
-      });
+        })
+        .catch(error => {
+          logger.exception('Failed to convert blob to array buffer', error);
+        });
     } catch (error) {
       logger.exception('Failed to handle recording complete', error);
     }
   }
-  
+
   // Start recording
   const startRecording = async (): Promise<void> => {
     if (selectedDevice) {
@@ -344,19 +377,23 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
       console.error('No audio device selected');
     }
   };
-  
+
   // Stop recording
   const stopRecording = (): void => {
     stopAudioRecording();
   };
-  
+
   // Transcribe recording
   const transcribeRecording = async (language?: string): Promise<void> => {
     try {
-      logger.info(`Attempting to transcribe recording with language: ${language || settings.language}`);
+      logger.info(
+        `Attempting to transcribe recording with language: ${language || settings.language}`
+      );
       logger.debug(`API key available: ${!!settings.apiKey}`);
-      logger.debug(`transcribeRecording API available: ${!!(window.electronAPI && typeof window.electronAPI.transcribeRecording === 'function')}`);
-      
+      logger.debug(
+        `transcribeRecording API available: ${!!(window.electronAPI && typeof window.electronAPI.transcribeRecording === 'function')}`
+      );
+
       if (window.electronAPI && typeof window.electronAPI.transcribeRecording === 'function') {
         logger.info('Calling transcribeRecording IPC method...');
         const result = await window.electronAPI.transcribeRecording(
@@ -364,7 +401,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
           settings.apiKey
         );
         logger.debug(`Transcription result: ${JSON.stringify(result, null, 2)}`);
-        
+
         if (result.success) {
           setCurrentTranscription({
             id: result.id,
@@ -372,19 +409,19 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
             timestamp: result.timestamp,
             duration: result.duration,
             language: result.language || settings.language,
-            pastedAtCursor: (result as any).pastedAtCursor
+            pastedAtCursor: (result as { pastedAtCursor?: boolean }).pastedAtCursor,
           });
-          
+
           // Log whether the text was pasted at the cursor
-          if ((result as any).pastedAtCursor) {
+          if ((result as { pastedAtCursor?: boolean }).pastedAtCursor) {
             logger.info('Transcribed text was pasted at cursor position');
           } else {
             logger.info('Transcribed text was not pasted at cursor position');
           }
-          
+
           // Refresh the list of transcriptions immediately
           await refreshRecentTranscriptions();
-          
+
           // Add a second refresh after a delay to ensure we get the latest data
           // This helps in case the file is still being written when the first refresh happens
           setTimeout(async () => {
@@ -402,7 +439,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
       logger.exception('Failed to transcribe recording', error);
     }
   };
-  
+
   // Save transcription
   const saveTranscription = async (id: string): Promise<void> => {
     try {
@@ -416,41 +453,37 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
       console.error('Failed to save transcription:', error);
     }
   };
-  
+
   // Context value
   const contextValue: AppContextType = {
     // Settings
     settings,
     updateSettings,
-    
+
     // Recording state
     isRecording,
     recordingTime,
-    
+
     // Audio devices
     audioDevices,
     selectedDevice,
     setSelectedDevice,
     refreshAudioDevices,
-    
+
     // Transcription
     currentTranscription,
     setCurrentTranscription,
     recentTranscriptions,
     refreshRecentTranscriptions,
-    
+
     // Actions
     startRecording,
     stopRecording,
     transcribeRecording,
-    saveTranscription
+    saveTranscription,
   };
-  
-  return (
-    <AppContext.Provider value={contextValue}>
-      {children}
-    </AppContext.Provider>
-  );
+
+  return <AppContext.Provider value={contextValue}>{children}</AppContext.Provider>;
 };
 
 // Custom hook to use the app context
@@ -460,4 +493,4 @@ export const useAppContext = (): AppContextType => {
     throw new Error('useAppContext must be used within an AppContextProvider');
   }
   return context;
-}; 
+};

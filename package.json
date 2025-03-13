@@ -11,7 +11,12 @@
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
     "build": "node compile.js",
-    "start:dev": "npm run build && npm start"
+    "start:dev": "npm run build && npm start",
+    "knip": "knip",
+    "knip:fix": "knip --fix",
+    "prepare": "husky",
+    "lint-staged": "lint-staged",
+    "commitlint": "commitlint"
   },
   "keywords": [
     "dictation",
@@ -22,30 +27,25 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "@babel/core": "^7.26.9",
-    "@babel/preset-env": "^7.26.9",
-    "@babel/preset-react": "^7.26.3",
-    "@babel/preset-typescript": "^7.26.0",
+    "@commitlint/cli": "^19.8.0",
+    "@commitlint/config-conventional": "^19.8.0",
     "@electron-forge/cli": "^7.7.0",
-    "@electron-forge/maker-deb": "^7.7.0",
-    "@electron-forge/maker-rpm": "^7.7.0",
-    "@electron-forge/maker-squirrel": "^7.7.0",
-    "@electron-forge/maker-zip": "^7.7.0",
-    "@electron-forge/plugin-webpack": "^7.7.0",
+    "@typescript-eslint/eslint-plugin": "^8.26.1",
+    "@typescript-eslint/parser": "^8.26.1",
     "autoprefixer": "10.4.15",
-    "babel-loader": "^10.0.0",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "electron": "^28.1.4",
     "esbuild": "^0.25.1",
+    "eslint": "^8.56.0",
+    "husky": "^9.1.7",
+    "knip": "^5.45.0",
+    "lint-staged": "^15.5.0",
     "lucide-react": "0.479.0",
-    "path-browserify": "^1.0.1",
     "postcss": "8.4.31",
-    "postcss-cli": "^11.0.0",
-    "postcss-loader": "8.1.1",
+    "prettier": "^3.5.3",
     "tailwindcss": "3.3.3",
     "tailwindcss-animate": "1.0.7",
-    "ts-loader": "^9.5.2",
     "typescript": "^5.8.2"
   },
   "dependencies": {
@@ -60,5 +60,14 @@
     "react": "^19.0.0",
     "react-dom": "19.0.0",
     "tailwind-merge": "3.0.2"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
   }
 }

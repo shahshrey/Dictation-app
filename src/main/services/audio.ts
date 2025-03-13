@@ -1,4 +1,4 @@
-import { IpcMain, BrowserWindow, desktopCapturer } from 'electron';
+import { IpcMain, BrowserWindow } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -30,11 +30,11 @@ export const setupAudioRecording = (ipcMain: IpcMain, mainWindow: BrowserWindow 
       if (!mainWindow) {
         throw new Error('Main window not available');
       }
-      
+
       // Request the renderer process to enumerate audio devices
       // This is more reliable than using desktopCapturer for audio devices
       mainWindow.webContents.send(IPC_CHANNELS.AUDIO_DEVICES_REQUEST);
-      
+
       // The actual device list will be sent back from the renderer process
       // via a separate IPC channel (AUDIO_DEVICES_RESULT)
       return { success: true };
@@ -84,4 +84,4 @@ export const setupAudioRecording = (ipcMain: IpcMain, mainWindow: BrowserWindow 
   ipcMain.handle('get-recording-path', () => {
     return AUDIO_FILE_PATH;
   });
-}; 
+};

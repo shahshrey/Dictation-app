@@ -21,12 +21,14 @@ A desktop dictation application built with Electron, React, TypeScript, and Mate
 ## Installation
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/yourusername/dictation-app.git
    cd dictation-app
    ```
 
 2. Install dependencies:
+
    ```bash
    pnpm install
    ```
@@ -43,6 +45,36 @@ Start the app in development mode:
 ```bash
 pnpm start
 ```
+
+### Git Hooks
+
+This project uses Husky and lint-staged to enforce code quality and consistent commit messages:
+
+- **Pre-commit Hook**: Automatically runs ESLint and Prettier on staged files before each commit
+- **Commit Message Hook**: Validates commit messages against the Conventional Commits standard
+
+Commit messages should follow the format:
+
+```
+type(scope): subject
+
+body
+```
+
+Where `type` is one of:
+
+- `feat`: A new feature
+- `fix`: A bug fix
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting, etc.)
+- `refactor`: Code changes that neither fix bugs nor add features
+- `perf`: Performance improvements
+- `test`: Adding or fixing tests
+- `chore`: Changes to the build process or auxiliary tools
+- `ci`: Changes to CI configuration
+- `revert`: Reverting a previous commit
+
+Example: `feat(audio): add support for multiple microphones`
 
 ## Building
 
@@ -112,4 +144,4 @@ MIT
 - [Material UI](https://material-ui.com/)
 - [Tailwind CSS](https://tailwindcss.com/)
 - [Shadcn UI](https://ui.shadcn.com/)
-- [WaveSurfer.js](https://wavesurfer-js.org/) 
+- [WaveSurfer.js](https://wavesurfer-js.org/)

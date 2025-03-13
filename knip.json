@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/main/index.js",
+    "src/renderer/**/*.{ts,tsx,js,jsx,html}",
+    "src/preload/**/*.{ts,js}"
+  ],
+  "project": ["src/**/*.{ts,tsx,js,jsx}"],
+  "ignoreExportsUsedInFile": {
+    "interface": true,
+    "type": true
+  },
+  "ignore": ["src/main/preload.js", "src/main/services/**/*.ts"]
+}
