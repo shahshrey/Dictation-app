@@ -70,6 +70,11 @@ jest.mock('path', () => ({
     }
     return path.split('/').pop() || '';
   }),
+  dirname: jest.fn().mockImplementation(path => {
+    const parts = path.split('/');
+    parts.pop();
+    return parts.join('/');
+  }),
 }));
 
 // Import the module under test

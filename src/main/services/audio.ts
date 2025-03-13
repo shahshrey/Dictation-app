@@ -10,12 +10,12 @@ const TEMP_DIR = path.join(os.tmpdir(), 'dictation-app');
 const AUDIO_FILE_PATH = path.join(TEMP_DIR, `recording.${AUDIO_SETTINGS.FILE_FORMAT}`);
 
 // Ensure temp directory exists
-if (!fs.existsSync(TEMP_DIR)) {
-  try {
+try {
+  if (!fs.existsSync(TEMP_DIR)) {
     fs.mkdirSync(TEMP_DIR, { recursive: true });
-  } catch (error) {
-    console.error('Failed to create temp directory:', error);
   }
+} catch (error) {
+  console.error('Failed to create temp directory:', error);
 }
 
 /**
@@ -46,10 +46,14 @@ export const setupAudioRecording = (ipcMain: IpcMain, mainWindow: BrowserWindow 
 
   // Receive audio devices from renderer process
   ipcMain.on(IPC_CHANNELS.AUDIO_DEVICES_RESULT, (_, devices: AudioDevice[]) => {
-    if (mainWindow) {
-      // Store the devices in the main process if needed
-      // And send them back to any renderer process that might need them
-      mainWindow.webContents.send(IPC_CHANNELS.AUDIO_DEVICES_RESULT, devices);
+    try {
+      if (mainWindow) {
+        // Store the devices in the main process if needed
+        // And send them back to any renderer process that might need them
+        mainWindow.webContents.send(IPC_CHANNELS.AUDIO_DEVICES_RESULT, devices);
+      }
+    } catch (error) {
+      console.error('Error handling audio devices result:', error);
     }
   });
 
@@ -71,6 +75,11 @@ export const setupAudioRecording = (ipcMain: IpcMain, mainWindow: BrowserWindow 
   // Save the recorded audio blob sent from the renderer
   ipcMain.handle('save-recording', async (_, arrayBuffer: ArrayBuffer) => {
     try {
+      // Ensure temp directory exists before writing
+      if (!fs.existsSync(TEMP_DIR)) {
+        fs.mkdirSync(TEMP_DIR, { recursive: true });
+      }
+
       const buffer = Buffer.from(arrayBuffer);
       fs.writeFileSync(AUDIO_FILE_PATH, buffer, { encoding: 'binary' });
       return { success: true, filePath: AUDIO_FILE_PATH };
@@ -82,6 +91,11 @@ export const setupAudioRecording = (ipcMain: IpcMain, mainWindow: BrowserWindow 
 
   // Get the path to the saved recording
   ipcMain.handle('get-recording-path', () => {
-    return AUDIO_FILE_PATH;
+    try {
+      return AUDIO_FILE_PATH;
+    } catch (error) {
+      console.error('Failed to get recording path:', error);
+      return null;
+    }
   });
 };
