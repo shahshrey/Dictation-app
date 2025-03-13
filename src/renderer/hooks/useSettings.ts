@@ -9,11 +9,29 @@ export const useSettings = () => {
   // Load settings
   const loadSettings = async (): Promise<void> => {
     try {
-      const loadedSettings = await window.electronAPI.getSettings();
-      // First convert to unknown, then assert as AppSettings to avoid type errors
-      setSettings((loadedSettings as unknown as AppSettings) ?? DEFAULT_SETTINGS);
+      logger.info('Loading settings...');
+      if (window.electronAPI && typeof window.electronAPI.getSettings === 'function') {
+        const loadedSettings = await window.electronAPI.getSettings();
+        logger.debug(`Loaded settings: ${JSON.stringify(loadedSettings, null, 2)}`);
+
+        // First convert to unknown, then assert as AppSettings to avoid type errors
+        const typedSettings = (loadedSettings as unknown as AppSettings) ?? DEFAULT_SETTINGS;
+
+        // Log important settings
+        logger.debug(`API key available: ${!!typedSettings.apiKey}`);
+        logger.debug(`Auto-transcribe enabled: ${typedSettings.autoTranscribe}`);
+        logger.debug(`Language setting: ${typedSettings.language}`);
+
+        setSettings(typedSettings);
+        return;
+      }
+
+      logger.warn('getSettings API not available, using default settings');
+      setSettings(DEFAULT_SETTINGS);
     } catch (error) {
       logger.exception('Failed to load settings', error);
+      // Fall back to default settings
+      setSettings(DEFAULT_SETTINGS);
     }
   };
 
@@ -21,10 +39,16 @@ export const useSettings = () => {
   const updateSettings = async (newSettings: Partial<AppSettings>): Promise<void> => {
     try {
       const updatedSettings = { ...settings, ...newSettings };
+      logger.info('Updating settings...');
+      logger.debug(`Updated settings: ${JSON.stringify(updatedSettings, null, 2)}`);
+
       setSettings(updatedSettings);
 
       if (window.electronAPI && typeof window.electronAPI.saveSettings === 'function') {
         await window.electronAPI.saveSettings(updatedSettings);
+        logger.info('Settings saved successfully');
+      } else {
+        logger.warn('saveSettings API not available, settings not persisted');
       }
     } catch (error) {
       logger.exception('Failed to update settings', error);

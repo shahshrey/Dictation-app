@@ -448,7 +448,7 @@ const createPopupWindow = () => {
 // Show the popup window - always show it when the app starts
 const showPopupWindow = () => {
   console.log('showPopupWindow called');
-  console.log('popupWindow exists:', !!popupWindow);
+
 
   if (!popupWindow) {
     console.log('No popup window exists, creating one');
@@ -456,9 +456,6 @@ const showPopupWindow = () => {
   }
 
   if (popupWindow) {
-    console.log('popupWindow destroyed:', popupWindow.isDestroyed());
-    console.log('popupWindow visible:', popupWindow.isVisible());
-
     if (popupWindow.isDestroyed()) {
       console.log('Popup window is destroyed, creating a new one');
       createPopupWindow();
@@ -499,11 +496,9 @@ const showPopupWindow = () => {
 // Hide the popup window - we'll keep this for potential future use
 const hidePopupWindow = () => {
   console.log('hidePopupWindow called');
-  console.log('popupWindow exists:', !!popupWindow);
+
 
   if (popupWindow) {
-    console.log('popupWindow destroyed:', popupWindow.isDestroyed());
-    console.log('popupWindow visible:', popupWindow.isVisible());
 
     if (!popupWindow.isDestroyed()) {
       console.log('Updating popup window to show not recording state');
@@ -766,7 +761,6 @@ const setupIpcHandlers = () => {
   // Get transcriptions (alias for get-recent-transcriptions)
   // This handler returns transcriptions in a format compatible with the renderer's expectations
   ipcMain.handle('get-transcriptions', async () => {
-    console.log('Main process: get-transcriptions handler called');
     try {
       if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
         console.log('Main process: Save directory does not exist');
@@ -818,8 +812,6 @@ const setupIpcHandlers = () => {
         })
         .filter(Boolean) // Remove any null entries from errors
         .sort((a, b) => b.timestamp - a.timestamp);
-
-      console.log(`Main process: Found ${files.length} transcriptions`);
       return files;
     } catch (error) {
       console.error('Failed to get transcriptions:', error);
@@ -833,6 +825,7 @@ const setupIpcHandlers = () => {
   ipcMain.handle('transcribe-recording', async (_, language, apiKey) => {
     logger.info('transcribe-recording handler called with language: ' + language);
     logger.debug('API key available: ' + !!apiKey);
+    logger.debug('API key length: ' + (apiKey ? apiKey.length : 0));
 
     try {
       // Initialize Groq client with the provided API key
@@ -848,9 +841,12 @@ const setupIpcHandlers = () => {
         };
       }
 
+      logger.info('Initializing Groq client with API key');
       const client = new Groq({ apiKey });
+      logger.debug('Groq client initialized successfully');
 
       // Get the path to the most recent recording
+      logger.debug('Checking for recording file at: ' + AUDIO_FILE_PATH);
       if (!fs.existsSync(AUDIO_FILE_PATH)) {
         logger.error('Recording file not found at ' + AUDIO_FILE_PATH, null);
         return {
@@ -866,6 +862,8 @@ const setupIpcHandlers = () => {
       // Validate the file size
       const fileStats = fs.statSync(AUDIO_FILE_PATH);
       logger.debug(`Audio file size: ${fileStats.size} bytes`);
+      logger.debug(`Audio file created: ${fileStats.birthtime}`);
+      logger.debug(`Audio file modified: ${fileStats.mtime}`);
 
       if (fileStats.size === 0) {
         logger.error('Audio file is empty', null);
@@ -880,7 +878,9 @@ const setupIpcHandlers = () => {
       }
 
       // Create a read stream for the audio file
+      logger.debug('Creating read stream for audio file');
       const audioFile = fs.createReadStream(AUDIO_FILE_PATH);
+      logger.debug('Read stream created successfully');
 
       // Choose the appropriate model based on language
       let model =
@@ -893,79 +893,93 @@ const setupIpcHandlers = () => {
       );
 
       // Transcribe the audio
-      const transcription = await client.audio.transcriptions.create({
-        file: audioFile,
-        model: model,
-        language: language || 'auto',
-      });
-
-      logger.info('Transcription successful, text length: ' + transcription.text.length);
-
-      // Generate a unique ID for the transcription
-      const id = `transcription-${Date.now()}`;
-      const timestamp = Date.now();
-      const duration = Math.floor(
-        (fileStats.mtime.getTime() - fileStats.birthtime.getTime()) / 1000
-      );
-
-      // Save the transcription to a file
-      let filePath = '';
+      logger.info('Calling Groq API for transcription...');
       try {
-        const filename = 'transcription';
-        const format = 'txt';
-        const timestampStr = new Date().toISOString().replace(/[:.]/g, '-');
-        const fullFilename = `${filename}_${timestampStr}.${format}`;
-        filePath = path.join(DEFAULT_SAVE_DIR, fullFilename);
+        const transcription = await client.audio.transcriptions.create({
+          file: audioFile,
+          model: model,
+          language: language || 'auto',
+        });
 
-        // Ensure the save directory exists
-        if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
-          logger.debug(`Creating save directory: ${DEFAULT_SAVE_DIR}`);
-          fs.mkdirSync(DEFAULT_SAVE_DIR, { recursive: true });
-        }
+        logger.info('Transcription successful, text length: ' + transcription.text.length);
+        logger.debug('Transcription text: ' + transcription.text.substring(0, 100) + '...');
 
-        // Write the file synchronously to ensure it's fully written before returning
-        fs.writeFileSync(filePath, transcription.text, { encoding: 'utf-8' });
-        logger.info(`Transcription saved to: ${filePath}`);
+        // Generate a unique ID for the transcription
+        const id = `transcription-${Date.now()}`;
+        const timestamp = Date.now();
+        const duration = Math.floor(
+          (fileStats.mtime.getTime() - fileStats.birthtime.getTime()) / 1000
+        );
+        
+        // Save the transcription to a file
+        let filePath = '';
+        try {
+          const filename = 'transcription';
+          const format = 'txt';
+          const timestampStr = new Date().toISOString().replace(/[:.]/g, '-');
+          const fullFilename = `${filename}_${timestampStr}.${format}`;
+          filePath = path.join(DEFAULT_SAVE_DIR, fullFilename);
 
-        // Verify the file was written correctly
-        if (fs.existsSync(filePath)) {
-          const fileContent = fs.readFileSync(filePath, { encoding: 'utf-8' });
-          if (fileContent !== transcription.text) {
-            logger.error('File content does not match transcription text', null);
-          } else {
-            logger.debug('File content verified successfully');
+          // Ensure the save directory exists
+          if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
+            logger.debug(`Creating save directory: ${DEFAULT_SAVE_DIR}`);
+            fs.mkdirSync(DEFAULT_SAVE_DIR, { recursive: true });
           }
-        } else {
-          logger.error('File was not created', null);
+
+          // Write the file synchronously to ensure it's fully written before returning
+          fs.writeFileSync(filePath, transcription.text, { encoding: 'utf-8' });
+          logger.info(`Transcription saved to: ${filePath}`);
+
+          // Verify the file was written correctly
+          if (fs.existsSync(filePath)) {
+            const fileContent = fs.readFileSync(filePath, { encoding: 'utf-8' });
+            if (fileContent !== transcription.text) {
+              logger.error('File content does not match transcription text', null);
+            } else {
+              logger.debug('File content verified successfully');
+            }
+          } else {
+            logger.error('File was not created', null);
+          }
+        } catch (saveError) {
+          logger.exception('Failed to save transcription to file', saveError);
+          // Continue even if saving fails
         }
-      } catch (saveError) {
-        logger.exception('Failed to save transcription to file', saveError);
-        // Continue even if saving fails
+
+        // Paste the transcribed text at the current cursor position
+        logger.info('Attempting to paste transcribed text at cursor position');
+        try {
+          await pasteTextAtCursor(transcription.text);
+          logger.info('Paste operation initiated');
+        } catch (pasteError) {
+          logger.exception('Failed to paste text at cursor position', pasteError);
+          // Continue even if pasting fails
+        }
+
+        // Add a small delay to ensure file system operations are complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+      
+        return {
+          success: true,
+          id,
+          text: transcription.text,
+          timestamp,
+          duration,
+          language: language || 'auto',
+          filePath, // Include the file path for debugging
+          pastedAtCursor: true, // Indicate that the text was pasted at the cursor
+        };
+      } catch (transcriptionError) {
+        logger.exception('Error during Groq API transcription call', transcriptionError);
+        return {
+          success: false,
+          error: transcriptionError instanceof Error ? transcriptionError.message : String(transcriptionError),
+          id: '',
+          text: '',
+          timestamp: 0,
+          duration: 0,
+        };
       }
-
-      // Paste the transcribed text at the current cursor position
-      logger.info('Attempting to paste transcribed text at cursor position');
-      try {
-        await pasteTextAtCursor(transcription.text);
-        logger.info('Paste operation initiated');
-      } catch (pasteError) {
-        logger.exception('Failed to paste text at cursor position', pasteError);
-        // Continue even if pasting fails
-      }
-
-      // Add a small delay to ensure file system operations are complete
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      return {
-        success: true,
-        id,
-        text: transcription.text,
-        timestamp,
-        duration,
-        language: language || 'auto',
-        filePath, // Include the file path for debugging
-        pastedAtCursor: true, // Indicate that the text was pasted at the cursor
-      };
     } catch (error) {
       logger.exception('Failed to transcribe recording', error);
       return {
@@ -1044,24 +1058,15 @@ const setupIpcHandlers = () => {
 
   // Window management
   ipcMain.handle('set-ignore-mouse-events', (event, ignore, options = { forward: true }) => {
-    console.log(
-      'set-ignore-mouse-events IPC handler called with ignore:',
-      ignore,
-      'options:',
-      options
-    );
-    console.log('popupWindow exists:', !!popupWindow);
 
     if (popupWindow) {
-      console.log('popupWindow destroyed:', popupWindow.isDestroyed());
 
       if (!popupWindow.isDestroyed()) {
-        console.log('Setting ignore mouse events to', ignore, 'with options:', options);
+
         try {
           // Use the provided options or default to forwarding events when not ignoring
           const forwardOptions = options || { forward: !ignore };
           popupWindow.setIgnoreMouseEvents(ignore, forwardOptions);
-          console.log('Successfully set ignore mouse events');
           return true;
         } catch (error) {
           console.error('Error setting ignore mouse events:', error);
@@ -1314,7 +1319,7 @@ const registerGlobalHotkey = () => {
   console.log('Registering global hotkey...');
   console.log('Current recording state:', isRecording);
   console.log('mainWindow exists:', !!mainWindow);
-  console.log('popupWindow exists:', !!popupWindow);
+
 
   // Unregister any existing shortcuts first
   globalShortcut.unregisterAll();
@@ -1329,8 +1334,7 @@ const registerGlobalHotkey = () => {
     console.log('Hotkey pressed!');
     console.log('mainWindow exists:', !!mainWindow);
     console.log('mainWindow destroyed:', mainWindow?.isDestroyed?.());
-    console.log('popupWindow exists:', !!popupWindow);
-    console.log('popupWindow destroyed:', popupWindow?.isDestroyed?.());
+  
     console.log('Current recording state:', isRecording);
 
     // Safely send event to main window if it exists and is not destroyed

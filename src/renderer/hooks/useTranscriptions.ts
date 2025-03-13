@@ -125,47 +125,83 @@ export const useTranscriptions = (settings: AppSettings) => {
         `Attempting to transcribe recording with language: ${language ?? settings.language}`
       );
       logger.debug(`API key available: ${!!settings.apiKey}`);
+      logger.debug(`API key length: ${settings.apiKey ? settings.apiKey.length : 0}`);
       logger.debug(
         `transcribeRecording API available: ${!!(window.electronAPI && typeof window.electronAPI.transcribeRecording === 'function')}`
       );
 
+      // Get API key from settings or use a default one for testing
+      let apiKey = settings.apiKey;
+
+      // Check if API key is available
+      if (!apiKey) {
+        logger.warn('No API key in settings, checking .env file or using default');
+
+        // Try to get API key from environment
+        if (process.env.GROQ_API_KEY) {
+          apiKey = process.env.GROQ_API_KEY;
+          logger.info('Using API key from environment variable');
+        } else {
+          // For testing purposes only - in production, always require a valid API key
+          logger.error('No API key available. Please set your Groq API key in the settings.', null);
+          return;
+        }
+      }
+
       if (window.electronAPI && typeof window.electronAPI.transcribeRecording === 'function') {
         logger.info('Calling transcribeRecording IPC method...');
-        const result = await window.electronAPI.transcribeRecording(
-          language ?? settings.language,
-          settings.apiKey
-        );
-        logger.debug(`Transcription result: ${JSON.stringify(result, null, 2)}`);
+        try {
+          // Log the parameters being sent
+          logger.debug(`Sending language: ${language ?? settings.language}`);
+          logger.debug(`API key length being sent: ${apiKey.length}`);
 
-        if (result.success) {
-          setCurrentTranscription({
-            id: result.id,
-            text: result.text,
-            timestamp: result.timestamp,
-            duration: result.duration,
-            language: result.language ?? settings.language,
-            pastedAtCursor: (result as { pastedAtCursor?: boolean }).pastedAtCursor,
-          });
+          const result = await window.electronAPI.transcribeRecording(
+            language ?? settings.language,
+            apiKey
+          );
 
-          // Log whether the text was pasted at the cursor
-          if ((result as { pastedAtCursor?: boolean }).pastedAtCursor) {
-            logger.info('Transcribed text was pasted at cursor position');
+          logger.debug(`Transcription result received: ${!!result}`);
+          if (result) {
+            logger.debug(`Transcription success: ${result.success}`);
+            logger.debug(`Transcription result: ${JSON.stringify(result, null, 2)}`);
           } else {
-            logger.info('Transcribed text was not pasted at cursor position');
+            logger.error('Received null or undefined result from transcribeRecording', null);
+            return;
           }
 
-          // Refresh the list of transcriptions immediately
-          await refreshRecentTranscriptions();
+          if (result.success) {
+            logger.info(`Transcription successful, text length: ${result.text.length}`);
+            setCurrentTranscription({
+              id: result.id,
+              text: result.text,
+              timestamp: result.timestamp,
+              duration: result.duration,
+              language: result.language ?? settings.language,
+              pastedAtCursor: (result as { pastedAtCursor?: boolean }).pastedAtCursor,
+            });
 
-          // Add a second refresh after a delay to ensure we get the latest data
-          // This helps in case the file is still being written when the first refresh happens
-          setTimeout(async () => {
-            logger.debug('Performing delayed refresh of transcriptions');
+            // Log whether the text was pasted at the cursor
+            if ((result as { pastedAtCursor?: boolean }).pastedAtCursor) {
+              logger.info('Transcribed text was pasted at cursor position');
+            } else {
+              logger.info('Transcribed text was not pasted at cursor position');
+            }
+
+            // Refresh the list of transcriptions immediately
             await refreshRecentTranscriptions();
-          }, 2000);
-        } else if (result.error) {
-          logger.error(`Transcription error: ${result.error}`, null);
-          // You could add error handling UI here
+
+            // Add a second refresh after a delay to ensure we get the latest data
+            // This helps in case the file is still being written when the first refresh happens
+            setTimeout(async () => {
+              logger.debug('Performing delayed refresh of transcriptions');
+              await refreshRecentTranscriptions();
+            }, 2000);
+          } else if (result.error) {
+            logger.error(`Transcription error: ${result.error}`, null);
+            // You could add error handling UI here
+          }
+        } catch (ipcError) {
+          logger.exception('Error calling transcribeRecording IPC method', ipcError);
         }
       } else {
         logger.warn('transcribeRecording API not available');

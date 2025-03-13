@@ -138,8 +138,6 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
   console.log('Registering get-transcriptions handler...');
   try {
     ipcMain.handle('get-transcriptions', async () => {
-      console.log('Main process: get-transcriptions handler called');
-
       try {
         if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
           return [];
@@ -185,7 +183,6 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
           })
           .slice(0, 10); // Get only the 10 most recent files
 
-        console.log(`Main process: Found ${files.length} transcriptions`);
         return files;
       } catch (error) {
         console.error('Error in get-transcriptions handler:', error);

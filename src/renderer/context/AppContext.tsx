@@ -63,7 +63,13 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
   // Fetch audio devices and settings on component mount
   useEffect(() => {
     refreshAudioDevices();
-    loadSettings();
+    loadSettings().then(() => {
+      logger.info('Settings loaded');
+      logger.debug(`Settings: ${JSON.stringify(settings, null, 2)}`);
+      logger.debug(`API key available: ${!!settings.apiKey}`);
+      logger.debug(`Auto-transcribe enabled: ${settings.autoTranscribe}`);
+      logger.debug(`Language setting: ${settings.language}`);
+    });
     refreshRecentTranscriptions();
 
     // Set up event listeners for the Home key and audio device requests

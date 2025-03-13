@@ -32,6 +32,8 @@ export const useRecording = ({
       logger.info(
         `Recording complete, blob size: ${audioBlob.size} bytes, type: ${audioBlob.type}`
       );
+      logger.debug(`Auto-transcribe setting: ${autoTranscribe}`);
+      logger.debug(`Language setting: ${language}`);
 
       if (audioBlob.size === 0) {
         logger.error('Empty audio blob received', null);
@@ -57,13 +59,20 @@ export const useRecording = ({
               logger.info(
                 `Recording saved: ${result.filePath}, size: ${(result as { size?: number }).size ?? 'unknown'}`
               );
-              // Auto-transcribe if enabled in settings
-              if (autoTranscribe) {
-                logger.info(`Auto-transcribe enabled, transcribing with language: ${language}`);
-                transcribeRecording(language);
-              } else {
-                logger.debug('Auto-transcribe disabled, not transcribing automatically');
-              }
+
+              // Always transcribe the recording, regardless of autoTranscribe setting
+              // Add a small delay before transcribing to ensure the file is fully written
+              setTimeout(() => {
+                logger.info(`Forcing transcription with language: ${language}`);
+                logger.debug(`Calling transcribeRecording function...`);
+                transcribeRecording(language)
+                  .then(() => {
+                    logger.info('Transcription process initiated successfully');
+                  })
+                  .catch(error => {
+                    logger.exception('Error during transcription process', error);
+                  });
+              }, 500);
             } else {
               logger.error(`Failed to save recording: ${result.error}`, null);
             }

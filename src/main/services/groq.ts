@@ -187,7 +187,7 @@ export const setupGroqAPI = (ipcMain: IpcMain): void => {
         const duration = Math.floor(
           (fileStats.mtime.getTime() - fileStats.birthtime.getTime()) / 1000
         );
-
+        console.log('transcription:', transcription);
         return {
           success: true,
           id,

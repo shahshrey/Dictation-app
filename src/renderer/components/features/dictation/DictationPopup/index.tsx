@@ -16,7 +16,6 @@ const DictationPopup: React.FC = () => {
 
     // Make sure the popup is interactive when it first appears
     if (window.electronAPI && typeof window.electronAPI.setIgnoreMouseEvents === 'function') {
-      console.log('Setting ignore mouse events to false on mount');
       window.electronAPI
         .setIgnoreMouseEvents(false)
         .catch(error => console.error('Error in setIgnoreMouseEvents on mount:', error));
@@ -67,7 +66,6 @@ const DictationPopup: React.FC = () => {
 
     try {
       if (window.electronAPI && typeof window.electronAPI.setIgnoreMouseEvents === 'function') {
-        console.log('Setting ignore mouse events to false');
         window.electronAPI
           .setIgnoreMouseEvents(false)
           .then(result => console.log('setIgnoreMouseEvents result:', result))
@@ -92,7 +90,6 @@ const DictationPopup: React.FC = () => {
       window.electronAPI &&
       typeof window.electronAPI.setIgnoreMouseEvents === 'function'
     ) {
-      console.log('Setting ignore mouse events to true with forward=true');
       window.electronAPI
         .setIgnoreMouseEvents(true, { forward: true })
         .catch(error => console.error('Error in setIgnoreMouseEvents on mouse leave:', error));
@@ -104,7 +101,6 @@ const DictationPopup: React.FC = () => {
     console.log('Mouse down on popup');
     // Make sure we can interact with the popup when clicking
     if (window.electronAPI && typeof window.electronAPI.setIgnoreMouseEvents === 'function') {
-      console.log('Setting ignore mouse events to false on mouse down');
       window.electronAPI
         .setIgnoreMouseEvents(false)
         .catch(error => console.error('Error in setIgnoreMouseEvents on mouse down:', error));

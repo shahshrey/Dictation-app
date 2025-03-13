@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Label } from '../../ui/label';
 import { Card } from '../../ui/card';
 import { AudioDevice } from '../../../../shared/types';
+import { logger } from '../../../utils/logger';
 
 const RecordingControls: React.FC = () => {
   const {
@@ -33,6 +34,16 @@ const RecordingControls: React.FC = () => {
     const device = audioDevices.find(d => d.id === deviceId);
     if (device) {
       setSelectedDevice(device);
+    }
+  };
+
+  // Handle manual transcription
+  const handleTranscribe = async (): Promise<void> => {
+    logger.info('Manual transcription requested');
+    try {
+      await transcribeRecording();
+    } catch (error) {
+      logger.exception('Error during manual transcription', error);
     }
   };
 
@@ -76,8 +87,8 @@ const RecordingControls: React.FC = () => {
           <Button
             variant="outline"
             className="flex-1"
-            onClick={() => transcribeRecording()}
-            disabled={isRecording || !currentTranscription}
+            onClick={handleTranscribe}
+            disabled={isRecording}
           >
             Transcribe
           </Button>
