@@ -3,8 +3,8 @@ import { createRoot } from 'react-dom/client';
 import App from './components/App';
 import { AppContextProvider } from './context/AppContext';
 import { ThemeProvider } from './components/layout/theme-provider';
-// Import only the processed CSS
-import './index.css';
+// Import the CSS directly
+import './styles/globals.css';
 
 console.log('Renderer process started');
 console.log('React version:', React.version);
@@ -29,4 +29,4 @@ root.render(
       </AppContextProvider>
     </ThemeProvider>
   </React.StrictMode>
-); 
+);

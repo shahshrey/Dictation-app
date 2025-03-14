@@ -69,6 +69,15 @@ try {
         ipcRenderer.removeListener('recording-source-selected', subscription);
       };
     },
+
+    // Settings
+    getSettings: () => ipcRenderer.invoke('get-settings'),
+    saveSettings: (settings: Record<string, unknown>) =>
+      ipcRenderer.invoke('save-settings', settings),
+
+    // Window management
+    setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) =>
+      ipcRenderer.invoke('set-ignore-mouse-events', ignore, options),
   };
 
   console.log('API methods being exposed:', Object.keys(api));

@@ -10,6 +10,8 @@ const rendererConfig = require('./webpack.renderer.config');
 module.exports = {
   packagerConfig: {
     asar: true,
+    out: 'out',
+    dir: 'dist'
   },
   rebuildConfig: {},
   makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],
@@ -37,6 +39,9 @@ module.exports = {
           },
         ],
       },
+      output: {
+        path: 'dist'
+      }
     }),
   ],
 };

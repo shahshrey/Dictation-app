@@ -248,7 +248,7 @@ const createWindow = () => {
       width: 800,
       height: 600,
       webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
+        preload: path.join(app.getAppPath(), 'dist/preload/preload.js'),
         contextIsolation: true,
         nodeIntegration: false,
         webSecurity: false, // Allow loading local resources
@@ -258,7 +258,7 @@ const createWindow = () => {
 
     console.log('Loading index.html file');
     // Load the index.html file
-    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
+    mainWindow.loadFile(path.join(app.getAppPath(), 'dist/index.html'));
 
     // Open DevTools in development mode
     if (process.env.NODE_ENV === 'development') {
@@ -346,7 +346,7 @@ const createPopupWindow = () => {
       visibleOnAllWorkspaces: true, // Visible on all workspaces
       focusable: false, // Make it non-focusable to prevent it from stealing focus
       webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
+        preload: path.join(app.getAppPath(), 'dist/preload/preload.js'),
         contextIsolation: true,
         nodeIntegration: false,
         webSecurity: false, // Allow loading local resources
@@ -366,7 +366,7 @@ const createPopupWindow = () => {
 
     console.log('Loading popup HTML file');
     // Load the popup HTML file
-    popupWindow.loadFile(path.join(__dirname, '../renderer/popup.html'));
+    popupWindow.loadFile(path.join(app.getAppPath(), 'dist/popup.html'));
 
     console.log('Getting primary display dimensions');
     // Position the popup window in the bottom right corner
@@ -828,12 +828,15 @@ const setupIpcHandlers = () => {
     logger.debug('API key length: ' + (apiKey ? apiKey.length : 0));
 
     try {
-      // Initialize Groq client with the provided API key
-      if (!apiKey) {
-        logger.error('No API key provided', null);
+      // Use the provided API key or fall back to the one in settings
+      const effectiveApiKey = apiKey || settings.apiKey;
+      
+      // Initialize Groq client with the effective API key
+      if (!effectiveApiKey) {
+        logger.error('No API key provided or found in settings', null);
         return {
           success: false,
-          error: 'No API key provided',
+          error: 'No API key provided or found in settings',
           id: '',
           text: '',
           timestamp: 0,
@@ -842,7 +845,7 @@ const setupIpcHandlers = () => {
       }
 
       logger.info('Initializing Groq client with API key');
-      const client = new Groq({ apiKey });
+      const client = new Groq({ apiKey: effectiveApiKey });
       logger.debug('Groq client initialized successfully');
 
       // Get the path to the most recent recording

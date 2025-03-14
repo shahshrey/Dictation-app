@@ -21,4 +21,8 @@ module.exports = {
   resolve: {
     extensions: ['.js', '.ts', '.jsx', '.tsx', '.css', '.json'],
   },
+  output: {
+    filename: 'main.js',
+    path: require('path').resolve(__dirname, 'dist'),
+  },
 };

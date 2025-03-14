@@ -49,6 +49,7 @@ module.exports = {
   },
   output: {
     filename: '[name].js',
-    path: require('path').resolve(__dirname, '.webpack/renderer'),
+    path: require('path').resolve(__dirname, 'dist'),
+    publicPath: './',
   },
 }; 

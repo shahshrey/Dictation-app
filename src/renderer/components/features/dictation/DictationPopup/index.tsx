@@ -2,18 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../../../context/AppContext';
 
 const DictationPopup: React.FC = () => {
-  console.log('DictationPopup component rendering');
   const { isRecording, startRecording, stopRecording, refreshRecentTranscriptions } =
     useAppContext();
   const [isDragging, setIsDragging] = useState(false);
-  const [isHovering, setIsHovering] = useState(false);
+  const [setIsHovering] = useState(false);
   const [wasRecording, setWasRecording] = useState(false);
 
   // Ensure the popup is always interactive when mounted
   useEffect(() => {
-    console.log('DictationPopup mounted or updated');
-    console.log('Current recording state:', isRecording);
-
     // Make sure the popup is interactive when it first appears
     if (window.electronAPI && typeof window.electronAPI.setIgnoreMouseEvents === 'function') {
       window.electronAPI
@@ -116,9 +112,6 @@ const DictationPopup: React.FC = () => {
     console.log('Mouse up on popup');
     setIsDragging(false);
   };
-
-  console.log('Rendering DictationPopup UI');
-  console.log('isHovering:', isHovering);
 
   return (
     <div

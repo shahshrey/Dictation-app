@@ -47,7 +47,6 @@ export const useTranscriptions = (settings: AppSettings) => {
     logger.info('Calling getTranscriptions IPC method...');
     try {
       const transcriptions = await window.electronAPI.getTranscriptions();
-      logger.debug(`Transcriptions received: ${JSON.stringify(transcriptions, null, 2)}`);
 
       // Only update if we actually got transcriptions
       if (Array.isArray(transcriptions) && transcriptions.length > 0) {

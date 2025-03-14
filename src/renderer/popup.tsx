@@ -2,9 +2,9 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import DictationPopup from './components/features/dictation/DictationPopup';
 import { AppContextProvider } from './context/AppContext';
-
-// Import CSS
-import './index.css';
+import { ThemeProvider } from './components/layout/theme-provider';
+// Import the CSS directly
+import './styles/globals.css';
 
 console.log('Popup window started');
 
@@ -21,8 +21,10 @@ const root = createRoot(rootElement);
 // Render the popup
 root.render(
   <React.StrictMode>
-    <AppContextProvider>
-      <DictationPopup />
-    </AppContextProvider>
+    <ThemeProvider defaultTheme="system">
+      <AppContextProvider>
+        <DictationPopup />
+      </AppContextProvider>
+    </ThemeProvider>
   </React.StrictMode>
-); 
+);
