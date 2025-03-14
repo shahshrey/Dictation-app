@@ -45,5 +45,7 @@ src/renderer/popup.js
 src/renderer/popup.js.map
 src/renderer/index.css
 src/renderer/index.css.map
+src/renderer/popup.css
+src/renderer/popup.css.map
 coverage/
 *.bak

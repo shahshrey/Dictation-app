@@ -47,4 +47,8 @@ module.exports = {
       path: require.resolve('path-browserify'),
     },
   },
+  output: {
+    filename: '[name].js',
+    path: require('path').resolve(__dirname, '.webpack/renderer'),
+  },
 }; 
