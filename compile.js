@@ -34,6 +34,7 @@ async function buildFiles() {
         '.js': 'js',
         '.jsx': 'jsx',
         '.css': 'css',
+        '.svg': 'dataurl',
       },
       define: {
         'process.env.NODE_ENV': '"development"',
@@ -105,6 +106,13 @@ async function buildFiles() {
       path.join(__dirname, 'src/renderer/popup.html'),
       path.join(__dirname, 'dist/popup.html')
     );
+
+    // Copy assets directory
+    const assetsDir = path.join(__dirname, 'src/assets');
+    const distAssetsDir = path.join(__dirname, 'dist/assets');
+    if (fs.existsSync(assetsDir)) {
+      fs.cpSync(assetsDir, distAssetsDir, { recursive: true });
+    }
 
     // Update HTML files to reference the processed Tailwind CSS
     let indexHtml = fs.readFileSync(path.join(__dirname, 'dist/index.html'), 'utf8');

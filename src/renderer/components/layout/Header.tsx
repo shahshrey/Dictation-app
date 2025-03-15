@@ -9,30 +9,39 @@ const Header: React.FC = () => {
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
-    <header className="bg-primary text-primary-foreground">
+    <header className="bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-md">
       <div className="container mx-auto px-4 py-3 flex items-center">
-        <div className="mr-2">
-          <MicIcon className="h-5 w-5" />
+        <div className="flex items-center">
+          <div className="h-10 w-10 mr-3 flex items-center justify-center bg-white/10 rounded-full p-1.5 shadow-inner">
+            <img src="./assets/logo/logo.svg" alt="Voice Vibe Logo" className="h-full w-full" />
+          </div>
+          <div className="flex flex-col">
+            <h1 className="text-2xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-purple-100 to-purple-200 bg-gradient-size animate-gradient-x">
+              Voice Vibe
+            </h1>
+            <span className="text-xs text-primary-foreground/80 -mt-1">Speak your thoughts</span>
+          </div>
         </div>
-        <h1 className="text-xl font-semibold flex-grow">Dictation App</h1>
 
         {isRecording && (
-          <div className="flex items-center mr-4">
+          <div className="flex items-center mr-4 ml-auto">
             <div className="w-3 h-3 rounded-full bg-destructive mr-2 animate-pulse" />
             <span className="text-sm">Recording</span>
           </div>
         )}
 
-        <ThemeToggle />
+        <div className="ml-auto flex items-center">
+          <ThemeToggle />
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-primary-foreground ml-2"
-          onClick={() => setSettingsOpen(true)}
-        >
-          <SettingsIcon className="h-5 w-5" />
-        </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-primary-foreground ml-2"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <SettingsIcon className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
 
       <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
@@ -40,24 +49,7 @@ const Header: React.FC = () => {
   );
 };
 
-// Simple icon components
-const MicIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-  >
-    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-    <line x1="12" x2="12" y1="19" y2="22" />
-  </svg>
-);
-
+// Simple icon component
 const SettingsIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"

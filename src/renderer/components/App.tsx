@@ -14,7 +14,7 @@ const App: React.FC = () => {
       <div className="container mx-auto flex-1 py-3 flex flex-col">
         <Card className="mb-3">
           <CardHeader>
-            <CardTitle>Dictation</CardTitle>
+            <CardTitle>Voice Recording</CardTitle>
           </CardHeader>
           <CardContent>
             <Suspense
@@ -31,7 +31,7 @@ const App: React.FC = () => {
 
         <Card className="mb-3 flex-1 overflow-hidden">
           <CardHeader>
-            <CardTitle>Transcription</CardTitle>
+            <CardTitle>Voice Transcription</CardTitle>
           </CardHeader>
           <CardContent className="h-full overflow-auto">
             <Suspense
@@ -48,7 +48,7 @@ const App: React.FC = () => {
 
         <Card className="w-full">
           <CardHeader>
-            <CardTitle>Recent Transcriptions</CardTitle>
+            <CardTitle>Recent Voice Notes</CardTitle>
           </CardHeader>
           <CardContent>
             <Suspense

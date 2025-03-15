@@ -5,7 +5,7 @@ const DictationPopup: React.FC = () => {
   const { isRecording, startRecording, stopRecording, refreshRecentTranscriptions } =
     useAppContext();
   const [isDragging, setIsDragging] = useState(false);
-  const [setIsHovering] = useState(false);
+  const [, setIsHovering] = useState(false);
   const [wasRecording, setWasRecording] = useState(false);
 
   // Ensure the popup is always interactive when mounted
@@ -133,7 +133,9 @@ const DictationPopup: React.FC = () => {
       {/* Pill container - make it draggable */}
       <button
         className={`flex items-center gap-2 px-3 py-1.5 rounded-full shadow-lg transition-all duration-300 hover:scale-105 ${
-          isRecording ? 'bg-primary/90 text-white' : 'bg-black/50 text-white hover:bg-black/70'
+          isRecording
+            ? 'bg-primary/90 text-white'
+            : 'bg-gradient-to-r from-primary/80 to-purple-700/80 text-white hover:from-primary hover:to-purple-700'
         }`}
         onClick={e => {
           console.log('Pill clicked');
@@ -178,12 +180,18 @@ const DictationPopup: React.FC = () => {
             <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
             <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
             <line x1="12" x2="12" y1="19" y2="22"></line>
+            {!isRecording && <path d="M12 19a10 10 0 0 0 10-10" />}
+            {!isRecording && <path d="M2 9a10 10 0 0 0 3.7 7.3" />}
           </svg>
         </div>
 
         {/* Status text */}
-        <span className="font-medium text-xs whitespace-nowrap">
-          {isRecording ? 'Recording...' : 'Dictate'}
+        <span
+          className={`font-medium text-xs whitespace-nowrap ${
+            !isRecording ? 'font-bold tracking-tight animate-pulse' : ''
+          }`}
+        >
+          {isRecording ? 'Recording...' : 'Voice Vibe'}
         </span>
 
         {/* Recording animation */}
