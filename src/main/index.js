@@ -247,6 +247,7 @@ const createWindow = () => {
     mainWindow = new BrowserWindow({
       width: 800,
       height: 600,
+      icon: path.join(app.getAppPath(), 'src/assets/logo/logo.png'),
       webPreferences: {
         preload: path.join(app.getAppPath(), 'dist/preload/preload.js'),
         contextIsolation: true,
@@ -345,6 +346,7 @@ const createPopupWindow = () => {
       type: process.platform === 'darwin' ? 'panel' : 'panel',
       visibleOnAllWorkspaces: true, // Visible on all workspaces
       focusable: false, // Make it non-focusable to prevent it from stealing focus
+      icon: path.join(app.getAppPath(), 'src/assets/logo/logo.png'),
       webPreferences: {
         preload: path.join(app.getAppPath(), 'dist/preload/preload.js'),
         contextIsolation: true,
@@ -1129,6 +1131,9 @@ app.whenReady().then(async () => {
   if (process.platform === 'darwin') {
     console.log('On macOS, setting app to stay in dock');
     app.dock.show();
+    
+    // Set the dock icon
+    app.dock.setIcon(path.join(app.getAppPath(), 'src/assets/logo/logo.png'));
 
     // Set up the dock menu
     setupDockMenu();
