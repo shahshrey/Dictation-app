@@ -3,25 +3,16 @@ import { useAppContext } from '../../context/AppContext';
 import { Button } from '../ui/button';
 import { ThemeToggle } from './theme-toggle';
 import SettingsModal from '../features/settings/SettingsModal';
+import AppLogo from '../ui/app-logo';
 
 const Header: React.FC = () => {
   const { isRecording } = useAppContext();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
-    <header className="bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-md">
-      <div className="container mx-auto px-4 py-3 flex items-center">
-        <div className="flex items-center">
-          <div className="h-10 w-10 mr-3 flex items-center justify-center bg-white/10 rounded-full p-1.5 shadow-inner">
-            <img src="./assets/logo/logo.svg" alt="Voice Vibe Logo" className="h-full w-full" />
-          </div>
-          <div className="flex flex-col">
-            <h1 className="text-2xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white via-purple-100 to-purple-200 bg-gradient-size animate-gradient-x">
-              Voice Vibe
-            </h1>
-            <span className="text-xs text-primary-foreground/80 -mt-1">Speak your thoughts</span>
-          </div>
-        </div>
+    <header className="bg-primary text-primary-foreground shadow-md">
+      <div className="container mx-auto px-4 py-2 flex items-center">
+        <AppLogo variant="primary" textClassName="text-primary-foreground" />
 
         {isRecording && (
           <div className="flex items-center mr-4 ml-auto">

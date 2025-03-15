@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../../../context/AppContext';
+import { cn } from '../../../../lib/utils';
+import { Mic, MicOff } from 'lucide-react';
 
 const DictationPopup: React.FC = () => {
   const { isRecording, startRecording, stopRecording, refreshRecentTranscriptions } =
@@ -132,11 +134,12 @@ const DictationPopup: React.FC = () => {
     >
       {/* Pill container - make it draggable */}
       <button
-        className={`flex items-center gap-2 px-3 py-1.5 rounded-full shadow-lg transition-all duration-300 hover:scale-105 ${
+        className={cn(
+          'flex items-center gap-2 px-3 py-1.5 rounded-full shadow-lg transition-all duration-300 hover:scale-105',
           isRecording
-            ? 'bg-primary/90 text-white'
-            : 'bg-gradient-to-r from-primary/80 to-purple-700/80 text-white hover:from-primary hover:to-purple-700'
-        }`}
+            ? 'bg-primary/90 text-primary-foreground'
+            : 'bg-gradient-to-r from-primary/80 to-primary-foreground/20 text-primary-foreground hover:from-primary hover:to-primary/70'
+        )}
         onClick={e => {
           console.log('Pill clicked');
           e.stopPropagation(); // Prevent event bubbling
@@ -163,33 +166,20 @@ const DictationPopup: React.FC = () => {
 
         {/* Mic icon */}
         <div
-          className={`flex items-center justify-center w-6 h-6 rounded-full ${
+          className={cn(
+            'flex items-center justify-center w-6 h-6 rounded-full',
             isRecording ? 'animate-pulse' : ''
-          }`}
+          )}
         >
-          <svg
-            className="w-4 h-4"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-            <line x1="12" x2="12" y1="19" y2="22"></line>
-            {!isRecording && <path d="M12 19a10 10 0 0 0 10-10" />}
-            {!isRecording && <path d="M2 9a10 10 0 0 0 3.7 7.3" />}
-          </svg>
+          {isRecording ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
         </div>
 
         {/* Status text */}
         <span
-          className={`font-medium text-xs whitespace-nowrap ${
+          className={cn(
+            'font-medium text-xs whitespace-nowrap',
             !isRecording ? 'font-bold tracking-tight animate-pulse' : ''
-          }`}
+          )}
         >
           {isRecording ? 'Recording...' : 'Voice Vibe'}
         </span>
@@ -197,8 +187,8 @@ const DictationPopup: React.FC = () => {
         {/* Recording animation */}
         {isRecording && (
           <div className="relative w-3 h-3 ml-1">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-red-500 animate-ping opacity-75"></div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-red-600"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-destructive animate-ping opacity-75"></div>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-destructive"></div>
           </div>
         )}
       </button>

@@ -6,6 +6,7 @@ import { Label } from '../../ui/label';
 import { Card } from '../../ui/card';
 import { AudioDevice } from '../../../../shared/types';
 import { logger } from '../../../utils/logger';
+import { cn } from '../../../lib/utils';
 
 const RecordingControls: React.FC = () => {
   const {
@@ -95,10 +96,16 @@ const RecordingControls: React.FC = () => {
         </div>
 
         {isRecording && (
-          <Card className="p-4 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+          <Card
+            className={cn(
+              'p-4 border',
+              'bg-destructive/5 border-destructive/20',
+              'dark:bg-destructive/10 dark:border-destructive/30'
+            )}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
-                <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
+                <div className="h-3 w-3 rounded-full bg-destructive animate-pulse" />
                 <span className="font-medium">Recording</span>
               </div>
               <span className="font-mono">{formatTime(recordingTime)}</span>
