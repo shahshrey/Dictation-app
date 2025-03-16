@@ -10,6 +10,28 @@ export interface Transcription {
   duration: number;
   language?: string;
   pastedAtCursor?: boolean;
+  title?: string;
+  tags?: string[];
+  confidence?: number;
+  wordCount?: number;
+  source?: string;
+  speakerCount?: number;
+  speakers?: Speaker[];
+  segments?: TranscriptionSegment[];
+}
+
+export interface Speaker {
+  id: string;
+  name?: string;
+}
+
+export interface TranscriptionSegment {
+  id: string;
+  speakerId?: string;
+  startTime: number;
+  endTime: number;
+  text: string;
+  confidence?: number;
 }
 
 // Settings related types

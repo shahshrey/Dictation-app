@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { AudioDevice, IPC_CHANNELS } from '../shared/types';
+import { AudioDevice, IPC_CHANNELS, Transcription } from '../shared/types';
 
 console.log('Preload script starting...');
 console.log('ipcRenderer available:', !!ipcRenderer);
@@ -43,13 +43,29 @@ try {
     },
 
     // File storage
-    saveTranscription: (text: string, options: { filename?: string; format?: string }) =>
-      ipcRenderer.invoke('save-transcription', text, options),
-    saveTranscriptionAs: (text: string) => ipcRenderer.invoke('save-transcription-as', text),
+    saveTranscription: (
+      transcription: Transcription,
+      options?: { filename?: string; format?: string }
+    ) => {
+      console.log('Preload: saveTranscription called with transcription ID:', transcription.id);
+      return ipcRenderer.invoke('save-transcription', transcription, options || {});
+    },
+    saveTranscriptionAs: (transcription: Transcription) => {
+      console.log('Preload: saveTranscriptionAs called with transcription ID:', transcription.id);
+      return ipcRenderer.invoke('save-transcription-as', transcription);
+    },
     getRecentTranscriptions: () => ipcRenderer.invoke('get-recent-transcriptions'),
     getTranscriptions: () => {
       console.log('Preload: getTranscriptions called');
       return ipcRenderer.invoke('get-transcriptions');
+    },
+    getTranscription: (id: string) => {
+      console.log('Preload: getTranscription called for ID:', id);
+      return ipcRenderer.invoke('get-transcription', id);
+    },
+    deleteTranscription: (id: string) => {
+      console.log('Preload: deleteTranscription called for ID:', id);
+      return ipcRenderer.invoke('delete-transcription', id);
     },
 
     // Event listeners
