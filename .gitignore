@@ -49,3 +49,4 @@ src/renderer/popup.css
 src/renderer/popup.css.map
 coverage/
 *.bak
+release-builds/

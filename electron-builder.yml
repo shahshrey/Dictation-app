@@ -1,0 +1,50 @@
+appId: com.dictation.app
+productName: Dictation App
+copyright: Copyright © 2023
+
+directories:
+  output: release-builds
+  buildResources: src/assets
+
+files:
+  - dist/**/*
+  - node_modules/**/*
+  - package.json
+  - build/**/*
+
+mac:
+  category: public.app-category.productivity
+  target: 
+    - dmg
+    - zip
+  icon: src/assets/logo/logo.icns
+  darkModeSupport: true
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  gatekeeperAssess: false
+  extendInfo:
+    NSMicrophoneUsageDescription: This app requires microphone access for dictation functionality.
+    LSUIElement: false
+    NSHumanReadableCopyright: Copyright © 2023
+    CFBundleDocumentTypes: []
+    CFBundleTypeRole: Editor
+    LSApplicationCategoryType: public.app-category.productivity
+  type: development
+  identity: null
+  binaries:
+    - Dictation App.app/Contents/MacOS/Dictation App
+  extraFiles:
+    - from: build/Info.plist
+      to: Contents/Info.plist
+
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+publish: null 
