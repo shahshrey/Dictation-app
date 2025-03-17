@@ -12,10 +12,15 @@ const LOG_LEVELS = {
   debug: 3,
 };
 
-// Set default log level to only show errors
-const DEFAULT_LOG_LEVEL = LOG_LEVELS.error;
+// Determine if we're in production mode
+const isProduction = process.env.NODE_ENV === 'production';
 
-// Create a browser-compatible logger
+// Set default log level based on environment
+// In production, only show errors and warnings
+// In development, show all logs
+const DEFAULT_LOG_LEVEL = isProduction ? LOG_LEVELS.warn : LOG_LEVELS.debug;
+
+// Create a browser-compatible logger with production optimizations
 const browserLogger = {
   error: (message: string, meta: Record<string, unknown> = {}): void => {
     console.error(`[ERROR] ${message}`, meta);
@@ -63,31 +68,81 @@ const browserLogger = {
   },
 };
 
+// Create optimized no-op functions for production
+const noOpLogger = {
+  // Always log errors
+  error: browserLogger.error,
+
+  // For non-error levels, use no-op functions in production when level is higher than default
+  warn: isProduction
+    ? DEFAULT_LOG_LEVEL >= LOG_LEVELS.warn
+      ? browserLogger.warn
+      : () => {}
+    : browserLogger.warn,
+
+  info: isProduction
+    ? DEFAULT_LOG_LEVEL >= LOG_LEVELS.info
+      ? browserLogger.info
+      : () => {}
+    : browserLogger.info,
+
+  debug: isProduction
+    ? DEFAULT_LOG_LEVEL >= LOG_LEVELS.debug
+      ? browserLogger.debug
+      : () => {}
+    : browserLogger.debug,
+
+  log: isProduction
+    ? (level: LogLevel, message: string, meta: Record<string, unknown> = {}): void => {
+        if (level === 'error' || (level === 'warn' && DEFAULT_LOG_LEVEL >= LOG_LEVELS.warn)) {
+          browserLogger.log(level, message, meta);
+        }
+        // Skip other levels in production
+      }
+    : browserLogger.log,
+
+  // Helper method to log objects with proper formatting
+  logObject: isProduction
+    ? (level: LogLevel, message: string, obj: unknown): void => {
+        if (level === 'error' || (level === 'warn' && DEFAULT_LOG_LEVEL >= LOG_LEVELS.warn)) {
+          browserLogger.log(level, message, { data: obj });
+        }
+        // Skip other levels in production
+      }
+    : (level: LogLevel, message: string, obj: unknown): void => {
+        browserLogger.log(level, message, { data: obj });
+      },
+
+  // For compatibility with existing code
+  exception: browserLogger.error,
+};
+
 // Export a simplified interface that works in both main and renderer processes
+// Use the optimized logger in production
 export default {
   error: (message: string, meta: LogMetadata = {}): void => {
-    browserLogger.error(message, meta);
+    noOpLogger.error(message, meta);
   },
 
   warn: (message: string, meta: LogMetadata = {}): void => {
-    browserLogger.warn(message, meta);
+    noOpLogger.warn(message, meta);
   },
 
   info: (message: string, meta: LogMetadata = {}): void => {
-    browserLogger.debug(message, meta);
+    noOpLogger.debug(message, meta);
   },
 
   debug: (message: string, meta: LogMetadata = {}): void => {
-    browserLogger.debug(message, meta);
+    noOpLogger.debug(message, meta);
   },
 
   // Helper method to log objects with proper formatting
   logObject: (level: LogLevel, message: string, obj: unknown): void => {
-    browserLogger.log(level, message, { data: obj });
+    noOpLogger.logObject(level, message, obj);
   },
 
   // For compatibility with existing code
   exception: (message: string, error: unknown): void => {
-    browserLogger.error(message, { error });
+    noOpLogger.error(message, { error });
   },
 };

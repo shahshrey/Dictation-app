@@ -3,6 +3,10 @@ const path = require('path');
 const fs = require('fs');
 const { execSync } = require('child_process');
 
+// Check if we're in production mode
+const isProduction = process.env.NODE_ENV === 'production';
+console.log(`Building in ${isProduction ? 'production' : 'development'} mode`);
+
 // Ensure dist directory exists
 const distDir = path.join(__dirname, 'dist');
 if (!fs.existsSync(distDir)) {
@@ -14,7 +18,7 @@ async function buildFiles() {
   try {
     // Process Tailwind CSS first
     try {
-      execSync('npx tailwindcss -i ./src/renderer/styles/globals.css -o ./dist/renderer/tailwind.css');
+      execSync(`npx tailwindcss -i ./src/renderer/styles/globals.css -o ./dist/renderer/tailwind.css ${isProduction ? '--minify' : ''}`);
     } catch (error) {
       console.error('Failed to process Tailwind CSS:', error);
       process.exit(1);
@@ -22,8 +26,8 @@ async function buildFiles() {
 
     const commonBuildOptions = {
       bundle: true,
-      minify: false,
-      sourcemap: true,
+      minify: isProduction,
+      sourcemap: !isProduction,
       platform: 'browser',
       allowOverwrite: true,
       loader: {
@@ -35,7 +39,7 @@ async function buildFiles() {
         '.svg': 'dataurl',
       },
       define: {
-        'process.env.NODE_ENV': '"development"',
+        'process.env.NODE_ENV': isProduction ? '"production"' : '"development"',
       },
       external: ['electron'],
       publicPath: '/',

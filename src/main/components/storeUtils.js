@@ -1,4 +1,5 @@
-const fs = require('fs');
+const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const { DEFAULT_SETTINGS } = require('./constants');
 const { ensureStorageDirectories } = require('./storageManager');
@@ -11,20 +12,47 @@ let store = null;
 let settings = { ...DEFAULT_SETTINGS };
 
 // Load settings from fallback file if needed
-const loadSettingsFromFile = () => {
+const loadSettingsFromFile = async () => {
   try {
     // Import electron dynamically to avoid circular dependencies
     const { app } = require('electron');
     const settingsPath = path.join(app.getPath('userData'), 'settings.json');
-    if (fs.existsSync(settingsPath)) {
-      logger.debug('Loading settings from fallback file:', settingsPath);
-      const fileSettings = JSON.parse(fs.readFileSync(settingsPath, { encoding: 'utf-8' }));
+    
+    // Check if file exists
+    try {
+      await fs.access(settingsPath);
+    } catch (error) {
+      logger.debug('Settings file does not exist:', { path: settingsPath });
+      return false;
+    }
+    
+    logger.debug('Loading settings from fallback file:', { path: settingsPath });
+    const fileData = await fs.readFile(settingsPath, { encoding: 'utf-8' });
+    const fileSettings = JSON.parse(fileData);
+    Object.assign(settings, fileSettings);
+    logger.debug('Settings loaded from fallback file');
+    return true;
+  } catch (error) {
+    logger.error('Failed to load settings from fallback file:', { error: error.message });
+  }
+  return false;
+};
+
+// Synchronous version for critical startup path
+const loadSettingsFromFileSync = () => {
+  try {
+    // Import electron dynamically to avoid circular dependencies
+    const { app } = require('electron');
+    const settingsPath = path.join(app.getPath('userData'), 'settings.json');
+    if (fsSync.existsSync(settingsPath)) {
+      logger.debug('Loading settings from fallback file (sync):', { path: settingsPath });
+      const fileSettings = JSON.parse(fsSync.readFileSync(settingsPath, { encoding: 'utf-8' }));
       Object.assign(settings, fileSettings);
-      logger.debug('Settings loaded from fallback file');
+      logger.debug('Settings loaded from fallback file (sync)');
       return true;
     }
   } catch (error) {
-    logger.error('Failed to load settings from fallback file:', { error: error.message });
+    logger.error('Failed to load settings from fallback file (sync):', { error: error.message });
   }
   return false;
 };
@@ -36,6 +64,9 @@ const initStore = async () => {
     store = new Store({
       defaults: DEFAULT_SETTINGS,
       name: 'settings', // Explicitly set the name to ensure consistency
+      // Add caching to improve performance
+      cwd: undefined, // Use default
+      watch: false, // Disable watching for changes to improve performance
     });
     
     // Update the settings object with values from the store
@@ -51,8 +82,7 @@ const initStore = async () => {
   } catch (error) {
     logger.error('Failed to initialize store:', { error: error.message });
     // Try to load settings from fallback file if store initialization fails
-    loadSettingsFromFile();
-    return false;
+    return loadSettingsFromFileSync(); // Use sync version for critical path
   }
 };
 
@@ -60,8 +90,9 @@ const initStore = async () => {
 const getStore = () => store;
 
 // Ensure directories exist using the storage manager
-function ensureDirectories() {
-  ensureStorageDirectories();
+// Make this async to improve startup time
+async function ensureDirectories() {
+  return ensureStorageDirectories();
 }
 
 module.exports = {
@@ -69,5 +100,6 @@ module.exports = {
   settings,
   initStore,
   ensureDirectories,
-  loadSettingsFromFile
+  loadSettingsFromFile,
+  loadSettingsFromFileSync
 }; 
