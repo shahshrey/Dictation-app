@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { AUDIO_FILE_PATH, TEMP_DIR, DEFAULT_SAVE_DIR, GROQ_MODELS } = require('./constants');
 const { initGroqClient, transcribeRecording } = require('./groqClient');
+const logger = require('../../shared/logger').default;
 
 // Set up IPC handlers
 const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManager) => {
@@ -17,7 +18,7 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
           .map(device => ({ id: device.deviceId, name: device.label || 'Microphone ' + device.deviceId })))
       `);
     } catch (error) {
-      console.error('Failed to get audio sources:', error);
+      logger.error('Failed to get audio sources:', { error: error.message });
       return [];
     }
   });
@@ -25,11 +26,11 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
   // Save the recorded audio blob sent from the renderer
   ipcMain.handle('save-recording', async (_, arrayBuffer) => {
     try {
-      console.log('Saving recording, buffer size:', arrayBuffer.byteLength);
+      logger.debug('Saving recording, buffer size:', { size: arrayBuffer.byteLength });
 
       // Validate that we have actual data
       if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-        console.error('Error: Empty audio buffer received');
+        logger.error('Error: Empty audio buffer received');
         return { success: false, error: 'Empty audio buffer received' };
       }
 
@@ -46,10 +47,10 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
       // Verify the file was written correctly
       if (fs.existsSync(AUDIO_FILE_PATH)) {
         const stats = fs.statSync(AUDIO_FILE_PATH);
-        console.log(`Recording saved successfully: ${AUDIO_FILE_PATH}, size: ${stats.size} bytes`);
+        logger.debug(`Recording saved successfully: ${AUDIO_FILE_PATH}, size: ${stats.size} bytes`);
 
         if (stats.size === 0) {
-          console.error('Error: File was saved but is empty');
+          logger.error('Error: File was saved but is empty');
           return {
             success: false,
             error: 'File was saved but is empty',
@@ -59,21 +60,21 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
 
         return { success: true, filePath: AUDIO_FILE_PATH, size: stats.size };
       } else {
-        console.error('Error: File was not saved');
+        logger.error('Error: File was not saved');
         return { success: false, error: 'File was not saved' };
       }
     } catch (error) {
-      console.error('Failed to save recording:', error);
+      logger.error('Failed to save recording:', { error: error.message });
       return { success: false, error: String(error) };
     }
   });
 
-  // Get the path to the saved recording
+  // Get the path to the recording file
   ipcMain.handle('get-recording-path', () => {
     return AUDIO_FILE_PATH;
   });
 
-  // Transcribe audio file
+  // Transcribe audio using Groq API
   ipcMain.handle('transcribe-audio', async (_, filePath, options) => {
     try {
       const groqClient = initGroqClient(settings.apiKey);
@@ -82,7 +83,10 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
         return { success: false, error: 'Groq API key not set' };
       }
 
+      logger.debug(`Using Groq model: ${options?.model || settings.transcriptionModel || GROQ_MODELS.TRANSCRIPTION.MULTILINGUAL} for transcription with language: ${options?.language || 'en'}`);
+      
       if (!fs.existsSync(filePath)) {
+        logger.error('Audio file not found:', { filePath });
         return { success: false, error: 'Audio file not found' };
       }
 
@@ -101,8 +105,6 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
       const language =
         options?.language === 'auto' || !options?.language ? 'en' : options?.language;
 
-      console.log(`Using Groq model: ${model} for transcription with language: ${language}`);
-
       const transcription = await groqClient.audio.transcriptions.create({
         file: audioFile,
         model: model,
@@ -116,12 +118,12 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
         model: model,
       };
     } catch (error) {
-      console.error('Failed to transcribe audio:', error);
+      logger.error('Failed to transcribe audio:', { error: error.message });
       return { success: false, error: String(error) };
     }
   });
 
-  // Translate audio file to English
+  // Translate audio using Groq API
   ipcMain.handle('translate-audio', async (_, filePath) => {
     try {
       const groqClient = initGroqClient(settings.apiKey);
@@ -131,12 +133,13 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
       }
 
       if (!fs.existsSync(filePath)) {
+        logger.error('Audio file not found:', { filePath });
         return { success: false, error: 'Audio file not found' };
       }
 
       const audioFile = fs.createReadStream(filePath);
 
-      console.log(`Using Groq model: ${GROQ_MODELS.TRANSLATION} for translation`);
+      logger.debug(`Using Groq model: ${GROQ_MODELS.TRANSLATION} for translation`);
 
       const translation = await groqClient.audio.translations.create({
         file: audioFile,
@@ -149,7 +152,7 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
         model: GROQ_MODELS.TRANSLATION,
       };
     } catch (error) {
-      console.error('Failed to translate audio:', error);
+      logger.error('Failed to translate audio:', { error: error.message });
       return { success: false, error: String(error) };
     }
   });
@@ -167,7 +170,7 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
 
       return { success: true, filePath };
     } catch (error) {
-      console.error('Failed to save transcription:', error);
+      logger.error('Failed to save transcription:', { error: error.message });
       return { success: false, error: String(error) };
     }
   });
@@ -195,7 +198,7 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
 
       return { success: true, filePath };
     } catch (error) {
-      console.error('Failed to save transcription:', error);
+      logger.error('Failed to save transcription:', { error: error.message });
       return { success: false, error: String(error) };
     }
   });
@@ -223,7 +226,7 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
               }
             };
           } catch (error) {
-            console.error(`Error processing file ${file}:`, error);
+            logger.error(`Error processing file ${file}:`, { error: error.message });
             return null;
           }
         })
@@ -236,7 +239,7 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
         transcriptions: files.map(f => f.transcription)
       };
     } catch (error) {
-      console.error('Failed to get recent transcriptions:', error);
+      logger.error('Failed to get recent transcriptions:', { error: error.message });
       return { success: false, error: String(error) };
     }
   });
@@ -246,7 +249,7 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
   ipcMain.handle('get-transcriptions', async () => {
     try {
       if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
-        console.log('Main process: Save directory does not exist');
+        logger.debug('Main process: Save directory does not exist');
         return [];
       }
 
@@ -267,14 +270,14 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
               const content = fs.readFileSync(filePath, { encoding: 'utf-8' });
               transcription = JSON.parse(content);
             } catch (readError) {
-              console.error(`Failed to read or parse file ${filePath}:`, readError);
+              logger.error(`Failed to read or parse file ${filePath}:`, { error: readError.message });
               return null; // Skip this file if we can't read or parse it
             }
 
             // Return the parsed transcription
             return transcription;
           } catch (error) {
-            console.error(`Failed to process file ${dirent.name}:`, error);
+            logger.error(`Failed to process file ${dirent.name}:`, { error: error.message });
             return null;
           }
         })
@@ -282,7 +285,7 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
         .sort((a, b) => b.timestamp - a.timestamp);
       return files;
     } catch (error) {
-      console.error('Failed to get transcriptions:', error);
+      logger.error('Failed to get transcriptions:', { error: error.message });
       return [];
     }
   });
@@ -302,7 +305,7 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
       shell.openPath(filePath);
       return { success: true };
     } catch (error) {
-      console.error('Failed to open file:', error);
+      logger.error('Failed to open file:', { error: error.message });
       return { success: false, error: String(error) };
     }
   });
@@ -310,12 +313,12 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
   // Get settings
   ipcMain.handle('get-settings', () => {
     // Log the settings being returned to the renderer
-    console.log('[DEBUG] Current settings from getSettings:', JSON.stringify({
+    logger.debug('[DEBUG] Current settings from getSettings:', JSON.stringify({
       ...settings,
       apiKey: settings.apiKey ? '[API KEY PRESENT]' : 'null'
     }));
-    console.log('[DEBUG] Current settings API key available:', !!settings.apiKey);
-    console.log('[DEBUG] Current settings API key length:', settings.apiKey ? settings.apiKey.length : 0);
+    logger.debug('[DEBUG] Current settings API key available:', !!settings.apiKey);
+    logger.debug('[DEBUG] Current settings API key length:', settings.apiKey ? settings.apiKey.length : 0);
     
     return settings;
   });
@@ -338,7 +341,7 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
 
       return { success: true };
     } catch (error) {
-      console.error('Failed to save settings:', error);
+      logger.error('Failed to save settings:', { error: error.message });
       return { success: false, error: String(error) };
     }
   });
@@ -352,7 +355,7 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
       }
       return { success: true };
     } catch (error) {
-      console.error('Failed to start recording:', error);
+      logger.error('Failed to start recording:', { error: error.message });
       return { success: false, error: String(error) };
     }
   });
@@ -365,7 +368,7 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
       }
       return { success: true };
     } catch (error) {
-      console.error('Failed to stop recording:', error);
+      logger.error('Failed to stop recording:', { error: error.message });
       return { success: false, error: String(error) };
     }
   });
@@ -380,86 +383,86 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
           global.popupWindow.setIgnoreMouseEvents(ignore, forwardOptions);
           return true;
         } catch (error) {
-          console.error('Error setting ignore mouse events:', error);
+          logger.error('Error setting ignore mouse events:', { error: error.message });
           return false;
         }
       } else {
-        console.log('Cannot set ignore mouse events - popup window is destroyed');
+        logger.debug('Cannot set ignore mouse events - popup window is destroyed');
         return false;
       }
     }
-    console.log('Cannot set ignore mouse events - popup window does not exist');
+    logger.debug('Cannot set ignore mouse events - popup window does not exist');
     return false;
   });
 };
 
 // Function to register the global hotkey
 const registerGlobalHotkey = (_, settings) => {
-  console.log('Registering global hotkey...');
-  console.log('Current recording state:', global.isRecording);
-  console.log('mainWindow exists:', !!global.mainWindow);
+  logger.debug('Registering global hotkey...');
+  logger.debug('Current recording state:', { isRecording: global.isRecording });
+  logger.debug('mainWindow exists:', { exists: !!global.mainWindow });
 
   // Unregister any existing shortcuts first
   globalShortcut.unregisterAll();
-  console.log('Unregistered all existing shortcuts');
+  logger.debug('Unregistered all existing shortcuts');
 
   // Get the hotkey from settings, default to 'Home' if not set
   const hotkey = settings.hotkey || 'Home';
-  console.log('Using hotkey:', hotkey);
+  logger.debug('Using hotkey:', { hotkey });
 
   // Define the hotkey handler function
   const hotkeyHandler = () => {
-    console.log('Hotkey pressed!');
-    console.log('mainWindow exists:', !!global.mainWindow);
-    console.log('popupWindow exists:', !!global.popupWindow);
+    logger.debug('Hotkey pressed!');
+    logger.debug('mainWindow exists:', { exists: !!global.mainWindow });
+    logger.debug('popupWindow exists:', { exists: !!global.popupWindow });
     
     // Ensure windows exist
     if (!global.mainWindow || global.mainWindow.isDestroyed()) {
-      console.log('Main window does not exist or is destroyed, recreating it');
+      logger.debug('Main window does not exist or is destroyed, recreating it');
       // Import the createWindow function dynamically to avoid circular dependencies
       const { createWindow } = require('./windowManager');
       createWindow();
     }
     
     if (!global.popupWindow || global.popupWindow.isDestroyed()) {
-      console.log('Popup window does not exist or is destroyed, recreating it');
+      logger.debug('Popup window does not exist or is destroyed, recreating it');
       // Import the createPopupWindow function dynamically to avoid circular dependencies
       const { createPopupWindow } = require('./windowManager');
       createPopupWindow();
     }
     
-    console.log('Current recording state:', global.isRecording);
+    logger.debug('Current recording state:', { isRecording: global.isRecording });
 
     // Now safely send event to main window
     if (global.mainWindow && !global.mainWindow.isDestroyed()) {
-      console.log('Sending toggle-recording event to mainWindow');
+      logger.debug('Sending toggle-recording event to mainWindow');
       try {
         global.mainWindow.webContents.send('toggle-recording');
       } catch (error) {
-        console.error('Error sending toggle-recording event:', error);
+        logger.error('Error sending toggle-recording event:', { error: error.message });
       }
     }
 
     // Toggle recording state and update popup
-    console.log('Toggling recording state from', global.isRecording, 'to', !global.isRecording);
+    logger.debug('Toggling recording state from', { from: global.isRecording, to: !global.isRecording });
     global.isRecording = !global.isRecording;
     
     if (global.isRecording) {
-      console.log('Starting recording');
+      logger.debug('Starting recording');
       // Show recording UI
       if (global.popupWindow && !global.popupWindow.isDestroyed()) {
         try {
           // Update UI to show recording state
           global.popupWindow.webContents.send('update-recording-state', true);
         } catch (error) {
-          console.error('Error updating popup window for recording:', error);
+          logger.error('Error updating popup window for recording:', { error: error.message });
         }
       }
     } else {
-      console.log('Stopping recording');
+      logger.debug('Stopping recording');
       // Update popup window to show not recording state
       if (global.popupWindow && !global.popupWindow.isDestroyed()) {
-        console.log('Updating popup window to show not recording state');
+        logger.debug('Updating popup window to show not recording state');
         try {
           // Update UI to show not recording state
           global.popupWindow.webContents.send('update-recording-state', false);
@@ -479,7 +482,7 @@ const registerGlobalHotkey = (_, settings) => {
             }
           }
         } catch (error) {
-          console.error('Error updating popup window:', error);
+          logger.error('Error updating popup window:', { error: error.message });
         }
       }
     }
@@ -487,24 +490,24 @@ const registerGlobalHotkey = (_, settings) => {
 
   try {
     // Register the global shortcut with the hotkey from settings
-    console.log('Attempting to register hotkey:', hotkey);
+    logger.debug('Attempting to register hotkey:', { hotkey });
     const registered = globalShortcut.register(hotkey, hotkeyHandler);
 
     if (!registered) {
-      console.error(`Failed to register hotkey: ${hotkey}`);
+      logger.error(`Failed to register hotkey: ${hotkey}`);
     } else {
-      console.log(`Successfully registered hotkey: ${hotkey}`);
+      logger.debug(`Successfully registered hotkey: ${hotkey}`);
     }
   } catch (error) {
-    console.error(`Error registering hotkey ${hotkey}:`, error);
+    logger.error(`Error registering hotkey ${hotkey}:`, { error: error.message });
 
     // Fallback to Home key if the specified hotkey is invalid
     try {
-      console.log('Attempting to register fallback hotkey: Home');
+      logger.debug('Attempting to register fallback hotkey: Home');
       globalShortcut.register('Home', hotkeyHandler);
-      console.log('Fallback to Home key successful');
+      logger.debug('Fallback to Home key successful');
     } catch (fallbackError) {
-      console.error('Failed to register fallback hotkey:', fallbackError);
+      logger.error('Failed to register fallback hotkey:', { error: fallbackError.message });
     }
   }
 };

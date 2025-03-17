@@ -1,14 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { AudioDevice, IPC_CHANNELS, Transcription } from '../shared/types';
+import logger from '../shared/logger';
 
-console.log('Preload script starting...');
-console.log('ipcRenderer available:', !!ipcRenderer);
-console.log('contextBridge available:', !!contextBridge);
+logger.debug('Preload script starting...');
+logger.debug('ipcRenderer available:', { available: !!ipcRenderer });
+logger.debug('contextBridge available:', { available: !!contextBridge });
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 try {
-  console.log('Exposing electronAPI to renderer process...');
+  logger.debug('Exposing electronAPI to renderer process...');
 
   const api = {
     // Audio recording
@@ -37,8 +38,8 @@ try {
     translateAudio: (filePath: string) => ipcRenderer.invoke('translate-audio', filePath),
 
     transcribeRecording: (language: string, apiKey: string) => {
-      console.log('Preload: transcribeRecording called with language:', language);
-      console.log('Preload: API key available:', !!apiKey);
+      logger.debug('Preload: transcribeRecording called with language:', { language });
+      logger.debug('Preload: API key available:', { available: !!apiKey });
       return ipcRenderer.invoke('transcribe-recording', language, apiKey);
     },
 
@@ -47,24 +48,28 @@ try {
       transcription: Transcription,
       options?: { filename?: string; format?: string }
     ) => {
-      console.log('Preload: saveTranscription called with transcription ID:', transcription.id);
+      logger.debug('Preload: saveTranscription called with transcription ID:', {
+        id: transcription.id,
+      });
       return ipcRenderer.invoke('save-transcription', transcription, options || {});
     },
     saveTranscriptionAs: (transcription: Transcription) => {
-      console.log('Preload: saveTranscriptionAs called with transcription ID:', transcription.id);
+      logger.debug('Preload: saveTranscriptionAs called with transcription ID:', {
+        id: transcription.id,
+      });
       return ipcRenderer.invoke('save-transcription-as', transcription);
     },
     getRecentTranscriptions: () => ipcRenderer.invoke('get-recent-transcriptions'),
     getTranscriptions: () => {
-      console.log('Preload: getTranscriptions called');
+      logger.debug('Preload: getTranscriptions called');
       return ipcRenderer.invoke('get-transcriptions');
     },
     getTranscription: (id: string) => {
-      console.log('Preload: getTranscription called for ID:', id);
+      logger.debug('Preload: getTranscription called for ID:', { id });
       return ipcRenderer.invoke('get-transcription', id);
     },
     deleteTranscription: (id: string) => {
-      console.log('Preload: deleteTranscription called for ID:', id);
+      logger.debug('Preload: deleteTranscription called for ID:', { id });
       return ipcRenderer.invoke('delete-transcription', id);
     },
 
@@ -96,9 +101,9 @@ try {
       ipcRenderer.invoke('set-ignore-mouse-events', ignore, options),
   };
 
-  console.log('API methods being exposed:', Object.keys(api));
+  logger.debug('API methods being exposed:', { methods: Object.keys(api) });
   contextBridge.exposeInMainWorld('electronAPI', api);
-  console.log('electronAPI successfully exposed to renderer process');
+  logger.debug('electronAPI successfully exposed to renderer process');
 } catch (error) {
-  console.error('Error in preload script:', error);
+  logger.error('Error in preload script:', { error: (error as Error).message });
 }

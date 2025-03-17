@@ -1,6 +1,6 @@
 import { AudioDevice } from '../../shared/types';
 import { useAudioRecording } from './useAudioRecording';
-import { logger } from '../utils/logger';
+import { logger } from '../shared/logger';
 
 interface UseRecordingProps {
   selectedDevice: AudioDevice | null;
@@ -29,7 +29,7 @@ export const useRecording = ({
   // Handle recording complete
   function handleRecordingComplete(audioBlob: Blob): void {
     try {
-      logger.info(
+      logger.debug(
         `Recording complete, blob size: ${audioBlob.size} bytes, type: ${audioBlob.type}`
       );
       logger.debug(`Auto-transcribe setting: ${autoTranscribe}`);
@@ -52,22 +52,22 @@ export const useRecording = ({
           }
 
           if (window.electronAPI && typeof window.electronAPI.saveRecording === 'function') {
-            logger.info('Sending recording to main process...');
+            logger.debug('Sending recording to main process...');
             const result = await window.electronAPI.saveRecording(arrayBuffer);
 
             if (result.success) {
-              logger.info(
+              logger.debug(
                 `Recording saved: ${result.filePath}, size: ${(result as { size?: number }).size ?? 'unknown'}`
               );
 
               // Always transcribe the recording, regardless of autoTranscribe setting
               // Add a small delay before transcribing to ensure the file is fully written
               setTimeout(() => {
-                logger.info(`Forcing transcription with language: ${language}`);
+                logger.debug(`Forcing transcription with language: ${language}`);
                 logger.debug(`Calling transcribeRecording function...`);
                 transcribeRecording(language)
                   .then(() => {
-                    logger.info('Transcription process initiated successfully');
+                    logger.debug('Transcription process initiated successfully');
                   })
                   .catch(error => {
                     logger.exception('Error during transcription process', error);
@@ -101,7 +101,7 @@ export const useRecording = ({
 
       // Request audio devices refresh using browser API
       try {
-        logger.info('No device selected, requesting microphone access to initialize devices');
+        logger.debug('No device selected, requesting microphone access to initialize devices');
 
         // Request microphone access to get device labels
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });

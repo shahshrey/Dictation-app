@@ -1,31 +1,32 @@
 const { systemPreferences, dialog } = require('electron');
 const { exec } = require('child_process');
+const logger = require('../../shared/logger').default;
 
 // Check for macOS accessibility permissions
 const checkMacOSPermissions = () => {
   if (process.platform === 'darwin') {
-    console.log('Checking macOS accessibility permissions');
+    logger.debug('Checking macOS accessibility permissions');
 
     // Check for screen recording permission (needed for system-wide overlay)
     const hasScreenRecordingPermission = systemPreferences.getMediaAccessStatus('screen');
-    console.log('Screen recording permission status:', hasScreenRecordingPermission);
+    logger.debug('Screen recording permission status:', { status: hasScreenRecordingPermission });
 
     if (hasScreenRecordingPermission !== 'granted') {
-      console.log('Requesting screen recording permission');
+      logger.debug('Requesting screen recording permission');
       try {
         // This will prompt the user for permission
         systemPreferences.askForMediaAccess('screen');
       } catch (error) {
-        console.error('Error requesting screen recording permission:', error);
+        logger.error('Error requesting screen recording permission:', { error: error.message });
       }
     }
 
     // Check for accessibility permission (needed for system-wide overlay)
     const hasAccessibilityPermission = systemPreferences.isTrustedAccessibilityClient(false);
-    console.log('Accessibility permission status:', hasAccessibilityPermission);
+    logger.debug('Accessibility permission status:', { status: hasAccessibilityPermission });
 
     if (!hasAccessibilityPermission) {
-      console.log('App needs accessibility permission for system-wide overlay');
+      logger.debug('App needs accessibility permission for system-wide overlay');
       dialog
         .showMessageBox({
           type: 'info',
@@ -46,7 +47,7 @@ const checkMacOSPermissions = () => {
           }
         })
         .catch(error => {
-          console.error('Error showing permission dialog:', error);
+          logger.error('Error showing permission dialog:', { error: error.message });
         });
     }
   }

@@ -13,10 +13,8 @@ if (!fs.existsSync(distDir)) {
 async function buildFiles() {
   try {
     // Process Tailwind CSS first
-    console.log('Processing Tailwind CSS...');
     try {
       execSync('npx tailwindcss -i ./src/renderer/styles/globals.css -o ./dist/renderer/tailwind.css');
-      console.log('Tailwind CSS processed successfully!');
     } catch (error) {
       console.error('Failed to process Tailwind CSS:', error);
       process.exit(1);
@@ -56,46 +54,37 @@ async function buildFiles() {
     };
 
     // Build the main process file
-    console.log('Building main process...');
     const mainEntryPath = path.resolve(__dirname, 'src/main/index.js');
-    console.log('Main entry path:', mainEntryPath);
     await build({
       ...commonBuildOptions,
       entryPoints: [mainEntryPath],
       outdir: path.join(__dirname, 'dist/main'),
       platform: 'node',
     });
-    console.log('Main process built successfully!');
 
     // Build the preload script
-    console.log('Building preload script...');
     await build({
       ...commonBuildOptions,
       entryPoints: [path.join(__dirname, 'src/preload/preload.ts')],
       outdir: path.join(__dirname, 'dist/preload'),
       platform: 'node',
     });
-    console.log('Preload script built successfully!');
 
     // Build the main renderer file
-    console.log('Building renderer...');
     await build({
       ...commonBuildOptions,
       entryPoints: [path.join(__dirname, 'src/renderer/index.tsx')],
       outdir: path.join(__dirname, 'dist/renderer'),
       plugins: [cssPlugin],
     });
-    console.log('Renderer built successfully!');
 
     // Build the popup file
-    console.log('Building popup...');
     await build({
       ...commonBuildOptions,
       entryPoints: [path.join(__dirname, 'src/renderer/popup.tsx')],
       outdir: path.join(__dirname, 'dist/renderer'),
       plugins: [cssPlugin],
     });
-    console.log('Popup built successfully!');
 
     // Copy HTML files
     fs.copyFileSync(
@@ -129,7 +118,6 @@ async function buildFiles() {
     );
     fs.writeFileSync(path.join(__dirname, 'dist/popup.html'), popupHtml);
 
-    console.log('Build completed successfully!');
   } catch (error) {
     console.error('Build failed:', error);
     process.exit(1);

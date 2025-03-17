@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { AudioDevice, IPC_CHANNELS } from '../../shared/types';
 import { AUDIO_SETTINGS } from '../../shared/constants';
+import logger from '../../shared/logger';
 
 // Define constants for audio recording
 const TEMP_DIR = path.join(os.tmpdir(), 'dictation-app');
@@ -15,7 +16,7 @@ try {
     fs.mkdirSync(TEMP_DIR, { recursive: true });
   }
 } catch (error) {
-  console.error('Failed to create temp directory:', error);
+  logger.error('Failed to create temp directory:', { error: (error as Error).message });
 }
 
 /**
@@ -39,7 +40,7 @@ export const setupAudioRecording = (ipcMain: IpcMain, mainWindow: BrowserWindow 
       // via a separate IPC channel (AUDIO_DEVICES_RESULT)
       return { success: true };
     } catch (error) {
-      console.error('Failed to request audio devices:', error);
+      logger.error('Failed to request audio devices:', { error: (error as Error).message });
       return { success: false, error: String(error) };
     }
   });
@@ -53,7 +54,7 @@ export const setupAudioRecording = (ipcMain: IpcMain, mainWindow: BrowserWindow 
         mainWindow.webContents.send(IPC_CHANNELS.AUDIO_DEVICES_RESULT, devices);
       }
     } catch (error) {
-      console.error('Error handling audio devices result:', error);
+      logger.error('Error handling audio devices result:', { error: (error as Error).message });
     }
   });
 
@@ -67,7 +68,7 @@ export const setupAudioRecording = (ipcMain: IpcMain, mainWindow: BrowserWindow 
       }
       return { success: false, error: 'Main window not available' };
     } catch (error) {
-      console.error('Failed to start recording:', error);
+      logger.error('Failed to start recording:', { error: (error as Error).message });
       return { success: false, error: String(error) };
     }
   });
@@ -84,7 +85,7 @@ export const setupAudioRecording = (ipcMain: IpcMain, mainWindow: BrowserWindow 
       fs.writeFileSync(AUDIO_FILE_PATH, buffer, { encoding: 'binary' });
       return { success: true, filePath: AUDIO_FILE_PATH };
     } catch (error) {
-      console.error('Failed to save recording:', error);
+      logger.error('Failed to save recording:', { error: (error as Error).message });
       return { success: false, error: String(error) };
     }
   });
@@ -94,7 +95,7 @@ export const setupAudioRecording = (ipcMain: IpcMain, mainWindow: BrowserWindow 
     try {
       return AUDIO_FILE_PATH;
     } catch (error) {
-      console.error('Failed to get recording path:', error);
+      logger.error('Failed to get recording path:', { error: (error as Error).message });
       return null;
     }
   });

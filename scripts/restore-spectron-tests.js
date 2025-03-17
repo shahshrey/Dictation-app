@@ -47,20 +47,20 @@ function restoreBackup() {
 
 // Main function
 function main() {
-  logger.info('Restoring Spectron tests to original state...');
+  logger.debug('Restoring Spectron tests to original state...');
   
   // Restore the backup
   if (!restoreBackup()) {
     return;
   }
   
-  logger.info('');
-  logger.info('Spectron tests have been restored to their original state (skipped).');
-  logger.info('');
-  logger.info('To enable Spectron tests again, run:');
-  logger.info('');
-  logger.info(`  ${COLORS.CYAN}node scripts/prepare-spectron-tests.js${COLORS.RESET}`);
-  logger.info('');
+  logger.debug('');
+  logger.debug('Spectron tests have been restored to their original state (skipped).');
+  logger.debug('');
+  logger.debug('To enable Spectron tests again, run:');
+  logger.debug('');
+  logger.debug(`  ${COLORS.CYAN}node scripts/prepare-spectron-tests.js${COLORS.RESET}`);
+  logger.debug('');
 }
 
 // Run the main function

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AudioDevice } from '../../shared/types';
-import { logger } from '../utils/logger';
+import logger from '../../shared/logger';
 
 export const useAudioDevices = () => {
   const [audioDevices, setAudioDevices] = useState<AudioDevice[]>([]);
@@ -9,7 +9,7 @@ export const useAudioDevices = () => {
   // Refresh audio devices
   const refreshAudioDevices = async (): Promise<void> => {
     try {
-      logger.info('Refreshing audio devices...');
+      logger.debug('Refreshing audio devices...');
 
       // Use the Web Audio API to enumerate devices directly in the renderer
       const mappedDevices: AudioDevice[] = [];

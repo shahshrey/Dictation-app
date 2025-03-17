@@ -3,10 +3,11 @@ import { createRoot } from 'react-dom/client';
 import DictationPopup from './components/features/dictation/DictationPopup';
 import { AppContextProvider } from './context/AppContext';
 import { ThemeProvider } from './components/layout/theme-provider';
+import { logger } from './shared/logger';
 // Import the CSS directly
 import './styles/globals.css';
 
-console.log('Popup window started');
+logger.debug('Popup window started');
 
 // Get the root element
 const rootElement = document.getElementById('root');

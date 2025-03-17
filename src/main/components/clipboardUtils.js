@@ -1,11 +1,11 @@
 const { clipboard } = require('electron');
 const { exec } = require('child_process');
-const { logger } = require('./constants');
+const logger = require('../../shared/logger').default;
 
 // Function to paste text at the current cursor position
 const pasteTextAtCursor = async text => {
   try {
-    logger.info('Attempting to paste text at cursor position');
+    logger.debug('Attempting to paste text at cursor position');
     logger.debug(
       `Text to paste (first 50 chars): ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`
     );
@@ -28,7 +28,7 @@ const pasteTextAtCursor = async text => {
           if (error) {
             logger.exception('Error executing AppleScript paste command', error);
           } else {
-            logger.info('Successfully pasted text at cursor position');
+            logger.debug('Successfully pasted text at cursor position');
           }
 
           // Restore the original clipboard content after a short delay
@@ -47,7 +47,7 @@ const pasteTextAtCursor = async text => {
           if (error) {
             logger.exception('Error executing PowerShell paste command', error);
           } else {
-            logger.info('Successfully pasted text at cursor position');
+            logger.debug('Successfully pasted text at cursor position');
           }
 
           // Restore the original clipboard content after a short delay

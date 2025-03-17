@@ -2,6 +2,7 @@ import { IpcMain, app } from 'electron';
 import { Groq } from 'groq-sdk';
 import * as fs from 'fs';
 import * as path from 'path';
+import logger from '../../shared/logger';
 
 // Initialize Groq client
 let groqClient: Groq | null = null;
@@ -26,7 +27,7 @@ const initGroqClient = (apiKey: string): Groq => {
 
     return groqClient;
   } catch (error) {
-    console.error('Failed to initialize Groq client:', error);
+    logger.error('Failed to initialize Groq client:', { error: (error as Error).message });
     throw new Error('Failed to initialize Groq client');
   }
 };
@@ -36,18 +37,20 @@ const initGroqClient = (apiKey: string): Groq => {
  * @param ipcMain Electron IPC main instance
  */
 export const setupGroqAPI = (ipcMain: IpcMain): void => {
-  console.log('Setting up Groq API handlers...');
+  logger.debug('Setting up Groq API handlers...');
 
   // Check if ipcMain is valid
-  console.log('ipcMain object type:', typeof ipcMain);
-  console.log('ipcMain.handle method available:', typeof ipcMain.handle === 'function');
+  logger.debug('ipcMain object type:', { type: typeof ipcMain });
+  logger.debug('ipcMain.handle method available:', {
+    available: typeof ipcMain.handle === 'function',
+  });
 
   // Transcribe audio file
-  console.log('Registering transcribe-audio handler...');
+  logger.debug('Registering transcribe-audio handler...');
   ipcMain.handle(
     'transcribe-audio',
     async (_, filePath: string, options: { language?: string; apiKey?: string }) => {
-      console.log('transcribe-audio handler called with filePath:', filePath);
+      logger.debug('transcribe-audio handler called with filePath:', { filePath });
       try {
         const apiKey = options.apiKey ?? '';
         const client = initGroqClient(apiKey);
@@ -70,7 +73,7 @@ export const setupGroqAPI = (ipcMain: IpcMain): void => {
           language: options.language ?? 'auto',
         };
       } catch (error) {
-        console.error('Failed to transcribe audio:', error);
+        logger.error('Failed to transcribe audio:', { error: (error as Error).message });
         return {
           success: false,
           error: error instanceof Error ? error.message : String(error),
@@ -80,9 +83,9 @@ export const setupGroqAPI = (ipcMain: IpcMain): void => {
   );
 
   // Translate audio file
-  console.log('Registering translate-audio handler...');
+  logger.debug('Registering translate-audio handler...');
   ipcMain.handle('translate-audio', async (_, filePath: string, options: { apiKey?: string }) => {
-    console.log('translate-audio handler called with filePath:', filePath);
+    logger.debug('translate-audio handler called with filePath:', { filePath });
     try {
       const apiKey = options.apiKey ?? '';
       const client = initGroqClient(apiKey);
@@ -103,7 +106,7 @@ export const setupGroqAPI = (ipcMain: IpcMain): void => {
         text: translation.text,
       };
     } catch (error) {
-      console.error('Failed to translate audio:', error);
+      logger.error('Failed to translate audio:', { error: (error as Error).message });
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),
@@ -112,11 +115,13 @@ export const setupGroqAPI = (ipcMain: IpcMain): void => {
   });
 
   // Transcribe the most recent recording
-  console.log('Registering transcribe-recording handler...');
+  logger.debug('Registering transcribe-recording handler...');
   try {
     ipcMain.handle('transcribe-recording', async (_, language: string, apiKey: string) => {
-      console.log('Main process: transcribe-recording handler called with language:', language);
-      console.log('Main process: API key available:', !!apiKey);
+      logger.debug('Main process: transcribe-recording handler called with language:', {
+        language,
+      });
+      logger.debug('Main process: API key available:', { available: !!apiKey });
 
       try {
         const client = initGroqClient(apiKey);
@@ -187,7 +192,7 @@ export const setupGroqAPI = (ipcMain: IpcMain): void => {
         const duration = Math.floor(
           (fileStats.mtime.getTime() - fileStats.birthtime.getTime()) / 1000
         );
-        console.log('transcription:', transcription);
+        logger.debug('transcription:', { text: transcription.text });
         return {
           success: true,
           id,
@@ -197,7 +202,7 @@ export const setupGroqAPI = (ipcMain: IpcMain): void => {
           language,
         };
       } catch (error) {
-        console.error('Failed to transcribe recording:', error);
+        logger.error('Failed to transcribe recording:', { error: (error as Error).message });
         return {
           success: false,
           error: error instanceof Error ? error.message : String(error),
@@ -208,14 +213,16 @@ export const setupGroqAPI = (ipcMain: IpcMain): void => {
         };
       }
     });
-    console.log('transcribe-recording handler registered successfully');
+    logger.debug('transcribe-recording handler registered successfully');
   } catch (error) {
-    console.error('Error registering transcribe-recording handler:', error);
+    logger.error('Error registering transcribe-recording handler:', {
+      error: (error as Error).message,
+    });
   }
 
   // Log all registered IPC handlers for debugging
-  console.log('Groq API handlers registered. Current IPC handlers:');
+  logger.debug('Groq API handlers registered. Current IPC handlers:');
   const events = (ipcMain as { _events?: Record<string, unknown> })._events;
   const registeredChannels = events ? Object.keys(events) : [];
-  console.log(registeredChannels);
+  logger.debug('Registered IPC channels:', { channels: registeredChannels });
 };

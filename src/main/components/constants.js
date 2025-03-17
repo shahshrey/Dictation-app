@@ -6,22 +6,6 @@ const TEMP_DIR = path.join(os.tmpdir(), 'dictation-app');
 const AUDIO_FILE_PATH = path.join(TEMP_DIR, 'recording.webm');
 const DEFAULT_SAVE_DIR = path.join(os.homedir(), 'Documents', 'Dictation App');
 
-// Define logger
-const logger = {
-  info: message => {
-    console.log(`[INFO] ${message}`);
-  },
-  error: (message, error) => {
-    console.error(`[ERROR] ${message}`, error);
-  },
-  debug: message => {
-    console.log(`[DEBUG] ${message}`);
-  },
-  exception: (message, error) => {
-    console.error(`[EXCEPTION] ${message}`, error);
-  },
-};
-
 // Define Groq API models
 const GROQ_MODELS = {
   TRANSCRIPTION: {
@@ -45,7 +29,6 @@ module.exports = {
   TEMP_DIR,
   AUDIO_FILE_PATH,
   DEFAULT_SAVE_DIR,
-  logger,
   GROQ_MODELS,
   DEFAULT_SETTINGS
 }; 

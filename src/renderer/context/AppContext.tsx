@@ -4,7 +4,7 @@ import { useSettings } from '../hooks/useSettings';
 import { useAudioDevices } from '../hooks/useAudioDevices';
 import { useTranscriptions } from '../hooks/useTranscriptions';
 import { useRecording } from '../hooks/useRecording';
-import { logger } from '../utils/logger';
+import logger from '../../shared/logger';
 
 // Define types for our context
 interface AppContextType {
@@ -66,7 +66,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
       try {
         // Load settings first
         await loadSettings();
-        logger.info('Settings loaded');
+        logger.debug('Settings loaded');
         logger.debug(`Settings: ${JSON.stringify(settings, null, 2)}`);
         logger.debug(`API key available: ${!!settings.apiKey}`);
         logger.debug(`Auto-transcribe enabled: ${settings.autoTranscribe}`);

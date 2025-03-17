@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { Transcription } from '../../shared/types';
+import logger from '../../shared/logger';
 
 // Define constants for file storage
 const DEFAULT_SAVE_DIR = path.join(os.homedir(), 'Documents', 'Dictation App');
@@ -15,7 +16,7 @@ try {
     fs.mkdirSync(DEFAULT_SAVE_DIR, { recursive: true });
   }
 } catch (error) {
-  console.error('Failed to create save directory:', error);
+  logger.error('Failed to create save directory:', { error: (error as Error).message });
 }
 
 // Helper function to read transcriptions from JSON file
@@ -30,7 +31,7 @@ const readTranscriptionsFromJson = (): Transcription[] => {
     const data = fs.readFileSync(TRANSCRIPTIONS_JSON, { encoding: 'utf-8' });
     return JSON.parse(data) as Transcription[];
   } catch (error) {
-    console.error('Failed to read transcriptions from JSON:', error);
+    logger.error('Failed to read transcriptions from JSON:', { error: (error as Error).message });
     return [];
   }
 };
@@ -43,7 +44,7 @@ const writeTranscriptionsToJson = (transcriptions: Transcription[]): boolean => 
     });
     return true;
   } catch (error) {
-    console.error('Failed to write transcriptions to JSON:', error);
+    logger.error('Failed to write transcriptions to JSON:', { error: (error as Error).message });
     return false;
   }
 };
@@ -64,40 +65,42 @@ const saveTranscriptionToJson = (transcription: Transcription): boolean => {
 
     return writeTranscriptionsToJson(transcriptions);
   } catch (error) {
-    console.error('Failed to save transcription to JSON:', error);
+    logger.error('Failed to save transcription to JSON:', { error: (error as Error).message });
     return false;
   }
 };
 
 export const setupFileStorage = (ipcMain: IpcMain): void => {
-  console.log('Setting up file storage handlers...');
+  logger.debug('Setting up file storage handlers...');
 
   // Check if ipcMain is valid
-  console.log('ipcMain object type:', typeof ipcMain);
-  console.log('ipcMain.handle method available:', typeof ipcMain.handle === 'function');
+  logger.debug('ipcMain object type:', { type: typeof ipcMain });
+  logger.debug('ipcMain.handle method available:', {
+    available: typeof ipcMain.handle === 'function',
+  });
 
   // Save transcription to JSON
-  console.log('Registering save-transcription handler...');
+  logger.debug('Registering save-transcription handler...');
   ipcMain.handle(
     'save-transcription',
     async (_, transcription: Transcription, _options: { filename?: string; format?: string }) => {
-      console.log('save-transcription handler called');
+      logger.debug('save-transcription handler called');
       try {
         // Save to JSON database
         const jsonSaved = saveTranscriptionToJson(transcription);
 
         return { success: true, jsonSaved };
       } catch (error) {
-        console.error('Failed to save transcription:', error);
+        logger.error('Failed to save transcription:', { error: (error as Error).message });
         return { success: false, error: String(error) };
       }
     }
   );
 
   // Save transcription with file dialog (JSON only)
-  console.log('Registering save-transcription-as handler...');
+  logger.debug('Registering save-transcription-as handler...');
   ipcMain.handle('save-transcription-as', async (_, transcription: Transcription) => {
-    console.log('save-transcription-as handler called');
+    logger.debug('save-transcription-as handler called');
     try {
       // Save to JSON database first
       saveTranscriptionToJson(transcription);
@@ -134,15 +137,15 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
 
       return { success: true, filePath };
     } catch (error) {
-      console.error('Failed to save transcription:', error);
+      logger.error('Failed to save transcription:', { error: (error as Error).message });
       return { success: false, error: String(error) };
     }
   });
 
   // Get recent transcriptions
-  console.log('Registering get-recent-transcriptions handler...');
+  logger.debug('Registering get-recent-transcriptions handler...');
   ipcMain.handle('get-recent-transcriptions', async () => {
-    console.log('get-recent-transcriptions handler called');
+    logger.debug('get-recent-transcriptions handler called');
     try {
       // Get transcriptions from JSON
       const jsonTranscriptions = readTranscriptionsFromJson();
@@ -152,13 +155,13 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
         transcriptions: jsonTranscriptions.sort((a, b) => b.timestamp - a.timestamp).slice(0, 10),
       };
     } catch (error) {
-      console.error('Failed to get recent transcriptions:', error);
+      logger.error('Failed to get recent transcriptions:', { error: (error as Error).message });
       return { success: false, error: String(error) };
     }
   });
 
   // Add handler for get-transcriptions
-  console.log('Registering get-transcriptions handler...');
+  logger.debug('Registering get-transcriptions handler...');
   try {
     ipcMain.handle('get-transcriptions', async () => {
       try {
@@ -166,18 +169,20 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
         const jsonTranscriptions = readTranscriptionsFromJson();
         return jsonTranscriptions.sort((a, b) => b.timestamp - a.timestamp);
       } catch (error) {
-        console.error('Failed to get transcriptions:', error);
+        logger.error('Failed to get transcriptions:', { error: (error as Error).message });
         return [];
       }
     });
   } catch (error) {
-    console.error('Failed to register get-transcriptions handler:', error);
+    logger.error('Failed to register get-transcriptions handler:', {
+      error: (error as Error).message,
+    });
   }
 
   // Get a single transcription by ID
-  console.log('Registering get-transcription handler...');
+  logger.debug('Registering get-transcription handler...');
   ipcMain.handle('get-transcription', async (_, id: string) => {
-    console.log(`get-transcription handler called for ID: ${id}`);
+    logger.debug('get-transcription handler called for ID:', { id });
     try {
       // Find in JSON database
       const transcriptions = readTranscriptionsFromJson();
@@ -189,15 +194,15 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
 
       return { success: false, error: 'Transcription not found' };
     } catch (error) {
-      console.error('Failed to get transcription:', error);
+      logger.error('Failed to get transcription:', { error: (error as Error).message });
       return { success: false, error: String(error) };
     }
   });
 
   // Delete a transcription by ID
-  console.log('Registering delete-transcription handler...');
+  logger.debug('Registering delete-transcription handler...');
   ipcMain.handle('delete-transcription', async (_, id: string) => {
-    console.log(`delete-transcription handler called for ID: ${id}`);
+    logger.debug('delete-transcription handler called for ID:', { id });
     try {
       // Remove from JSON database
       const transcriptions = readTranscriptionsFromJson();
@@ -210,19 +215,19 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
 
       return { success: false, error: 'Transcription not found' };
     } catch (error) {
-      console.error('Failed to delete transcription:', error);
+      logger.error('Failed to delete transcription:', { error: (error as Error).message });
       return { success: false, error: String(error) };
     }
   });
 
   // Log all registered IPC handlers for debugging
-  console.log('File storage handlers registered. Current IPC handlers:');
+  logger.debug('File storage handlers registered. Current IPC handlers:');
   try {
     const events = (ipcMain as { _events?: Record<string, unknown> })._events;
     const registeredChannels = events ? Object.keys(events) : [];
-    console.log(registeredChannels);
+    logger.debug('Registered IPC channels:', { channels: registeredChannels });
   } catch (error) {
-    console.error('Error getting registered IPC handlers:', error);
-    console.log([]);
+    logger.error('Error getting registered IPC handlers:', { error: (error as Error).message });
+    logger.debug('No registered IPC channels found');
   }
 };

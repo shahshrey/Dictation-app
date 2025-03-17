@@ -7,6 +7,7 @@ import { Label } from '../../ui/label';
 import { Input } from '../../ui/input';
 import { AudioDevice } from '../../../../shared/types';
 import HotkeyInput from './HotkeyInput';
+import { logger } from '../../../shared/logger';
 
 const SettingsPanel: React.FC = () => {
   const {
@@ -128,7 +129,7 @@ const SettingsPanel: React.FC = () => {
             onClick={() => {
               // This would be handled by the main process
               // to show a directory picker
-              console.log('Browse button clicked - would open directory picker in production');
+              logger.debug('Browse button clicked - would open directory picker in production');
               // In a real implementation, we would call the main process
               // to show a directory picker dialog
             }}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { AppSettings } from '../../shared/types';
 import { DEFAULT_SETTINGS } from '../../shared/constants';
-import { logger } from '../utils/logger';
+import logger from '../../shared/logger';
 
 export const useSettings = () => {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -9,7 +9,7 @@ export const useSettings = () => {
   // Load settings
   const loadSettings = async (): Promise<void> => {
     try {
-      logger.info('Loading settings...');
+      logger.debug('Loading settings...');
       if (window.electronAPI && typeof window.electronAPI.getSettings === 'function') {
         const loadedSettings = await window.electronAPI.getSettings();
         logger.debug(
@@ -49,14 +49,14 @@ export const useSettings = () => {
   const updateSettings = async (newSettings: Partial<AppSettings>): Promise<void> => {
     try {
       const updatedSettings = { ...settings, ...newSettings };
-      logger.info('Updating settings...');
+      logger.debug('Updating settings...');
       logger.debug(`Updated settings: ${JSON.stringify(updatedSettings, null, 2)}`);
 
       setSettings(updatedSettings);
 
       if (window.electronAPI && typeof window.electronAPI.saveSettings === 'function') {
         await window.electronAPI.saveSettings(updatedSettings);
-        logger.info('Settings saved successfully');
+        logger.debug('Settings saved successfully');
       } else {
         logger.warn('saveSettings API not available, settings not persisted');
       }

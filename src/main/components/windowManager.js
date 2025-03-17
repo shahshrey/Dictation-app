@@ -1,5 +1,6 @@
 const { BrowserWindow, app } = require('electron');
 const path = require('path');
+const logger = require('../../shared/logger').default;
 
 // Global reference to the main window
 let mainWindow = null;
@@ -10,10 +11,10 @@ let popupWindow = null;
 let isRecording = false;
 
 const createWindow = () => {
-  console.log('createWindow called');
+  logger.debug('createWindow called');
 
   try {
-    console.log('Creating main browser window');
+    logger.debug('Creating main browser window');
     // Create the browser window.
     const mainWindow = new BrowserWindow({
       width: 800,
@@ -30,41 +31,41 @@ const createWindow = () => {
     // IMPORTANT: Store the window in the global state
     global.mainWindow = mainWindow;
     
-    console.log('Main window created successfully');
+    logger.debug('Main window created successfully');
 
-    console.log('Loading index.html file');
+    logger.debug('Loading index.html file');
     // Load the index.html file
     mainWindow.loadFile(path.join(app.getAppPath(), 'dist/index.html'));
 
     // Open DevTools in development mode
     if (process.env.NODE_ENV === 'development') {
-      console.log('Opening DevTools');
+      logger.debug('Opening DevTools');
       mainWindow.webContents.openDevTools();
     }
 
     // Add event listeners to track window state
     mainWindow.on('close', () => {
-      console.log('Main window close event triggered');
+      logger.debug('Main window close event triggered');
     });
 
     mainWindow.on('closed', () => {
-      console.log('Main window closed event triggered');
+      logger.debug('Main window closed event triggered');
       global.mainWindow = null;
     });
 
     mainWindow.on('focus', () => {
-      console.log('Main window focus event triggered');
+      logger.debug('Main window focus event triggered');
     });
 
     mainWindow.on('blur', () => {
-      console.log('Main window blur event triggered');
+      logger.debug('Main window blur event triggered');
     });
 
-    console.log('Main window setup complete');
+    logger.debug('Main window setup complete');
 
     return mainWindow;
   } catch (error) {
-    console.error('Error creating main window:', error);
+    logger.error('Error creating main window:', { error: error.message });
     return null;
   }
 };
@@ -72,7 +73,7 @@ const createWindow = () => {
 // After creating the popup window, set additional properties to hide it from dock
 const hidePopupFromDock = () => {
   if (popupWindow && process.platform === 'darwin') {
-    console.log('Setting additional properties to hide popup from dock');
+    logger.debug('Setting additional properties to hide popup from dock');
     try {
       // Set additional properties to hide from dock and app switcher
       popupWindow.setSkipTaskbar(true);
@@ -95,19 +96,19 @@ const hidePopupFromDock = () => {
         });
       }
 
-      console.log('Successfully set additional properties to hide popup from dock');
+      logger.debug('Successfully set additional properties to hide popup from dock');
     } catch (error) {
-      console.error('Error setting additional properties to hide popup from dock:', error);
+      logger.error('Error setting additional properties to hide popup from dock:', { error: error.message });
     }
   }
 };
 
 // Create a popup window for dictation
 const createPopupWindow = () => {
-  console.log('createPopupWindow called');
+  logger.debug('createPopupWindow called');
 
   try {
-    console.log('Creating popup window with system-wide overlay settings');
+    logger.debug('Creating popup window with system-wide overlay settings');
     // Create the popup window as a system-wide overlay
     const popupWindow = new BrowserWindow({
       width: 180, // Smaller width for the pill
@@ -143,23 +144,23 @@ const createPopupWindow = () => {
     // IMPORTANT: Store the window in the global state
     global.popupWindow = popupWindow;
     
-    console.log('Popup window created successfully');
+    logger.debug('Popup window created successfully');
 
     // Set additional properties to hide from dock
     hidePopupFromDock();
 
-    console.log('Loading popup HTML file');
+    logger.debug('Loading popup HTML file');
     // Load the popup HTML file
     popupWindow.loadFile(path.join(app.getAppPath(), 'dist/popup.html'));
 
-    console.log('Getting primary display dimensions');
+    logger.debug('Getting primary display dimensions');
     // Position the popup window in the bottom right corner
     const { width, height } = require('electron').screen.getPrimaryDisplay().workAreaSize;
-    console.log('Primary display dimensions:', width, 'x', height);
-    console.log('Positioning popup window at:', width - 200, height - 100);
+    logger.debug('Primary display dimensions:', width, 'x', height);
+    logger.debug('Positioning popup window at:', width - 200, height - 100);
     popupWindow.setPosition(width - 200, height - 100);
 
-    console.log('Setting popup window to be visible on all workspaces');
+    logger.debug('Setting popup window to be visible on all workspaces');
     // Make sure it's visible on all workspaces and full screen
     if (typeof popupWindow.setVisibleOnAllWorkspaces === 'function') {
       popupWindow.setVisibleOnAllWorkspaces(true, {
@@ -178,80 +179,80 @@ const createPopupWindow = () => {
       }
     }
 
-    console.log('Setting popup window to ignore mouse events by default');
+    logger.debug('Setting popup window to ignore mouse events by default');
     // Make the window non-interactive when not hovered
     // This allows clicks to pass through to the application underneath
     popupWindow.setIgnoreMouseEvents(true, { forward: true });
 
-    console.log('Setting up mouse event handlers for the popup window');
+    logger.debug('Setting up mouse event handlers for the popup window');
     // But enable mouse events when hovering over the window
     popupWindow.webContents.on('did-finish-load', () => {
-      console.log('Popup window finished loading, setting up mouse event handlers');
+      logger.debug('Popup window finished loading, setting up mouse event handlers');
       try {
         popupWindow.webContents.executeJavaScript(`
           document.addEventListener('mouseover', () => {
-            console.log('Mouse over popup window, enabling mouse events');
+            logger.debug('Mouse over popup window, enabling mouse events');
             window.electronAPI.setIgnoreMouseEvents(false);
           });
           
           document.addEventListener('mouseout', () => {
-            console.log('Mouse out of popup window, disabling mouse events');
+            logger.debug('Mouse out of popup window, disabling mouse events');
             window.electronAPI.setIgnoreMouseEvents(true, { forward: true });
           });
         `);
-        console.log('Mouse event handlers set up successfully');
+        logger.debug('Mouse event handlers set up successfully');
       } catch (error) {
-        console.error('Error setting up mouse event handlers:', error);
+        logger.error('Error setting up mouse event handlers:', { error: error.message });
       }
     });
 
     // Add event listeners to track window state
     popupWindow.on('close', () => {
-      console.log('Popup window close event triggered');
+      logger.debug('Popup window close event triggered');
     });
 
     popupWindow.on('closed', () => {
-      console.log('Popup window closed event triggered');
+      logger.debug('Popup window closed event triggered');
       global.popupWindow = null;
     });
 
     popupWindow.on('show', () => {
-      console.log('Popup window show event triggered');
+      logger.debug('Popup window show event triggered');
     });
 
     popupWindow.on('hide', () => {
-      console.log('Popup window hide event triggered');
+      logger.debug('Popup window hide event triggered');
     });
 
-    console.log('Popup window setup complete');
+    logger.debug('Popup window setup complete');
 
     return popupWindow;
   } catch (error) {
-    console.error('Error creating popup window:', error);
+    logger.error('Error creating popup window:', { error: error.message });
     return null;
   }
 };
 
 // Show the popup window - always show it when the app starts
 const showPopupWindow = () => {
-  console.log('showPopupWindow called');
+  logger.debug('showPopupWindow called');
 
   if (!global.popupWindow) {
-    console.log('No popup window exists, creating one');
+    logger.debug('No popup window exists, creating one');
     createPopupWindow();
   }
 
   if (global.popupWindow) {
     if (global.popupWindow.isDestroyed()) {
-      console.log('Popup window is destroyed, creating a new one');
+      logger.debug('Popup window is destroyed, creating a new one');
       createPopupWindow();
     }
 
     if (!global.popupWindow.isVisible()) {
-      console.log('Showing popup window');
+      logger.debug('Showing popup window');
       try {
         global.popupWindow.show();
-        console.log('Popup window shown successfully');
+        logger.debug('Popup window shown successfully');
 
         // Ensure it's always on top and visible on all workspaces
         global.popupWindow.setAlwaysOnTop(true, 'screen-saver');
@@ -269,23 +270,23 @@ const showPopupWindow = () => {
           }
         }
       } catch (error) {
-        console.error('Error showing popup window:', error);
+        logger.error('Error showing popup window:', { error: error.message });
       }
     } else {
-      console.log('Popup window is already visible');
+      logger.debug('Popup window is already visible');
     }
   } else {
-    console.error('Failed to create popup window');
+    logger.error('Failed to create popup window');
   }
 };
 
 // Hide the popup window - we'll keep this for potential future use
 const hidePopupWindow = () => {
-  console.log('hidePopupWindow called');
+  logger.debug('hidePopupWindow called');
 
   if (global.popupWindow) {
     if (!global.popupWindow.isDestroyed()) {
-      console.log('Updating popup window to show not recording state');
+      logger.debug('Updating popup window to show not recording state');
       try {
         // Instead of hiding, we'll just update the UI to show not recording
         // The actual UI update is handled by the renderer process based on isRecording state
@@ -305,22 +306,22 @@ const hidePopupWindow = () => {
           }
         }
 
-        console.log('Popup window updated to not recording state');
+        logger.debug('Popup window updated to not recording state');
       } catch (error) {
-        console.error('Error updating popup window:', error);
+        logger.error('Error updating popup window:', { error: error.message });
       }
     } else {
-      console.log('Popup window is destroyed, cannot update');
+      logger.debug('Popup window is destroyed, cannot update');
     }
   } else {
-    console.log('No popup window to update');
+    logger.debug('No popup window to update');
   }
 };
 
 // Set up the dock menu for macOS
 const setupDockMenu = () => {
   if (process.platform === 'darwin') {
-    console.log('Setting up dock menu for macOS');
+    logger.debug('Setting up dock menu for macOS');
 
     const dockMenu = [
       {
@@ -328,14 +329,14 @@ const setupDockMenu = () => {
         click: () => {
           if (global.popupWindow && !global.popupWindow.isDestroyed()) {
             if (global.popupWindow.isVisible()) {
-              console.log('Hiding popup window from dock menu');
+              logger.debug('Hiding popup window from dock menu');
               hidePopupWindow();
             } else {
-              console.log('Showing popup window from dock menu');
+              logger.debug('Showing popup window from dock menu');
               showPopupWindow();
             }
           } else {
-            console.log('Creating and showing popup window from dock menu');
+            logger.debug('Creating and showing popup window from dock menu');
             createPopupWindow();
             showPopupWindow();
           }
@@ -344,7 +345,7 @@ const setupDockMenu = () => {
     ];
 
     app.dock.setMenu(require('electron').Menu.buildFromTemplate(dockMenu));
-    console.log('Dock menu set up successfully');
+    logger.debug('Dock menu set up successfully');
   }
 };
 

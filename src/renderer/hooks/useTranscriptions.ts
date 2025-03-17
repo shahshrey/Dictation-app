@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Transcription, AppSettings } from '../../shared/types';
-import { logger } from '../utils/logger';
+import logger from '../../shared/logger';
 
 export const useTranscriptions = (settings: AppSettings) => {
   const [currentTranscription, setCurrentTranscription] = useState<Transcription | null>(null);
@@ -40,7 +40,7 @@ export const useTranscriptions = (settings: AppSettings) => {
       return false;
     }
 
-    logger.info('Calling getTranscriptions IPC method...');
+    logger.debug('Calling getTranscriptions IPC method...');
     try {
       const transcriptions = await window.electronAPI.getTranscriptions();
 
@@ -61,7 +61,7 @@ export const useTranscriptions = (settings: AppSettings) => {
       return false;
     }
 
-    logger.info('Falling back to getRecentTranscriptions IPC method...');
+    logger.debug('Falling back to getRecentTranscriptions IPC method...');
     try {
       const result = await window.electronAPI.getRecentTranscriptions();
       logger.debug(`Recent transcriptions result: ${JSON.stringify(result, null, 2)}`);
@@ -89,7 +89,7 @@ export const useTranscriptions = (settings: AppSettings) => {
   // Refresh recent transcriptions
   const refreshRecentTranscriptions = async (): Promise<void> => {
     try {
-      logger.info('Attempting to refresh recent transcriptions...');
+      logger.debug('Attempting to refresh recent transcriptions...');
       logger.debug(`electronAPI available: ${!!window.electronAPI}`);
       logger.debug(
         `getTranscriptions method available: ${!!(window.electronAPI && typeof window.electronAPI.getTranscriptions === 'function')}`
@@ -156,7 +156,7 @@ export const useTranscriptions = (settings: AppSettings) => {
   // Transcribe recording
   const transcribeRecording = async (language?: string): Promise<void> => {
     try {
-      logger.info(
+      logger.debug(
         `Attempting to transcribe recording with language: ${language ?? settings.language}`
       );
       logger.debug(`API key available: ${!!settings.apiKey}`);
@@ -178,7 +178,7 @@ export const useTranscriptions = (settings: AppSettings) => {
       }
 
       if (window.electronAPI && typeof window.electronAPI.transcribeRecording === 'function') {
-        logger.info('Calling transcribeRecording IPC method...');
+        logger.debug('Calling transcribeRecording IPC method...');
         try {
           // Log the parameters being sent
           logger.debug(`Sending language: ${language ?? settings.language}`);
@@ -199,7 +199,7 @@ export const useTranscriptions = (settings: AppSettings) => {
           }
 
           if (result.success) {
-            logger.info(`Transcription successful, text length: ${result.text.length}`);
+            logger.debug(`Transcription successful, text length: ${result.text.length}`);
 
             // Calculate word count if not provided
             const wordCount = result.wordCount ?? result.text.split(/\s+/).length;
@@ -222,16 +222,16 @@ export const useTranscriptions = (settings: AppSettings) => {
 
             // Log whether the text was pasted at the cursor
             if (result.pastedAtCursor) {
-              logger.info('Transcribed text was pasted at cursor position');
+              logger.debug('Transcribed text was pasted at cursor position');
             } else {
-              logger.info('Transcribed text was not pasted at cursor position');
+              logger.debug('Transcribed text was not pasted at cursor position');
             }
 
             // Save the transcription to JSON
             if (window.electronAPI && typeof window.electronAPI.saveTranscription === 'function') {
               try {
                 await window.electronAPI.saveTranscription(transcription);
-                logger.info('Transcription saved to JSON database');
+                logger.debug('Transcription saved to JSON database');
               } catch (saveError) {
                 logger.exception('Failed to save transcription to JSON database', saveError);
               }

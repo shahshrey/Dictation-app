@@ -1,6 +1,7 @@
 const { Groq } = require('groq-sdk');
 const fs = require('fs');
 const path = require('path');
+const logger = require('../../shared/logger').default;
 
 // Initialize Groq client
 let groqClient = null;
@@ -13,21 +14,21 @@ const initGroqClient = (apiKey) => {
   try {
     return new Groq({ apiKey });
   } catch (error) {
-    console.error('Failed to initialize Groq client:', error);
+    logger.error('Failed to initialize Groq client:', { error: error.message });
     return null;
   }
 };
 
 // Add a function to handle transcription that doesn't rely on process
 const transcribeRecording = async (language, apiKey) => {
-  global.logger.info('transcribeRecording function called with language: ' + language);
-  global.logger.debug('API key available: ' + !!apiKey);
-  global.logger.debug('API key length: ' + (apiKey ? apiKey.length : 0));
+  logger.debug('transcribeRecording function called with language: ' + language);
+  logger.debug('API key available: ' + !!apiKey);
+  logger.debug('API key length: ' + (apiKey ? apiKey.length : 0));
 
   try {
     // Use the provided API key directly without falling back to settings
     if (!apiKey) {
-      global.logger.error('No API key provided', null);
+      logger.error('No API key provided');
       return {
         success: false,
         error: 'No API key provided',
@@ -38,14 +39,14 @@ const transcribeRecording = async (language, apiKey) => {
       };
     }
 
-    global.logger.info('Initializing Groq client with API key');
+    logger.debug('Initializing Groq client with API key');
     const client = initGroqClient(apiKey);
-    global.logger.debug('Groq client initialized successfully');
+    logger.debug('Groq client initialized successfully');
 
     // Get the path to the most recent recording
-    global.logger.debug('Checking for recording file at: ' + global.AUDIO_FILE_PATH);
+    logger.debug('Checking for recording file at: ' + global.AUDIO_FILE_PATH);
     if (!fs.existsSync(global.AUDIO_FILE_PATH)) {
-      global.logger.error('Recording file not found at ' + global.AUDIO_FILE_PATH, null);
+      logger.error('Recording file not found at ' + global.AUDIO_FILE_PATH);
       return {
         success: false,
         error: 'Recording file not found',
@@ -58,12 +59,12 @@ const transcribeRecording = async (language, apiKey) => {
 
     // Validate the file size
     const fileStats = fs.statSync(global.AUDIO_FILE_PATH);
-    global.logger.debug(`Audio file size: ${fileStats.size} bytes`);
-    global.logger.debug(`Audio file created: ${fileStats.birthtime}`);
-    global.logger.debug(`Audio file modified: ${fileStats.mtime}`);
+    logger.debug(`Audio file size: ${fileStats.size} bytes`);
+    logger.debug(`Audio file created: ${fileStats.birthtime}`);
+    logger.debug(`Audio file modified: ${fileStats.mtime}`);
 
     if (fileStats.size === 0) {
-      global.logger.error('Audio file is empty', null);
+      logger.error('Audio file is empty');
       return {
         success: false,
         error: 'Audio file is empty',
@@ -75,9 +76,9 @@ const transcribeRecording = async (language, apiKey) => {
     }
 
     // Create a read stream for the audio file
-    global.logger.debug('Creating read stream for audio file');
+    logger.debug('Creating read stream for audio file');
     const audioFile = fs.createReadStream(global.AUDIO_FILE_PATH);
-    global.logger.debug('Read stream created successfully');
+    logger.debug('Read stream created successfully');
 
     // Choose the appropriate model based on language
     let model =
@@ -85,12 +86,12 @@ const transcribeRecording = async (language, apiKey) => {
         ? global.GROQ_MODELS.TRANSCRIPTION.ENGLISH
         : global.GROQ_MODELS.TRANSCRIPTION.MULTILINGUAL;
 
-    global.logger.info(
+    logger.debug(
       `Using Groq model: ${model} for transcription with language: ${language || 'en'}`
     );
 
     // Transcribe the audio
-    global.logger.info('Calling Groq API for transcription...');
+    logger.debug('Calling Groq API for transcription...');
     try {
       // Create the API request parameters
       const transcriptionParams = {
@@ -109,8 +110,8 @@ const transcribeRecording = async (language, apiKey) => {
 
       const transcription = await client.audio.transcriptions.create(transcriptionParams);
 
-      global.logger.info('Transcription successful, text length: ' + transcription.text.length);
-      global.logger.debug('Transcription text: ' + transcription.text.substring(0, 100) + '...');
+      logger.debug('Transcription successful, text length: ' + transcription.text.length);
+      logger.debug('Transcription text: ' + transcription.text.substring(0, 100) + '...');
 
       // Generate a unique ID for the transcription
       const id = `transcription-${Date.now()}`;
@@ -130,7 +131,7 @@ const transcribeRecording = async (language, apiKey) => {
 
         // Ensure the save directory exists
         if (!fs.existsSync(global.DEFAULT_SAVE_DIR)) {
-          global.logger.debug(`Creating save directory: ${global.DEFAULT_SAVE_DIR}`);
+          logger.debug(`Creating save directory: ${global.DEFAULT_SAVE_DIR}`);
           fs.mkdirSync(global.DEFAULT_SAVE_DIR, { recursive: true });
         }
 
@@ -148,7 +149,7 @@ const transcribeRecording = async (language, apiKey) => {
 
         // Write the file synchronously to ensure it's fully written before returning
         fs.writeFileSync(filePath, JSON.stringify(transcriptionObject, null, 2), { encoding: 'utf-8' });
-        global.logger.info(`Transcription saved to: ${filePath}`);
+        logger.debug(`Transcription saved to: ${filePath}`);
 
         // Verify the file was written correctly
         if (fs.existsSync(filePath)) {
@@ -156,28 +157,28 @@ const transcribeRecording = async (language, apiKey) => {
           try {
             const parsedContent = JSON.parse(fileContent);
             if (!parsedContent || !parsedContent.text || parsedContent.text !== transcription.text) {
-              global.logger.error('File content does not match transcription object', null);
+              logger.error('File content does not match transcription object');
             } else {
-              global.logger.debug('File content verified successfully');
+              logger.debug('File content verified successfully');
             }
           } catch (parseError) {
-            global.logger.error('Failed to parse saved JSON file', parseError);
+            logger.error('Failed to parse saved JSON file', { error: parseError.message });
           }
         } else {
-          global.logger.error(`File not found after writing: ${filePath}`, null);
+          logger.error(`File not found after writing: ${filePath}`);
         }
       } catch (saveError) {
-        global.logger.exception('Failed to save transcription to file', saveError);
+        logger.error('Failed to save transcription to file', { error: saveError.message });
         // Continue even if saving fails
       }
 
       // Paste the transcribed text at the current cursor position
-      global.logger.info('Attempting to paste transcribed text at cursor position');
+      logger.debug('Attempting to paste transcribed text at cursor position');
       try {
         await global.pasteTextAtCursor(transcription.text);
-        global.logger.info('Paste operation initiated');
+        logger.debug('Paste operation initiated');
       } catch (pasteError) {
-        global.logger.exception('Failed to paste text at cursor position', pasteError);
+        logger.error('Failed to paste text at cursor position', { error: pasteError.message });
         // Continue even if pasting fails
       }
 
@@ -195,7 +196,7 @@ const transcribeRecording = async (language, apiKey) => {
         pastedAtCursor: true, // Indicate that the text was pasted at the cursor
       };
     } catch (transcriptionError) {
-      global.logger.exception('Error during Groq API transcription call', transcriptionError);
+      logger.error('Error during Groq API transcription call', { error: transcriptionError.message });
       return {
         success: false,
         error: transcriptionError instanceof Error ? transcriptionError.message : String(transcriptionError),
@@ -206,7 +207,7 @@ const transcribeRecording = async (language, apiKey) => {
       };
     }
   } catch (error) {
-    global.logger.exception('Failed to transcribe recording', error);
+    logger.error('Failed to transcribe recording', { error: error.message });
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),

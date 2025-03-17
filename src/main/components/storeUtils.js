@@ -1,5 +1,6 @@
 const fs = require('fs');
 const { DEFAULT_SETTINGS, TEMP_DIR, DEFAULT_SAVE_DIR } = require('./constants');
+const logger = require('../../shared/logger').default;
 
 // Initialize store for settings
 let store = null;
@@ -25,7 +26,7 @@ const initStore = async () => {
     
     return true;
   } catch (error) {
-    console.error('Failed to initialize store:', error);
+    logger.error('Failed to initialize store:', { error: error.message });
     return false;
   }
 };
@@ -37,7 +38,7 @@ function ensureDirectories() {
     try {
       fs.mkdirSync(TEMP_DIR, { recursive: true });
     } catch (error) {
-      console.error('Failed to create temp directory:', error);
+      logger.error('Failed to create temp directory:', { error: error.message });
     }
   }
 
@@ -46,7 +47,7 @@ function ensureDirectories() {
     try {
       fs.mkdirSync(DEFAULT_SAVE_DIR, { recursive: true });
     } catch (error) {
-      console.error('Failed to create save directory:', error);
+      logger.error('Failed to create save directory:', { error: error.message });
     }
   }
 }

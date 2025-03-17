@@ -50,7 +50,7 @@ async function checkApplicationBuilt() {
       rl.close();
       
       if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
-        logger.info('Building the application...');
+        logger.debug('Building the application...');
         const { execSync } = require('child_process');
         execSync('pnpm build', { stdio: 'inherit' });
         logger.success('Application built successfully!');
@@ -58,7 +58,7 @@ async function checkApplicationBuilt() {
         logger.warning('Skipping build. Note that Spectron tests may fail without a built application.');
       }
     } else {
-      logger.info('Application appears to be built.');
+      logger.debug('Application appears to be built.');
     }
   } catch (error) {
     logger.error(`Error checking if application is built: ${error.message}`);
@@ -94,7 +94,7 @@ function enableSpectronTests() {
     
     // Check if tests are already enabled
     if (!content.includes('describe.skip(\'Real IPC Communication with Spectron')) {
-      logger.info('Spectron tests are already enabled.');
+      logger.debug('Spectron tests are already enabled.');
       return true;
     }
     
@@ -132,7 +132,7 @@ function restoreBackup() {
 
 // Main function
 async function main() {
-  logger.info('Preparing Spectron tests...');
+  logger.debug('Preparing Spectron tests...');
   
   // Check if application is built
   await checkApplicationBuilt();
@@ -147,16 +147,16 @@ async function main() {
     return;
   }
   
-  logger.info('');
-  logger.info('Spectron tests are now ready to run!');
-  logger.info('You can run them with:');
-  logger.info('');
-  logger.info(`  ${COLORS.CYAN}pnpm test:integration:spectron${COLORS.RESET}`);
-  logger.info('');
-  logger.info('To restore the original file (with tests skipped), run:');
-  logger.info('');
-  logger.info(`  ${COLORS.CYAN}node scripts/restore-spectron-tests.js${COLORS.RESET}`);
-  logger.info('');
+  logger.debug('');
+  logger.debug('Spectron tests are now ready to run!');
+  logger.debug('You can run them with:');
+  logger.debug('');
+  logger.debug(`  ${COLORS.CYAN}pnpm test:integration:spectron${COLORS.RESET}`);
+  logger.debug('');
+  logger.debug('To restore the original file (with tests skipped), run:');
+  logger.debug('');
+  logger.debug(`  ${COLORS.CYAN}node scripts/restore-spectron-tests.js${COLORS.RESET}`);
+  logger.debug('');
   logger.warning('Note: Spectron tests require the application to be built and may require additional setup.');
 }
 
