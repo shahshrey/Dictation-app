@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const { DEFAULT_SETTINGS, TEMP_DIR, DEFAULT_SAVE_DIR } = require('./constants');
+const { DEFAULT_SETTINGS } = require('./constants');
+const { ensureStorageDirectories } = require('./storageManager');
 const logger = require('../../shared/logger').default;
 
 // Initialize store for settings
@@ -58,25 +59,9 @@ const initStore = async () => {
 // Get the store instance (only available after initialization)
 const getStore = () => store;
 
-// Ensure directories exist
+// Ensure directories exist using the storage manager
 function ensureDirectories() {
-  // Ensure temp directory exists
-  if (!fs.existsSync(TEMP_DIR)) {
-    try {
-      fs.mkdirSync(TEMP_DIR, { recursive: true });
-    } catch (error) {
-      logger.error('Failed to create temp directory:', { error: error.message });
-    }
-  }
-
-  // Ensure save directory exists
-  if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
-    try {
-      fs.mkdirSync(DEFAULT_SAVE_DIR, { recursive: true });
-    } catch (error) {
-      logger.error('Failed to create save directory:', { error: error.message });
-    }
-  }
+  ensureStorageDirectories();
 }
 
 module.exports = {

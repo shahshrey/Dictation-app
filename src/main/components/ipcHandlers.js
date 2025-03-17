@@ -1,10 +1,20 @@
 const { ipcMain, dialog } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { AUDIO_FILE_PATH, TEMP_DIR, DEFAULT_SAVE_DIR, GROQ_MODELS, DEFAULT_SETTINGS } = require('./constants');
+const { AUDIO_FILE_PATH, TEMP_DIR, GROQ_MODELS, DEFAULT_SETTINGS } = require('./constants');
 const { initGroqClient, transcribeRecording } = require('./groqClient');
 const { recheckAccessibilityPermission } = require('./permissionsUtils');
 const { showPopupWindow, hidePopupWindow, setIgnoreMouseEvents, registerGlobalHotkey } = require('./windowManager');
+const { 
+  saveTranscription, 
+  saveTranscriptionAs, 
+  getRecentTranscriptions, 
+  getTranscriptions,
+  getTranscription,
+  deleteTranscription,
+  openFile
+} = require('./storageManager');
+const { STORAGE_CHANNELS } = require('../../shared/storage');
 const logger = require('../../shared/logger').default;
 
 // Set up IPC handlers
@@ -189,137 +199,33 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store) => {
     }
   });
 
-  // Save transcription to a file
-  ipcMain.handle('save-transcription', async (_, transcription, options) => {
-    try {
-      const filename = options?.filename || 'transcription';
-      const format = 'json';
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const fullFilename = `${filename}_${timestamp}.${format}`;
-      const filePath = path.join(DEFAULT_SAVE_DIR, fullFilename);
-
-      fs.writeFileSync(filePath, JSON.stringify(transcription, null, 2), { encoding: 'utf-8' });
-
-      return { success: true, filePath };
-    } catch (error) {
-      logger.error('Failed to save transcription:', { error: error.message });
-      return { success: false, error: String(error) };
-    }
+  // Storage operations using the storage manager
+  ipcMain.handle(STORAGE_CHANNELS.SAVE_TRANSCRIPTION, async (_, transcription, options) => {
+    return await saveTranscription(transcription, options);
   });
 
-  // Save transcription with file dialog
-  ipcMain.handle('save-transcription-as', async (_, transcription) => {
-    try {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const defaultPath = path.join(DEFAULT_SAVE_DIR, `transcription_${timestamp}.json`);
-
-      const { canceled, filePath } = await dialog.showSaveDialog({
-        title: 'Save Transcription',
-        defaultPath,
-        filters: [
-          { name: 'JSON Files', extensions: ['json'] },
-          { name: 'All Files', extensions: ['*'] },
-        ],
-      });
-
-      if (canceled || !filePath) {
-        return { success: false, canceled: true };
-      }
-
-      fs.writeFileSync(filePath, JSON.stringify(transcription, null, 2), { encoding: 'utf-8' });
-
-      return { success: true, filePath };
-    } catch (error) {
-      logger.error('Failed to save transcription:', { error: error.message });
-      return { success: false, error: String(error) };
-    }
+  ipcMain.handle(STORAGE_CHANNELS.SAVE_TRANSCRIPTION_AS, async (_, transcription) => {
+    return await saveTranscriptionAs(transcription);
   });
 
-  // Get recent transcriptions
-  ipcMain.handle('get-recent-transcriptions', async () => {
-    try {
-      if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
-        return { success: true, transcriptions: [] };
-      }
-
-      const files = fs
-        .readdirSync(DEFAULT_SAVE_DIR)
-        .filter(file => file.endsWith('.json') && file !== 'transcriptions.json')
-        .map(file => {
-          try {
-            const filePath = path.join(DEFAULT_SAVE_DIR, file);
-            const stats = fs.statSync(filePath);
-            const content = fs.readFileSync(filePath, { encoding: 'utf-8' });
-            return {
-              transcription: JSON.parse(content),
-              stats: {
-                createdAt: stats.birthtime,
-                modifiedAt: stats.mtime,
-              }
-            };
-          } catch (error) {
-            logger.error(`Error processing file ${file}:`, { error: error.message });
-            return null;
-          }
-        })
-        .filter(Boolean)
-        .sort((a, b) => b.stats.modifiedAt.getTime() - a.stats.modifiedAt.getTime())
-        .slice(0, 10);
-
-      return { 
-        success: true, 
-        transcriptions: files.map(f => f.transcription)
-      };
-    } catch (error) {
-      logger.error('Failed to get recent transcriptions:', { error: error.message });
-      return { success: false, error: String(error) };
-    }
+  ipcMain.handle(STORAGE_CHANNELS.GET_RECENT_TRANSCRIPTIONS, async () => {
+    return await getRecentTranscriptions();
   });
 
-  // Get transcriptions (alias for get-recent-transcriptions)
-  // This handler returns transcriptions in a format compatible with the renderer's expectations
-  ipcMain.handle('get-transcriptions', async () => {
-    try {
-      if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
-        logger.debug('Main process: Save directory does not exist');
-        return [];
-      }
+  ipcMain.handle(STORAGE_CHANNELS.GET_TRANSCRIPTIONS, async () => {
+    return await getTranscriptions();
+  });
 
-      // Force a directory read to get the latest files
-      const files = fs
-        .readdirSync(DEFAULT_SAVE_DIR, { withFileTypes: true })
-        .filter(dirent => dirent.isFile() && dirent.name.endsWith('.json') && dirent.name !== 'transcriptions.json')
-        .map(dirent => {
-          const filePath = path.join(DEFAULT_SAVE_DIR, dirent.name);
+  ipcMain.handle(STORAGE_CHANNELS.GET_TRANSCRIPTION, async (_, id) => {
+    return await getTranscription(id);
+  });
 
-          try {
-            // Get file stats (for debugging purposes only)
-            // const stats = fs.statSync(filePath);
+  ipcMain.handle(STORAGE_CHANNELS.DELETE_TRANSCRIPTION, async (_, id) => {
+    return await deleteTranscription(id);
+  });
 
-            // Read file content
-            let transcription = null;
-            try {
-              const content = fs.readFileSync(filePath, { encoding: 'utf-8' });
-              transcription = JSON.parse(content);
-            } catch (readError) {
-              logger.error(`Failed to read or parse file ${filePath}:`, { error: readError.message });
-              return null; // Skip this file if we can't read or parse it
-            }
-
-            // Return the parsed transcription
-            return transcription;
-          } catch (error) {
-            logger.error(`Failed to process file ${dirent.name}:`, { error: error.message });
-            return null;
-          }
-        })
-        .filter(Boolean) // Remove any null entries from errors
-        .sort((a, b) => b.timestamp - a.timestamp);
-      return files;
-    } catch (error) {
-      logger.error('Failed to get transcriptions:', { error: error.message });
-      return [];
-    }
+  ipcMain.handle(STORAGE_CHANNELS.OPEN_FILE, (_, filePath) => {
+    return openFile(filePath);
   });
 
   // Transcribe the most recent recording using Groq API
@@ -328,18 +234,6 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store) => {
   ipcMain.handle('transcribe-recording', async (_, language, apiKey) => {
     // Use the transcribeRecording function from groqClient.js
     return await transcribeRecording(language, apiKey);
-  });
-
-  // Open file
-  ipcMain.handle('open-file', (_, filePath) => {
-    try {
-      const { shell } = require('electron');
-      shell.openPath(filePath);
-      return { success: true };
-    } catch (error) {
-      logger.error('Failed to open file:', { error: error.message });
-      return { success: false, error: String(error) };
-    }
   });
 
   // Get settings

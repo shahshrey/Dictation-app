@@ -7,6 +7,14 @@ export interface AudioDevice {
 
 // Import the Transcription type from shared types
 import { Transcription } from '../../shared/types';
+import {
+  SaveTranscriptionOptions,
+  SaveTranscriptionResult,
+  GetTranscriptionsResult,
+  GetTranscriptionResult,
+  DeleteTranscriptionResult,
+  OpenFileResult,
+} from '../../shared/storage';
 
 interface ElectronAPI {
   // Audio recording
@@ -60,27 +68,14 @@ interface ElectronAPI {
   // File storage
   saveTranscription: (
     transcription: Transcription,
-    options?: { filename?: string; format?: string }
-  ) => Promise<{ success: boolean; jsonSaved?: boolean; error?: string }>;
-  saveTranscriptionAs: (
-    transcription: Transcription
-  ) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
-  getRecentTranscriptions: () => Promise<{
-    success: boolean;
-    transcriptions?: Transcription[];
-    error?: string;
-  }>;
+    options?: SaveTranscriptionOptions
+  ) => Promise<SaveTranscriptionResult>;
+  saveTranscriptionAs: (transcription: Transcription) => Promise<SaveTranscriptionResult>;
+  getRecentTranscriptions: () => Promise<GetTranscriptionsResult>;
   getTranscriptions: () => Promise<Transcription[]>;
-  getTranscription: (id: string) => Promise<{
-    success: boolean;
-    transcription?: Transcription;
-    error?: string;
-  }>;
-  deleteTranscription: (id: string) => Promise<{
-    success: boolean;
-    error?: string;
-  }>;
-  openFile: (path: string) => Promise<{ success: boolean; error?: string }>;
+  getTranscription: (id: string) => Promise<GetTranscriptionResult>;
+  deleteTranscription: (id: string) => Promise<DeleteTranscriptionResult>;
+  openFile: (path: string) => Promise<OpenFileResult>;
 
   // Settings
   getSettings: () => Promise<Record<string, unknown>>;

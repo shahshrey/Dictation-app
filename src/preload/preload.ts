@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { AudioDevice, IPC_CHANNELS, Transcription } from '../shared/types';
+import { STORAGE_CHANNELS } from '../shared/storage';
 import logger from '../shared/logger';
 
 logger.debug('Preload script starting...');
@@ -59,26 +60,30 @@ try {
       logger.debug('Preload: saveTranscription called with transcription ID:', {
         id: transcription.id,
       });
-      return ipcRenderer.invoke('save-transcription', transcription, options || {});
+      return ipcRenderer.invoke(STORAGE_CHANNELS.SAVE_TRANSCRIPTION, transcription, options || {});
     },
     saveTranscriptionAs: (transcription: Transcription) => {
       logger.debug('Preload: saveTranscriptionAs called with transcription ID:', {
         id: transcription.id,
       });
-      return ipcRenderer.invoke('save-transcription-as', transcription);
+      return ipcRenderer.invoke(STORAGE_CHANNELS.SAVE_TRANSCRIPTION_AS, transcription);
     },
-    getRecentTranscriptions: () => ipcRenderer.invoke('get-recent-transcriptions'),
+    getRecentTranscriptions: () => ipcRenderer.invoke(STORAGE_CHANNELS.GET_RECENT_TRANSCRIPTIONS),
     getTranscriptions: () => {
       logger.debug('Preload: getTranscriptions called');
-      return ipcRenderer.invoke('get-transcriptions');
+      return ipcRenderer.invoke(STORAGE_CHANNELS.GET_TRANSCRIPTIONS);
     },
     getTranscription: (id: string) => {
       logger.debug('Preload: getTranscription called for ID:', { id });
-      return ipcRenderer.invoke('get-transcription', id);
+      return ipcRenderer.invoke(STORAGE_CHANNELS.GET_TRANSCRIPTION, id);
     },
     deleteTranscription: (id: string) => {
       logger.debug('Preload: deleteTranscription called for ID:', { id });
-      return ipcRenderer.invoke('delete-transcription', id);
+      return ipcRenderer.invoke(STORAGE_CHANNELS.DELETE_TRANSCRIPTION, id);
+    },
+    openFile: (path: string) => {
+      logger.debug('Preload: openFile called for path:', { path });
+      return ipcRenderer.invoke(STORAGE_CHANNELS.OPEN_FILE, path);
     },
 
     // Event listeners
