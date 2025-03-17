@@ -3,7 +3,7 @@
  */
 
 // Application constants
-export const APP_NAME = 'Dictation App';
+export const APP_NAME = 'Voice Vibe';
 export const APP_VERSION = '1.0.0';
 
 // Default settings

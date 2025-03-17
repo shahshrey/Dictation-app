@@ -1,7 +1,7 @@
 const { ipcMain, dialog } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { AUDIO_FILE_PATH, TEMP_DIR, DEFAULT_SAVE_DIR, GROQ_MODELS } = require('./constants');
+const { AUDIO_FILE_PATH, TEMP_DIR, DEFAULT_SAVE_DIR, GROQ_MODELS, DEFAULT_SETTINGS } = require('./constants');
 const { initGroqClient, transcribeRecording } = require('./groqClient');
 const { recheckAccessibilityPermission } = require('./permissionsUtils');
 const { showPopupWindow, hidePopupWindow, setIgnoreMouseEvents, registerGlobalHotkey } = require('./windowManager');
@@ -344,30 +344,68 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store) => {
 
   // Get settings
   ipcMain.handle('get-settings', () => {
-    // Log the settings being returned to the renderer
-    logger.debug('[DEBUG] Current settings from getSettings:', JSON.stringify({
-      ...settings,
-      apiKey: settings.apiKey ? '[API KEY PRESENT]' : 'null'
-    }));
-    logger.debug('[DEBUG] Current settings API key available:', !!settings.apiKey);
-    logger.debug('[DEBUG] Current settings API key length:', settings.apiKey ? settings.apiKey.length : 0);
-    
-    return settings;
+    try {
+      // Try to load settings from fallback file if store is not available
+      if (!store) {
+        logger.debug('Store not available, trying to load settings from fallback file');
+        try {
+          const settingsPath = path.join(require('electron').app.getPath('userData'), 'settings.json');
+          if (fs.existsSync(settingsPath)) {
+            const fileSettings = JSON.parse(fs.readFileSync(settingsPath, { encoding: 'utf-8' }));
+            logger.debug('Loaded settings from fallback file');
+            // Update the in-memory settings
+            Object.assign(settings, fileSettings);
+          } else {
+            logger.debug('No fallback settings file found, using default settings');
+          }
+        } catch (fileError) {
+          logger.error('Error loading settings from fallback file:', { error: fileError.message });
+        }
+      }
+      
+      // Log the settings being returned to the renderer
+      logger.debug('[DEBUG] Current settings from getSettings:', JSON.stringify({
+        ...settings,
+        apiKey: settings.apiKey ? '[API KEY PRESENT]' : 'null'
+      }));
+      logger.debug('[DEBUG] Current settings API key available:', !!settings.apiKey);
+      logger.debug('[DEBUG] Current settings API key length:', settings.apiKey ? settings.apiKey.length : 0);
+      
+      return settings;
+    } catch (error) {
+      logger.error('Error in get-settings handler:', { error: error.message });
+      return { ...DEFAULT_SETTINGS };
+    }
   });
 
   // Save settings
   ipcMain.handle('save-settings', (_, newSettings) => {
     try {
       if (store) {
-        store.set(newSettings);
-        Object.assign(settings, newSettings);
+        logger.debug('Saving settings using electron-store');
+        try {
+          store.set(newSettings);
+          logger.debug('Settings saved successfully to electron-store');
+        } catch (storeError) {
+          logger.error('Error saving to electron-store, falling back to file:', { error: storeError.message });
+          // Fall back to file storage if store.set fails
+          Object.assign(settings, newSettings);
+          const settingsPath = path.join(require('electron').app.getPath('userData'), 'settings.json');
+          fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), { encoding: 'utf-8' });
+          logger.debug('Settings saved to fallback file:', settingsPath);
+        }
       } else {
+        logger.debug('Store not available, saving settings to file');
         Object.assign(settings, newSettings);
         // Save to a JSON file as fallback
         const settingsPath = path.join(require('electron').app.getPath('userData'), 'settings.json');
-        fs.writeFileSync(settingsPath, JSON.stringify(settings), { encoding: 'utf-8' });
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), { encoding: 'utf-8' });
+        logger.debug('Settings saved to file:', settingsPath);
       }
 
+      // Always update the in-memory settings
+      Object.assign(settings, newSettings);
+      
       // Re-register the global hotkey with the new settings
       registerGlobalHotkey(mainWindow, settings);
 

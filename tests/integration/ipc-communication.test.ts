@@ -430,7 +430,9 @@ describe.skip('Real IPC Communication with Spectron', () => {
     // Start recording
     const startResult = await client.execute<{ success: boolean }>(() => {
       return (
-        window as { electronAPI: { startRecording: () => Promise<{ success: boolean }> } }
+        window as unknown as {
+          electronAPI: { startRecording: () => Promise<{ success: boolean }> };
+        }
       ).electronAPI.startRecording();
     });
 
@@ -443,7 +445,7 @@ describe.skip('Real IPC Communication with Spectron', () => {
     // Stop recording
     const stopResult = await client.execute<{ success: boolean }>(() => {
       return (
-        window as { electronAPI: { stopRecording: () => Promise<{ success: boolean }> } }
+        window as unknown as { electronAPI: { stopRecording: () => Promise<{ success: boolean }> } }
       ).electronAPI.stopRecording();
     });
 
@@ -475,7 +477,9 @@ describe.skip('Real IPC Communication with Spectron', () => {
       // Step 2: Start recording
       await client.execute<{ success: boolean }>(() => {
         return (
-          window as { electronAPI: { startRecording: () => Promise<{ success: boolean }> } }
+          window as unknown as {
+            electronAPI: { startRecording: () => Promise<{ success: boolean }> };
+          }
         ).electronAPI.startRecording();
       });
 
@@ -485,7 +489,9 @@ describe.skip('Real IPC Communication with Spectron', () => {
       // Step 3: Stop recording
       await client.execute<{ success: boolean }>(() => {
         return (
-          window as { electronAPI: { stopRecording: () => Promise<{ success: boolean }> } }
+          window as unknown as {
+            electronAPI: { stopRecording: () => Promise<{ success: boolean }> };
+          }
         ).electronAPI.stopRecording();
       });
 
@@ -495,7 +501,7 @@ describe.skip('Real IPC Communication with Spectron', () => {
       // Step 4: Get transcriptions
       const transcriptions = await client.execute<unknown[]>(() => {
         return (
-          window as { electronAPI: { getTranscriptions: () => Promise<unknown[]> } }
+          window as unknown as { electronAPI: { getTranscriptions: () => Promise<unknown[]> } }
         ).electronAPI.getTranscriptions();
       });
 
@@ -583,7 +589,7 @@ describe.skip('Real IPC Communication with Spectron', () => {
     // Get settings to verify they were saved
     const settings = await client.execute<AppSettings>(() => {
       return (
-        window as { electronAPI: { getSettings: () => Promise<AppSettings> } }
+        window as unknown as { electronAPI: { getSettings: () => Promise<AppSettings> } }
       ).electronAPI.getSettings();
     });
 

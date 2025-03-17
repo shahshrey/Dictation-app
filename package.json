@@ -1,7 +1,7 @@
 {
-  "name": "dictation-app",
+  "name": "voice-vibe",
   "version": "1.0.0",
-  "description": "A dictation app using Electron and Groq API",
+  "description": "A voice transcription app using Electron and Groq API",
   "main": "dist/main/index.js",
   "scripts": {
     "start": "electron .",

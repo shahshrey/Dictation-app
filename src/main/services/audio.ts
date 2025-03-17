@@ -7,7 +7,7 @@ import { AUDIO_SETTINGS } from '../../shared/constants';
 import logger from '../../shared/logger';
 
 // Define constants for audio recording
-const TEMP_DIR = path.join(os.tmpdir(), 'dictation-app');
+const TEMP_DIR = path.join(os.tmpdir(), 'voice-vibe');
 const AUDIO_FILE_PATH = path.join(TEMP_DIR, `recording.${AUDIO_SETTINGS.FILE_FORMAT}`);
 
 // Ensure temp directory exists

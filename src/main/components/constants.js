@@ -2,9 +2,9 @@
 const path = require('path');
 const os = require('os');
 
-const TEMP_DIR = path.join(os.tmpdir(), 'dictation-app');
+const TEMP_DIR = path.join(os.tmpdir(), 'voice-vibe');
 const AUDIO_FILE_PATH = path.join(TEMP_DIR, 'recording.webm');
-const DEFAULT_SAVE_DIR = path.join(os.homedir(), 'Documents', 'Dictation App');
+const DEFAULT_SAVE_DIR = path.join(os.homedir(), 'Documents', 'Voice Vibe');
 
 // Define Groq API models
 const GROQ_MODELS = {

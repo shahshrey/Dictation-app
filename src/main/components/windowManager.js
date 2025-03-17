@@ -9,7 +9,7 @@ logger.debug('Is packaged:', app.isPackaged);
 
 // Add file logging for packaged environment
 if (app.isPackaged) {
-  const logPath = path.join(os.homedir(), 'Library/Logs/DictationApp/app.log');
+  const logPath = path.join(os.homedir(), 'Library/Logs/VoiceVibe/app.log');
   logger.debug('Setting up file logging at:', logPath);
   // Ensure parent directory exists
   require('fs').mkdirSync(path.dirname(logPath), { recursive: true });
@@ -454,7 +454,7 @@ const setupDockMenu = () => {
 
     const dockMenu = [
       {
-        label: 'Show/Hide Dictation Popup',
+        label: 'Show/Hide Voice Vibe Popup',
         click: () => {
           if (global.popupWindow && !global.popupWindow.isDestroyed()) {
             if (global.popupWindow.isVisible()) {

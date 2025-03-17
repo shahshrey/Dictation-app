@@ -1,5 +1,5 @@
-appId: com.dictation.app
-productName: Dictation App
+appId: com.voicevibe.app
+productName: Voice Vibe
 copyright: Copyright © 2023
 
 directories:
@@ -30,7 +30,7 @@ mac:
   entitlementsInherit: build/entitlements.mac.plist
   gatekeeperAssess: false
   extendInfo:
-    NSMicrophoneUsageDescription: This app requires microphone access for dictation functionality.
+    NSMicrophoneUsageDescription: This app requires microphone access for voice transcription functionality.
     LSUIElement: false
     NSHumanReadableCopyright: Copyright © 2023
     CFBundleDocumentTypes: []

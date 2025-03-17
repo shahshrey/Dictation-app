@@ -27,12 +27,11 @@ global.popupWindow = null;
 // Only after setting up globals, import other components
 const { pasteTextAtCursor } = require('./components/clipboardUtils');
 const { checkMacOSPermissions, recheckAccessibilityPermission } = require('./components/permissionsUtils');
-const { store, settings, initStore, ensureDirectories } = require('./components/storeUtils');
+const { getStore, settings, initStore, ensureDirectories, loadSettingsFromFile } = require('./components/storeUtils');
 const { groqClient, initGroqClient } = require('./components/groqClient');
 
 // Set additional globals needed by other modules
 global.settings = settings;
-global.store = store;
 global.pasteTextAtCursor = pasteTextAtCursor;
 global.initGroqClient = initGroqClient;
 global.groqClient = groqClient;
@@ -72,7 +71,16 @@ app.whenReady().then(async () => {
   }
 
   logger.debug('Initializing store');
-  await initStore();
+  const storeInitialized = await initStore();
+  
+  // Set the global store after initialization
+  global.store = getStore();
+  
+  // If store initialization failed, try to load settings from fallback file
+  if (!storeInitialized) {
+    logger.debug('Store initialization failed, trying to load settings from fallback file');
+    loadSettingsFromFile();
+  }
 
   logger.debug('Ensuring directories exist');
   ensureDirectories();
@@ -92,7 +100,7 @@ app.whenReady().then(async () => {
 
   logger.debug('Setting up IPC handlers');
   // Pass all necessary dependencies to setupIpcHandlers
-  setupIpcHandlers(global.mainWindow, global.popupWindow, settings, store);
+  setupIpcHandlers(global.mainWindow, global.popupWindow, settings, getStore());
 
   logger.debug('Creating and showing the floating popup window');
   // Create and show the floating popup window

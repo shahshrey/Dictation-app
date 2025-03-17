@@ -6,7 +6,7 @@ import { Transcription } from '../../shared/types';
 import logger from '../../shared/logger';
 
 // Define constants for file storage
-const DEFAULT_SAVE_DIR = path.join(os.homedir(), 'Documents', 'Dictation App');
+const DEFAULT_SAVE_DIR = path.join(os.homedir(), 'Documents', 'Voice Vibe');
 const DEFAULT_FILENAME = 'transcription';
 const TRANSCRIPTIONS_JSON = path.join(DEFAULT_SAVE_DIR, 'transcriptions.json');
 

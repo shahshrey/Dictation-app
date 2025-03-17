@@ -20,7 +20,7 @@ const HotkeyInput: React.FC<HotkeyInputProps> = ({ currentHotkey, onHotkeyChange
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <Label htmlFor="hotkey" className="text-sm font-medium">
-          Dictation Hotkey
+          Voice Vibe Hotkey
         </Label>
       </div>
       <div className="flex space-x-2">
@@ -38,7 +38,7 @@ const HotkeyInput: React.FC<HotkeyInputProps> = ({ currentHotkey, onHotkeyChange
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Press this key to start/stop dictation. Current key: {currentHotkey}
+        Press this key to start/stop Voice Vibe. Current key: {currentHotkey}
       </p>
     </div>
   );

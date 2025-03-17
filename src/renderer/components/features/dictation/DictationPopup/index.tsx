@@ -137,7 +137,7 @@ const DictationPopup: React.FC = () => {
         boxShadow: 'none',
       }}
       role="application"
-      aria-label="Dictation popup"
+      aria-label="Voice Vibe popup"
     >
       {/* Pill container - make it draggable */}
       <button
