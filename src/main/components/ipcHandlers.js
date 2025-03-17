@@ -1,15 +1,14 @@
-const { ipcMain, dialog, globalShortcut } = require('electron');
+const { ipcMain, dialog } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { AUDIO_FILE_PATH, TEMP_DIR, DEFAULT_SAVE_DIR, GROQ_MODELS } = require('./constants');
 const { initGroqClient, transcribeRecording } = require('./groqClient');
 const { recheckAccessibilityPermission } = require('./permissionsUtils');
+const { showPopupWindow, hidePopupWindow, setIgnoreMouseEvents, registerGlobalHotkey } = require('./windowManager');
 const logger = require('../../shared/logger').default;
 
 // Set up IPC handlers
-const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManager) => {
-  const { showPopupWindow, hidePopupWindow } = windowManager;
-  
+const setupIpcHandlers = (mainWindow, popupWindow, settings, store) => {
   // Handle permission issues
   ipcMain.on('permission-issue', (_, permissionType) => {
     logger.debug('Permission issue reported:', { permissionType });
@@ -383,9 +382,7 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
   ipcMain.handle('start-recording', async () => {
     try {
       global.isRecording = true;
-      if (showPopupWindow) {
-        showPopupWindow();
-      }
+      showPopupWindow();
       return { success: true };
     } catch (error) {
       logger.error('Failed to start recording:', { error: error.message });
@@ -396,9 +393,7 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
   ipcMain.handle('stop-recording', async () => {
     try {
       global.isRecording = false;
-      if (hidePopupWindow) {
-        hidePopupWindow();
-      }
+      hidePopupWindow();
       return { success: true };
     } catch (error) {
       logger.error('Failed to stop recording:', { error: error.message });
@@ -408,144 +403,10 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
 
   // Window management
   ipcMain.handle('set-ignore-mouse-events', (event, ignore, options = { forward: true }) => {
-    if (global.popupWindow) {
-      if (!global.popupWindow.isDestroyed()) {
-        try {
-          // Use the provided options or default to forwarding events when not ignoring
-          const forwardOptions = options || { forward: !ignore };
-          global.popupWindow.setIgnoreMouseEvents(ignore, forwardOptions);
-          return true;
-        } catch (error) {
-          logger.error('Error setting ignore mouse events:', { error: error.message });
-          return false;
-        }
-      } else {
-        logger.debug('Cannot set ignore mouse events - popup window is destroyed');
-        return false;
-      }
-    }
-    logger.debug('Cannot set ignore mouse events - popup window does not exist');
-    return false;
+    return setIgnoreMouseEvents(ignore, options);
   });
 };
 
-// Function to register the global hotkey
-const registerGlobalHotkey = (_, settings) => {
-  logger.debug('Registering global hotkey...');
-  logger.debug('Current recording state:', { isRecording: global.isRecording });
-  logger.debug('mainWindow exists:', { exists: !!global.mainWindow });
-
-  // Unregister any existing shortcuts first
-  globalShortcut.unregisterAll();
-  logger.debug('Unregistered all existing shortcuts');
-
-  // Get the hotkey from settings, default to 'Home' if not set
-  const hotkey = settings.hotkey || 'Home';
-  logger.debug('Using hotkey:', { hotkey });
-
-  // Define the hotkey handler function
-  const hotkeyHandler = () => {
-    logger.debug('Hotkey pressed!');
-    logger.debug('mainWindow exists:', { exists: !!global.mainWindow });
-    logger.debug('popupWindow exists:', { exists: !!global.popupWindow });
-    
-    // Ensure windows exist
-    if (!global.mainWindow || global.mainWindow.isDestroyed()) {
-      logger.debug('Main window does not exist or is destroyed, recreating it');
-      // Import the createWindow function dynamically to avoid circular dependencies
-      const { createWindow } = require('./windowManager');
-      createWindow();
-    }
-    
-    if (!global.popupWindow || global.popupWindow.isDestroyed()) {
-      logger.debug('Popup window does not exist or is destroyed, recreating it');
-      // Import the createPopupWindow function dynamically to avoid circular dependencies
-      const { createPopupWindow } = require('./windowManager');
-      createPopupWindow();
-    }
-    
-    logger.debug('Current recording state:', { isRecording: global.isRecording });
-
-    // Now safely send event to main window
-    if (global.mainWindow && !global.mainWindow.isDestroyed()) {
-      logger.debug('Sending toggle-recording event to mainWindow');
-      try {
-        global.mainWindow.webContents.send('toggle-recording');
-      } catch (error) {
-        logger.error('Error sending toggle-recording event:', { error: error.message });
-      }
-    }
-
-    // Toggle recording state and update popup
-    logger.debug('Toggling recording state from', { from: global.isRecording, to: !global.isRecording });
-    global.isRecording = !global.isRecording;
-    
-    if (global.isRecording) {
-      logger.debug('Starting recording');
-      // Show recording UI
-      if (global.popupWindow && !global.popupWindow.isDestroyed()) {
-        try {
-          // Update UI to show recording state
-          global.popupWindow.webContents.send('update-recording-state', true);
-        } catch (error) {
-          logger.error('Error updating popup window for recording:', { error: error.message });
-        }
-      }
-    } else {
-      logger.debug('Stopping recording');
-      // Update popup window to show not recording state
-      if (global.popupWindow && !global.popupWindow.isDestroyed()) {
-        logger.debug('Updating popup window to show not recording state');
-        try {
-          // Update UI to show not recording state
-          global.popupWindow.webContents.send('update-recording-state', false);
-          
-          global.popupWindow.setAlwaysOnTop(true, 'screen-saver');
-          if (typeof global.popupWindow.setVisibleOnAllWorkspaces === 'function') {
-            global.popupWindow.setVisibleOnAllWorkspaces(true, {
-              visibleOnFullScreen: true,
-              skipTransformProcessType: true,
-            });
-          }
-
-          // For macOS, ensure window level is set to floating
-          if (process.platform === 'darwin') {
-            if (typeof global.popupWindow.setWindowButtonVisibility === 'function') {
-              global.popupWindow.setWindowButtonVisibility(false);
-            }
-          }
-        } catch (error) {
-          logger.error('Error updating popup window:', { error: error.message });
-        }
-      }
-    }
-  };
-
-  try {
-    // Register the global shortcut with the hotkey from settings
-    logger.debug('Attempting to register hotkey:', { hotkey });
-    const registered = globalShortcut.register(hotkey, hotkeyHandler);
-
-    if (!registered) {
-      logger.error(`Failed to register hotkey: ${hotkey}`);
-    } else {
-      logger.debug(`Successfully registered hotkey: ${hotkey}`);
-    }
-  } catch (error) {
-    logger.error(`Error registering hotkey ${hotkey}:`, { error: error.message });
-
-    // Fallback to Home key if the specified hotkey is invalid
-    try {
-      logger.debug('Attempting to register fallback hotkey: Home');
-      globalShortcut.register('Home', hotkeyHandler);
-      logger.debug('Fallback to Home key successful');
-    } catch (fallbackError) {
-      logger.error('Failed to register fallback hotkey:', { error: fallbackError.message });
-    }
-  }
-};
-
 module.exports = {
-  setupIpcHandlers,
-  registerGlobalHotkey
+  setupIpcHandlers
 }; 

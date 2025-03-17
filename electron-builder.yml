@@ -11,6 +11,13 @@ files:
   - node_modules/**/*
   - package.json
   - build/**/*
+  - src/assets/**/*
+
+extraResources:
+  - from: dist
+    to: dist
+  - from: src/assets
+    to: assets
 
 mac:
   category: public.app-category.productivity

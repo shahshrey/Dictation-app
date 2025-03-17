@@ -6,7 +6,6 @@ const {
   globalShortcut,
 } = require('electron');
 const path = require('path');
-const os = require('os');
 const logger = require('../shared/logger').default;
 
 // First import constants to prevent circular dependencies
@@ -44,12 +43,12 @@ const {
   createPopupWindow,
   hidePopupFromDock,
   showPopupWindow,
-  hidePopupWindow,
   setupDockMenu,
+  registerGlobalHotkey
 } = require('./components/windowManager');
 
 // Import IPC handlers last as they depend on all other components
-const { setupIpcHandlers, registerGlobalHotkey } = require('./components/ipcHandlers');
+const { setupIpcHandlers } = require('./components/ipcHandlers');
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
@@ -70,37 +69,6 @@ app.whenReady().then(async () => {
 
     // Set up the dock menu
     setupDockMenu();
-
-    // Set the app's activation policy to show in dock but hide popup
-    try {
-      // This is a macOS specific API to control dock behavior
-      if (app.dock && typeof app.dock.setMenu === 'function') {
-        // Create a dock menu that allows controlling the popup
-        const dockMenu = require('electron').Menu.buildFromTemplate([
-          {
-            label: 'Show Dictation Popup',
-            click: () => {
-              if (!global.popupWindow || global.popupWindow.isDestroyed()) {
-                createPopupWindow();
-              }
-              showPopupWindow();
-            },
-          },
-          {
-            label: 'Hide Dictation Popup',
-            click: () => {
-              if (global.popupWindow && !global.popupWindow.isDestroyed()) {
-                hidePopupWindow();
-              }
-            },
-          },
-        ]);
-
-        app.dock.setMenu(dockMenu);
-      }
-    } catch (error) {
-      logger.error('Error setting dock menu:', { error: error.message });
-    }
   }
 
   logger.debug('Initializing store');
@@ -116,15 +84,15 @@ app.whenReady().then(async () => {
     global.mainWindow = mainWindowInstance;
   }
 
-  logger.debug('Setting up IPC handlers');
-  // Pass the window manager functions to the IPC handlers
-  const windowManager = {
-    showPopupWindow,
-    hidePopupWindow,
-  };
+  // Make sure the main window is created successfully
+  if (!global.mainWindow) {
+    logger.error('Failed to create main window, trying again');
+    global.mainWindow = createWindow();
+  }
 
+  logger.debug('Setting up IPC handlers');
   // Pass all necessary dependencies to setupIpcHandlers
-  setupIpcHandlers(global.mainWindow, global.popupWindow, settings, store, windowManager);
+  setupIpcHandlers(global.mainWindow, global.popupWindow, settings, store);
 
   logger.debug('Creating and showing the floating popup window');
   // Create and show the floating popup window
@@ -133,48 +101,34 @@ app.whenReady().then(async () => {
   if (!global.popupWindow && popupWindowInstance) {
     global.popupWindow = popupWindowInstance;
   }
+  
+  // Make sure the popup window is created successfully
+  if (!global.popupWindow) {
+    logger.error('Failed to create popup window, trying again');
+    global.popupWindow = createPopupWindow();
+  }
+  
+  // Explicitly show the popup window
   showPopupWindow();
 
   // Ensure the popup window doesn't appear in the app switcher
   if (global.popupWindow && process.platform === 'darwin') {
-    try {
-      // This is a macOS specific trick to hide from the app switcher
-      global.popupWindow.setWindowButtonVisibility(false);
-      global.popupWindow.setSkipTaskbar(true);
-
-      // Call the function to hide popup from dock
-      hidePopupFromDock();
-
-      // For macOS Sequoia (15.1), we need an additional step to hide from dock
-      if (process.platform === 'darwin') {
-        // Get the macOS version
-        const osVersion = os.release();
-        logger.debug('macOS version:', { version: osVersion });
-
-        // If it's macOS Sequoia or newer
-        if (osVersion.startsWith('24.')) {
-          // macOS Sequoia is Darwin 24.x
-          logger.debug('Using macOS Sequoia specific settings to hide popup from dock');
-
-          // Set the window to be a utility window
-          if (typeof global.popupWindow.setWindowButtonVisibility === 'function') {
-            global.popupWindow.setWindowButtonVisibility(false);
-          }
-
-          // Set the window to be an accessory window
-          if (typeof global.popupWindow.setAccessoryView === 'function') {
-            global.popupWindow.setAccessoryView(true);
-          }
-        }
-      }
-    } catch (error) {
-      logger.error('Error configuring popup window visibility:', { error: error.message });
-    }
+    // Call the function to hide popup from dock
+    hidePopupFromDock();
   }
 
   logger.debug('Registering global hotkey');
   // Register the global shortcut with the current hotkey from settings
   registerGlobalHotkey(global.mainWindow, settings);
+
+  // Force show the main window after a short delay to ensure it's visible
+  setTimeout(() => {
+    if (global.mainWindow && !global.mainWindow.isDestroyed()) {
+      logger.debug('Forcing main window to show');
+      global.mainWindow.show();
+      global.mainWindow.focus();
+    }
+  }, 500);
 
   app.on('activate', () => {
     logger.debug('App activate event triggered');
@@ -227,11 +181,6 @@ app.on('window-all-closed', () => {
       showPopupWindow();
     } else {
       logger.debug('Popup window is already visible');
-      // Ensure it's always on top and visible on all workspaces
-      if (global.popupWindow && !global.popupWindow.isDestroyed()) {
-        global.popupWindow.setAlwaysOnTop(true, 'screen-saver');
-        global.popupWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-      }
     }
 
     // Ensure the app stays in the dock
