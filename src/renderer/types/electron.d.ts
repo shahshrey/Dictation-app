@@ -5,14 +5,8 @@ export interface AudioDevice {
   isDefault: boolean;
 }
 
-// Transcription interface
-export interface Transcription {
-  id: string;
-  text: string;
-  timestamp: number;
-  duration: number;
-  language?: string;
-}
+// Import the Transcription type from shared types
+import { Transcription } from '../../shared/types';
 
 interface ElectronAPI {
   // Audio recording
@@ -55,28 +49,34 @@ interface ElectronAPI {
     duration: number;
     language?: string;
     error?: string;
+    wordCount?: number;
+    confidence?: number;
+    pastedAtCursor?: boolean;
   }>;
 
   // File storage
   saveTranscription: (
-    text: string,
+    transcription: Transcription,
     options?: { filename?: string; format?: string }
-  ) => Promise<{ success: boolean; filePath?: string; error?: string }>;
+  ) => Promise<{ success: boolean; jsonSaved?: boolean; error?: string }>;
   saveTranscriptionAs: (
-    text: string
+    transcription: Transcription
   ) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
   getRecentTranscriptions: () => Promise<{
     success: boolean;
-    files?: Array<{
-      name: string;
-      path: string;
-      size: number;
-      createdAt: Date;
-      modifiedAt: Date;
-    }>;
+    transcriptions?: Transcription[];
     error?: string;
   }>;
   getTranscriptions: () => Promise<Transcription[]>;
+  getTranscription: (id: string) => Promise<{
+    success: boolean;
+    transcription?: Transcription;
+    error?: string;
+  }>;
+  deleteTranscription: (id: string) => Promise<{
+    success: boolean;
+    error?: string;
+  }>;
   openFile: (path: string) => Promise<{ success: boolean; error?: string }>;
 
   // Settings

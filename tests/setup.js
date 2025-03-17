@@ -12,7 +12,7 @@ jest.mock('electron', () => {
     ipcMain: mockIpc.ipcMain,
     ipcRenderer: mockIpc.ipcRenderer,
     dialog: {
-      showSaveDialog: jest.fn().mockResolvedValue({ canceled: false, filePath: '/mock/save/path.txt' }),
+      showSaveDialog: jest.fn().mockResolvedValue({ canceled: false, filePath: '/mock/save/path.json' }),
     },
     BrowserWindow: jest.fn().mockImplementation(() => ({
       webContents: {
@@ -27,9 +27,9 @@ jest.mock('fs', () => ({
   existsSync: jest.fn().mockReturnValue(true),
   mkdirSync: jest.fn(),
   writeFileSync: jest.fn(),
-  readFileSync: jest.fn().mockReturnValue('mock file content'),
+  readFileSync: jest.fn().mockReturnValue('{"text":"mock transcription content","id":"mock-id","timestamp":1672531200000,"duration":5,"language":"en"}'),
   createReadStream: jest.fn().mockReturnValue({ path: '/mock/audio.wav' }),
-  readdirSync: jest.fn().mockReturnValue(['file1.txt', 'file2.txt']),
+  readdirSync: jest.fn().mockReturnValue(['file1.json', 'file2.json']),
   statSync: jest.fn().mockReturnValue({
     size: 1024,
     birthtime: new Date('2023-01-01'),

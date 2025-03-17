@@ -2,56 +2,6 @@ import { useState } from 'react';
 import { Transcription, AppSettings } from '../../shared/types';
 import { logger } from '../utils/logger';
 
-// Define the expected response types
-interface TranscriptionResult {
-  success: boolean;
-  id: string;
-  text: string;
-  timestamp: number;
-  duration: number;
-  language?: string;
-  error?: string;
-  wordCount?: number;
-  confidence?: number;
-  pastedAtCursor?: boolean;
-}
-
-interface GetRecentTranscriptionsResult {
-  success: boolean;
-  files?: Array<{ name: string; path: string; size: number; createdAt: Date; modifiedAt: Date }>;
-  transcriptions?: Transcription[];
-  error?: string;
-}
-
-interface GetTranscriptionResult {
-  success: boolean;
-  transcription?: Transcription;
-  error?: string;
-}
-
-interface DeleteTranscriptionResult {
-  success: boolean;
-  error?: string;
-}
-
-// Extend the ElectronAPI interface
-declare global {
-  interface ElectronAPI {
-    getTranscription: (id: string) => Promise<GetTranscriptionResult>;
-    deleteTranscription: (id: string) => Promise<DeleteTranscriptionResult>;
-    getRecentTranscriptions: () => Promise<GetRecentTranscriptionsResult>;
-    getTranscriptions: () => Promise<Transcription[]>;
-    saveTranscription: (
-      transcription: Transcription,
-      options?: { filename?: string; format?: string }
-    ) => Promise<{ success: boolean; filePath?: string; jsonSaved?: boolean; error?: string }>;
-    saveTranscriptionAs: (
-      transcription: Transcription
-    ) => Promise<{ success: boolean; filePath?: string; canceled?: boolean; error?: string }>;
-    transcribeRecording: (language: string, apiKey: string) => Promise<TranscriptionResult>;
-  }
-}
-
 export const useTranscriptions = (settings: AppSettings) => {
   const [currentTranscription, setCurrentTranscription] = useState<Transcription | null>(null);
   const [recentTranscriptions, setRecentTranscriptions] = useState<Transcription[]>([]);
@@ -74,32 +24,6 @@ export const useTranscriptions = (settings: AppSettings) => {
     } else {
       setRecentTranscriptions([]);
     }
-  };
-
-  const convertFilesToTranscriptions = (
-    files: Array<{ name: string; modifiedAt?: Date; createdAt?: Date }>
-  ): Transcription[] => {
-    return files.map(file => {
-      // Extract timestamp logic to avoid nested ternary
-      let timestamp: number;
-      if (file.modifiedAt instanceof Date) {
-        timestamp = file.modifiedAt.getTime();
-      } else if (file.createdAt instanceof Date) {
-        timestamp = file.createdAt.getTime();
-      } else {
-        timestamp = Date.now();
-      }
-
-      return {
-        id: file.name.replace(/\.txt$/, ''),
-        text: '', // We don't have the content here
-        timestamp,
-        duration: 0,
-        language: 'en',
-        wordCount: 0, // Default word count
-        source: 'file', // Mark source as file
-      };
-    });
   };
 
   const fetchTranscriptionsWithPrimaryMethod = async (): Promise<boolean> => {
@@ -133,23 +57,17 @@ export const useTranscriptions = (settings: AppSettings) => {
       const result = await window.electronAPI.getRecentTranscriptions();
       logger.debug(`Recent transcriptions result: ${JSON.stringify(result, null, 2)}`);
 
-      if (result && result.success) {
-        // Check if we have transcriptions in the result
-        if (result.transcriptions && Array.isArray(result.transcriptions)) {
+      if (result && result.success && result.transcriptions) {
+        // Only use JSON transcriptions
+        if (Array.isArray(result.transcriptions) && result.transcriptions.length > 0) {
           processTranscriptionsResult(result.transcriptions);
-          return true;
-        }
-        // Fall back to files if no transcriptions
-        else if (Array.isArray(result.files)) {
-          // Convert file objects to transcription objects
-          const transcriptions = convertFilesToTranscriptions(result.files);
-          setRecentTranscriptions(transcriptions);
           return true;
         }
       }
 
+      // If we get here, we didn't find any valid transcriptions
       logger.warn(
-        `getRecentTranscriptions returned invalid data: ${JSON.stringify(result, null, 2)}`
+        `getRecentTranscriptions returned no valid transcriptions: ${JSON.stringify(result, null, 2)}`
       );
       setRecentTranscriptions([]);
       return true;
@@ -281,7 +199,7 @@ export const useTranscriptions = (settings: AppSettings) => {
             logger.info(`Transcription successful, text length: ${result.text.length}`);
 
             // Calculate word count if not provided
-            const wordCount = result.wordCount || result.text.split(/\s+/).length;
+            const wordCount = result.wordCount ?? result.text.split(/\s+/).length;
 
             // Create enhanced transcription object
             const transcription: Transcription = {
@@ -306,11 +224,20 @@ export const useTranscriptions = (settings: AppSettings) => {
               logger.info('Transcribed text was not pasted at cursor position');
             }
 
+            // Save the transcription to JSON
+            if (window.electronAPI && typeof window.electronAPI.saveTranscription === 'function') {
+              try {
+                await window.electronAPI.saveTranscription(transcription);
+                logger.info('Transcription saved to JSON database');
+              } catch (saveError) {
+                logger.exception('Failed to save transcription to JSON database', saveError);
+              }
+            }
+
             // Refresh the list of transcriptions immediately
             await refreshRecentTranscriptions();
 
             // Add a second refresh after a delay to ensure we get the latest data
-            // This helps in case the file is still being written when the first refresh happens
             setTimeout(async () => {
               logger.debug('Performing delayed refresh of transcriptions');
               await refreshRecentTranscriptions();

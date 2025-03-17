@@ -155,15 +155,15 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
   });
 
   // Save transcription to a file
-  ipcMain.handle('save-transcription', async (_, text, options) => {
+  ipcMain.handle('save-transcription', async (_, transcription, options) => {
     try {
       const filename = options?.filename || 'transcription';
-      const format = options?.format || 'txt';
+      const format = 'json';
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const fullFilename = `${filename}_${timestamp}.${format}`;
       const filePath = path.join(DEFAULT_SAVE_DIR, fullFilename);
 
-      fs.writeFileSync(filePath, text, { encoding: 'utf-8' });
+      fs.writeFileSync(filePath, JSON.stringify(transcription, null, 2), { encoding: 'utf-8' });
 
       return { success: true, filePath };
     } catch (error) {
@@ -173,16 +173,16 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
   });
 
   // Save transcription with file dialog
-  ipcMain.handle('save-transcription-as', async (_, text) => {
+  ipcMain.handle('save-transcription-as', async (_, transcription) => {
     try {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const defaultPath = path.join(DEFAULT_SAVE_DIR, `transcription_${timestamp}.txt`);
+      const defaultPath = path.join(DEFAULT_SAVE_DIR, `transcription_${timestamp}.json`);
 
       const { canceled, filePath } = await dialog.showSaveDialog({
         title: 'Save Transcription',
         defaultPath,
         filters: [
-          { name: 'Text Files', extensions: ['txt'] },
+          { name: 'JSON Files', extensions: ['json'] },
           { name: 'All Files', extensions: ['*'] },
         ],
       });
@@ -191,7 +191,7 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
         return { success: false, canceled: true };
       }
 
-      fs.writeFileSync(filePath, text, { encoding: 'utf-8' });
+      fs.writeFileSync(filePath, JSON.stringify(transcription, null, 2), { encoding: 'utf-8' });
 
       return { success: true, filePath };
     } catch (error) {
@@ -204,27 +204,37 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
   ipcMain.handle('get-recent-transcriptions', async () => {
     try {
       if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
-        return { success: true, files: [] };
+        return { success: true, transcriptions: [] };
       }
 
       const files = fs
         .readdirSync(DEFAULT_SAVE_DIR)
-        .filter(file => file.endsWith('.txt'))
+        .filter(file => file.endsWith('.json') && file !== 'transcriptions.json')
         .map(file => {
-          const filePath = path.join(DEFAULT_SAVE_DIR, file);
-          const stats = fs.statSync(filePath);
-          return {
-            name: file,
-            path: filePath,
-            size: stats.size,
-            createdAt: stats.birthtime,
-            modifiedAt: stats.mtime,
-          };
+          try {
+            const filePath = path.join(DEFAULT_SAVE_DIR, file);
+            const stats = fs.statSync(filePath);
+            const content = fs.readFileSync(filePath, { encoding: 'utf-8' });
+            return {
+              transcription: JSON.parse(content),
+              stats: {
+                createdAt: stats.birthtime,
+                modifiedAt: stats.mtime,
+              }
+            };
+          } catch (error) {
+            console.error(`Error processing file ${file}:`, error);
+            return null;
+          }
         })
-        .sort((a, b) => b.modifiedAt.getTime() - a.modifiedAt.getTime())
-        .slice(0, 10); // Get only the 10 most recent files
+        .filter(Boolean)
+        .sort((a, b) => b.stats.modifiedAt.getTime() - a.stats.modifiedAt.getTime())
+        .slice(0, 10);
 
-      return { success: true, files };
+      return { 
+        success: true, 
+        transcriptions: files.map(f => f.transcription)
+      };
     } catch (error) {
       console.error('Failed to get recent transcriptions:', error);
       return { success: false, error: String(error) };
@@ -243,41 +253,26 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
       // Force a directory read to get the latest files
       const files = fs
         .readdirSync(DEFAULT_SAVE_DIR, { withFileTypes: true })
-        .filter(dirent => dirent.isFile() && dirent.name.endsWith('.txt'))
+        .filter(dirent => dirent.isFile() && dirent.name.endsWith('.json') && dirent.name !== 'transcriptions.json')
         .map(dirent => {
           const filePath = path.join(DEFAULT_SAVE_DIR, dirent.name);
 
           try {
-            // Get file stats
-            const stats = fs.statSync(filePath);
+            // Get file stats (for debugging purposes only)
+            // const stats = fs.statSync(filePath);
 
             // Read file content
-            let content = '';
+            let transcription = null;
             try {
-              content = fs.readFileSync(filePath, { encoding: 'utf-8' });
+              const content = fs.readFileSync(filePath, { encoding: 'utf-8' });
+              transcription = JSON.parse(content);
             } catch (readError) {
-              console.error(`Failed to read file ${filePath}:`, readError);
-              content = ''; // Default to empty string if read fails
+              console.error(`Failed to read or parse file ${filePath}:`, readError);
+              return null; // Skip this file if we can't read or parse it
             }
 
-            // Extract timestamp from filename or use file creation time
-            let timestamp = stats.birthtime.getTime();
-            const timestampMatch = dirent.name.match(/(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})/);
-            if (timestampMatch) {
-              const dateStr = timestampMatch[1].replace(/-/g, (m, i) => (i > 9 ? ':' : '-'));
-              const date = new Date(dateStr);
-              if (!isNaN(date.getTime())) {
-                timestamp = date.getTime();
-              }
-            }
-
-            return {
-              id: path.basename(dirent.name, '.txt'),
-              text: content,
-              timestamp,
-              duration: 0, // Duration not available from saved files
-              language: 'en', // Default language
-            };
+            // Return the parsed transcription
+            return transcription;
           } catch (error) {
             console.error(`Failed to process file ${dirent.name}:`, error);
             return null;

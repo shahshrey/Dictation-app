@@ -1,12 +1,20 @@
 import { IpcMain } from 'electron';
 
 // Constants for testing
-const TEST_TRANSCRIPTION = 'This is a test transcription';
+const TEST_TRANSCRIPTION = {
+  id: 'test-id',
+  text: 'This is a test transcription',
+  timestamp: new Date('2023-01-01T12:00:00Z').getTime(),
+  duration: 5,
+  language: 'en',
+  wordCount: 6,
+  source: 'test',
+};
 const MOCK_HOME_DIR = '/mock/home';
 const MOCK_SAVE_DIR = `${MOCK_HOME_DIR}/Documents/Dictation App`;
 const MOCK_DATE = new Date('2023-01-01T12:00:00Z');
 const MOCK_TIMESTAMP = '2023-01-01T12-00-00-000Z';
-const MOCK_FILENAME = `transcription_${MOCK_TIMESTAMP}.txt`;
+const MOCK_FILENAME = `transcription_${MOCK_TIMESTAMP}.json`;
 const MOCK_FILEPATH = `${MOCK_SAVE_DIR}/${MOCK_FILENAME}`;
 
 // Define handler function type for testing
@@ -25,7 +33,7 @@ jest.mock('os', () => {
 jest.mock('electron', () => {
   const mockShowSaveDialog = jest.fn().mockResolvedValue({
     canceled: false,
-    filePath: '/mock/custom/path/test.txt',
+    filePath: '/mock/custom/path/test.json',
   });
 
   const mockIpcMain = {
@@ -156,9 +164,13 @@ describe('Storage Service', () => {
         };
 
         // Verify that the file was written
-        expect(fs.writeFileSync).toHaveBeenCalledWith(MOCK_FILEPATH, TEST_TRANSCRIPTION, {
-          encoding: 'utf-8',
-        });
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+          MOCK_FILEPATH,
+          JSON.stringify(TEST_TRANSCRIPTION, null, 2),
+          {
+            encoding: 'utf-8',
+          }
+        );
 
         // Verify the result
         expect(result).toEqual({
@@ -172,7 +184,7 @@ describe('Storage Service', () => {
         const handler = savedHandlers['save-transcription'];
 
         // Custom options
-        const customOptions = { filename: 'custom-name', format: 'md' };
+        const customOptions = { filename: 'custom-name' };
 
         // Call the handler
         const result = (await handler({}, TEST_TRANSCRIPTION, customOptions)) as {
@@ -181,12 +193,16 @@ describe('Storage Service', () => {
         };
 
         // Expected file path with mocked date
-        const expectedFilePath = `${MOCK_SAVE_DIR}/custom-name_${MOCK_TIMESTAMP}.md`;
+        const expectedFilePath = `${MOCK_SAVE_DIR}/custom-name_${MOCK_TIMESTAMP}.json`;
 
         // Verify that the file was written with custom name and format
-        expect(fs.writeFileSync).toHaveBeenCalledWith(expectedFilePath, TEST_TRANSCRIPTION, {
-          encoding: 'utf-8',
-        });
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+          expectedFilePath,
+          JSON.stringify(TEST_TRANSCRIPTION, null, 2),
+          {
+            encoding: 'utf-8',
+          }
+        );
 
         // Verify the result
         expect(result).toEqual({
@@ -253,7 +269,7 @@ describe('Storage Service', () => {
         const handler = savedHandlers['save-transcription-as'];
 
         // Mock dialog.showSaveDialog to return a file path
-        const mockFilePath = '/mock/custom/path/test.txt';
+        const mockFilePath = '/mock/custom/path/test.json';
         mockDialog.showSaveDialog.mockResolvedValueOnce({
           canceled: false,
           filePath: mockFilePath,
@@ -271,15 +287,19 @@ describe('Storage Service', () => {
         expect(dialogOptions.title).toBe('Save Transcription');
         expect(dialogOptions.filters).toEqual(
           expect.arrayContaining([
-            { name: 'Text Files', extensions: ['txt'] },
+            { name: 'JSON Files', extensions: ['json'] },
             { name: 'All Files', extensions: ['*'] },
           ])
         );
 
         // Verify that the file was written to the selected path
-        expect(fs.writeFileSync).toHaveBeenCalledWith(mockFilePath, TEST_TRANSCRIPTION, {
-          encoding: 'utf-8',
-        });
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+          mockFilePath,
+          JSON.stringify(TEST_TRANSCRIPTION, null, 2),
+          {
+            encoding: 'utf-8',
+          }
+        );
 
         // Verify the result
         expect(result).toEqual({
@@ -324,7 +344,7 @@ describe('Storage Service', () => {
         // Mock dialog.showSaveDialog to return a file path
         mockDialog.showSaveDialog.mockResolvedValueOnce({
           canceled: false,
-          filePath: '/mock/custom/path/test.txt',
+          filePath: '/mock/custom/path/test.json',
         });
 
         // Mock fs.writeFileSync to throw an error
@@ -353,7 +373,7 @@ describe('Storage Service', () => {
         const handler = savedHandlers['get-recent-transcriptions'];
 
         // Mock fs.readdirSync to return some files
-        const mockFiles = ['file1.txt', 'file2.txt', 'file3.txt', 'nontext.pdf'];
+        const mockFiles = ['file1.json', 'file2.json', 'file3.json', 'nontext.pdf'];
         (fs.readdirSync as jest.Mock).mockReturnValueOnce(mockFiles);
 
         // Create mock stats with different dates
@@ -378,9 +398,9 @@ describe('Storage Service', () => {
 
         // Create a map of file paths to stats
         const statsMap = {
-          [`${MOCK_SAVE_DIR}/file1.txt`]: mockStats1,
-          [`${MOCK_SAVE_DIR}/file2.txt`]: mockStats2,
-          [`${MOCK_SAVE_DIR}/file3.txt`]: mockStats3,
+          [`${MOCK_SAVE_DIR}/file1.json`]: mockStats1,
+          [`${MOCK_SAVE_DIR}/file2.json`]: mockStats2,
+          [`${MOCK_SAVE_DIR}/file3.json`]: mockStats3,
         };
 
         // Mock fs.statSync to return stats based on file path
@@ -410,9 +430,9 @@ describe('Storage Service', () => {
         // Verify that the directory was read
         expect(fs.readdirSync).toHaveBeenCalledWith(MOCK_SAVE_DIR);
 
-        // Verify that the files were filtered to only include .txt files
+        // Verify that the files were filtered to only include .json files
         expect(result.files.length).toBe(3);
-        expect(result.files.every(file => file.name.endsWith('.txt'))).toBe(true);
+        expect(result.files.every(file => file.name.endsWith('.json'))).toBe(true);
 
         // Create a map of expected files by name for easier verification
         const filesByName = result.files.reduce(
@@ -424,25 +444,25 @@ describe('Storage Service', () => {
         );
 
         // Verify each file has the correct metadata
-        expect(filesByName['file1.txt']).toEqual({
-          name: 'file1.txt',
-          path: `${MOCK_SAVE_DIR}/file1.txt`,
+        expect(filesByName['file1.json']).toEqual({
+          name: 'file1.json',
+          path: `${MOCK_SAVE_DIR}/file1.json`,
           size: 1024,
           createdAt: new Date('2023-01-01'),
           modifiedAt: new Date('2023-01-05'),
         });
 
-        expect(filesByName['file2.txt']).toEqual({
-          name: 'file2.txt',
-          path: `${MOCK_SAVE_DIR}/file2.txt`,
+        expect(filesByName['file2.json']).toEqual({
+          name: 'file2.json',
+          path: `${MOCK_SAVE_DIR}/file2.json`,
           size: 2048,
           createdAt: new Date('2023-01-02'),
           modifiedAt: new Date('2023-01-03'),
         });
 
-        expect(filesByName['file3.txt']).toEqual({
-          name: 'file3.txt',
-          path: `${MOCK_SAVE_DIR}/file3.txt`,
+        expect(filesByName['file3.json']).toEqual({
+          name: 'file3.json',
+          path: `${MOCK_SAVE_DIR}/file3.json`,
           size: 3072,
           createdAt: new Date('2023-01-03'),
           modifiedAt: new Date('2023-01-04'),
@@ -515,7 +535,7 @@ describe('Storage Service', () => {
         const handler = savedHandlers['get-recent-transcriptions'];
 
         // Create 15 mock files
-        const mockFiles = Array.from({ length: 15 }, (_, i) => `file${i + 1}.txt`);
+        const mockFiles = Array.from({ length: 15 }, (_, i) => `file${i + 1}.json`);
         (fs.readdirSync as jest.Mock).mockReturnValueOnce(mockFiles);
 
         // Create a map of file paths to stats with descending modification dates
@@ -530,7 +550,7 @@ describe('Storage Service', () => {
 
         // Create stats with descending dates (file15 has newest date)
         for (let i = 1; i <= 15; i++) {
-          const filePath = `${MOCK_SAVE_DIR}/file${i}.txt`;
+          const filePath = `${MOCK_SAVE_DIR}/file${i}.json`;
           statsMap[filePath] = {
             size: 1024 * i,
             birthtime: new Date(`2023-01-${i}`),
@@ -583,7 +603,7 @@ describe('Storage Service', () => {
         // Verify the newest files are included and oldest are excluded
         // We'll check by file number, which corresponds to the date
         const fileNumbers = result.files.map(file => {
-          const match = file.name.match(/file(\d+)\.txt/);
+          const match = file.name.match(/file(\d+)\.json/);
           return match ? parseInt(match[1]) : 0;
         });
 
@@ -605,8 +625,8 @@ describe('Storage Service', () => {
 
         // Mock fs.readdirSync to return some files
         const mockFiles = [
-          'transcription_2023-01-01T12-30-45.txt',
-          'transcription_2023-01-02T10-15-30.txt',
+          'transcription_2023-01-01T12-30-45.json',
+          'transcription_2023-01-02T10-15-30.json',
         ];
         (fs.readdirSync as jest.Mock).mockReturnValueOnce(mockFiles);
 
@@ -627,8 +647,8 @@ describe('Storage Service', () => {
 
         // Create a map of file paths to stats
         const statsMap = {
-          [`${MOCK_SAVE_DIR}/transcription_2023-01-01T12-30-45.txt`]: mockStats1,
-          [`${MOCK_SAVE_DIR}/transcription_2023-01-02T10-15-30.txt`]: mockStats2,
+          [`${MOCK_SAVE_DIR}/transcription_2023-01-01T12-30-45.json`]: mockStats1,
+          [`${MOCK_SAVE_DIR}/transcription_2023-01-02T10-15-30.json`]: mockStats2,
         };
 
         // Mock fs.statSync to return stats based on file path
@@ -645,13 +665,28 @@ describe('Storage Service', () => {
 
         // Mock fs.readFileSync to return file content
         const contentMap = {
-          [`${MOCK_SAVE_DIR}/transcription_2023-01-01T12-30-45.txt`]: 'First transcription content',
-          [`${MOCK_SAVE_DIR}/transcription_2023-01-02T10-15-30.txt`]:
-            'Second transcription content',
+          [`${MOCK_SAVE_DIR}/transcription_2023-01-01T12-30-45.json`]: JSON.stringify({
+            id: 'transcription_2023-01-01T12-30-45',
+            text: 'First transcription content',
+            timestamp: new Date('2023-01-01T12:30:45').getTime(),
+            duration: 5,
+            language: 'en',
+            wordCount: 3,
+            source: 'test',
+          }),
+          [`${MOCK_SAVE_DIR}/transcription_2023-01-02T10-15-30.json`]: JSON.stringify({
+            id: 'transcription_2023-01-02T10-15-30',
+            text: 'Second transcription content',
+            timestamp: new Date('2023-01-02T10:15:30').getTime(),
+            duration: 7,
+            language: 'fr',
+            wordCount: 3,
+            source: 'test',
+          }),
         };
 
         (fs.readFileSync as jest.Mock).mockImplementation((filePath: string) => {
-          return contentMap[filePath] || '';
+          return contentMap[filePath] || '{}';
         });
 
         // Call the handler
@@ -661,6 +696,8 @@ describe('Storage Service', () => {
           timestamp: number;
           duration: number;
           language: string;
+          wordCount: number;
+          source: string;
         }>;
 
         // Verify that the directory was read
@@ -669,11 +706,11 @@ describe('Storage Service', () => {
         // Verify that the files were read
         expect(fs.readFileSync).toHaveBeenCalledTimes(2);
         expect(fs.readFileSync).toHaveBeenCalledWith(
-          `${MOCK_SAVE_DIR}/transcription_2023-01-01T12-30-45.txt`,
+          `${MOCK_SAVE_DIR}/transcription_2023-01-01T12-30-45.json`,
           { encoding: 'utf-8' }
         );
         expect(fs.readFileSync).toHaveBeenCalledWith(
-          `${MOCK_SAVE_DIR}/transcription_2023-01-02T10-15-30.txt`,
+          `${MOCK_SAVE_DIR}/transcription_2023-01-02T10-15-30.json`,
           { encoding: 'utf-8' }
         );
 
@@ -712,7 +749,7 @@ describe('Storage Service', () => {
         const handler = savedHandlers['get-transcriptions'];
 
         // Mock fs.readdirSync to return a file without timestamp pattern
-        const mockFiles = ['custom_filename.txt'];
+        const mockFiles = ['custom_filename.json'];
         (fs.readdirSync as jest.Mock).mockReturnValueOnce(mockFiles);
 
         // Mock fs.statSync to return file stats
@@ -726,7 +763,17 @@ describe('Storage Service', () => {
         (fs.statSync as jest.Mock).mockReturnValue(mockStats);
 
         // Mock fs.readFileSync to return file content
-        (fs.readFileSync as jest.Mock).mockReturnValue('Custom file content');
+        (fs.readFileSync as jest.Mock).mockReturnValue(
+          JSON.stringify({
+            id: 'custom_filename',
+            text: 'Custom file content',
+            timestamp: new Date('2023-01-01T10:00:00').getTime(),
+            duration: 3,
+            language: 'en',
+            wordCount: 3,
+            source: 'test',
+          })
+        );
 
         // Call the handler
         const result = (await handler({})) as Array<{
@@ -735,6 +782,8 @@ describe('Storage Service', () => {
           timestamp: number;
           duration: number;
           language: string;
+          wordCount: number;
+          source: string;
         }>;
 
         // Verify the result
@@ -767,7 +816,7 @@ describe('Storage Service', () => {
         const handler = savedHandlers['get-transcriptions'];
 
         // Mock fs.readdirSync to return some files
-        const mockFiles = ['file1.txt', 'file2.txt'];
+        const mockFiles = ['file1.json', 'file2.json'];
         (fs.readdirSync as jest.Mock).mockReturnValueOnce(mockFiles);
 
         // Mock fs.statSync to return file stats
@@ -787,12 +836,20 @@ describe('Storage Service', () => {
           // Mock fs.readFileSync to throw an error for the second file
           // but return content for the first file
           (fs.readFileSync as jest.Mock).mockImplementation((filePath: string) => {
-            if (filePath.includes('file2.txt')) {
+            if (filePath.includes('file2.json')) {
               // Instead of throwing an error, we'll just log it and return empty content
               console.error('Failed to read file');
-              return '';
+              return '{}';
             }
-            return 'File content';
+            return JSON.stringify({
+              id: 'file1',
+              text: 'File content',
+              timestamp: new Date('2023-01-01').getTime(),
+              duration: 3,
+              language: 'en',
+              wordCount: 2,
+              source: 'test',
+            });
           });
 
           // Call the handler - the implementation should handle the error internally
@@ -803,6 +860,8 @@ describe('Storage Service', () => {
             timestamp: number;
             duration: number;
             language: string;
+            wordCount: number;
+            source: string;
           }>;
 
           // Should still return both files, but the second one will have empty content
@@ -832,7 +891,7 @@ describe('Storage Service', () => {
         const handler = savedHandlers['get-transcriptions'];
 
         // Mock fs.readdirSync to return a file with timestamp pattern
-        const mockFiles = ['transcription_2023-01-15T14-30-25.txt'];
+        const mockFiles = ['transcription_2023-01-15T14-30-25.json'];
         (fs.readdirSync as jest.Mock).mockReturnValueOnce(mockFiles);
 
         // Mock fs.statSync to return file stats
@@ -845,7 +904,17 @@ describe('Storage Service', () => {
         (fs.statSync as jest.Mock).mockReturnValue(mockStats);
 
         // Mock fs.readFileSync to return file content
-        (fs.readFileSync as jest.Mock).mockReturnValue('Transcription content');
+        (fs.readFileSync as jest.Mock).mockReturnValue(
+          JSON.stringify({
+            id: 'transcription_2023-01-15T14-30-25',
+            text: 'Transcription content',
+            timestamp: new Date('2023-01-15T14:30:25').getTime(),
+            duration: 5,
+            language: 'en',
+            wordCount: 2,
+            source: 'test',
+          })
+        );
 
         // Call the handler
         const result = (await handler({})) as Array<{
@@ -854,6 +923,8 @@ describe('Storage Service', () => {
           timestamp: number;
           duration: number;
           language: string;
+          wordCount: number;
+          source: string;
         }>;
 
         // Verify the result

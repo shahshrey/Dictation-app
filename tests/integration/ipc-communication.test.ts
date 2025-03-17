@@ -507,9 +507,7 @@ describe.skip('Real IPC Communication with Spectron', () => {
       expect(files.length).toBeGreaterThan(0);
 
       // Check if at least one file is a transcription file
-      const transcriptionFiles = files.filter(
-        file => file.endsWith('.txt') || file.endsWith('.json')
-      );
+      const transcriptionFiles = files.filter(file => file.endsWith('.json'));
       expect(transcriptionFiles.length).toBeGreaterThan(0);
     } finally {
       // Clean up temporary directory

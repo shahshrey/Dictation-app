@@ -126,7 +126,7 @@ const transcribeRecording = async (language, apiKey) => {
       let filePath = '';
       try {
         const filename = 'transcription';
-        const format = 'txt';
+        const format = 'json';
         const timestampStr = new Date().toISOString().replace(/[:.]/g, '-');
         const fullFilename = `${filename}_${timestampStr}.${format}`;
         filePath = path.join(global.DEFAULT_SAVE_DIR, fullFilename);
@@ -137,20 +137,37 @@ const transcribeRecording = async (language, apiKey) => {
           fs.mkdirSync(global.DEFAULT_SAVE_DIR, { recursive: true });
         }
 
+        // Create a transcription object
+        const transcriptionObject = {
+          id: path.basename(fullFilename, '.json'),
+          text: transcription.text,
+          timestamp,
+          duration,
+          language: transcriptionParams.language,
+          wordCount: transcription.text.split(/\s+/).length,
+          source: 'recording',
+          confidence: 0.95, // Default confidence value
+        };
+
         // Write the file synchronously to ensure it's fully written before returning
-        fs.writeFileSync(filePath, transcription.text, { encoding: 'utf-8' });
+        fs.writeFileSync(filePath, JSON.stringify(transcriptionObject, null, 2), { encoding: 'utf-8' });
         global.logger.info(`Transcription saved to: ${filePath}`);
 
         // Verify the file was written correctly
         if (fs.existsSync(filePath)) {
           const fileContent = fs.readFileSync(filePath, { encoding: 'utf-8' });
-          if (fileContent !== transcription.text) {
-            global.logger.error('File content does not match transcription text', null);
-          } else {
-            global.logger.debug('File content verified successfully');
+          try {
+            const parsedContent = JSON.parse(fileContent);
+            if (!parsedContent || !parsedContent.text || parsedContent.text !== transcription.text) {
+              global.logger.error('File content does not match transcription object', null);
+            } else {
+              global.logger.debug('File content verified successfully');
+            }
+          } catch (parseError) {
+            global.logger.error('Failed to parse saved JSON file', parseError);
           }
         } else {
-          global.logger.error('File was not created', null);
+          global.logger.error(`File not found after writing: ${filePath}`, null);
         }
       } catch (saveError) {
         global.logger.exception('Failed to save transcription to file', saveError);
