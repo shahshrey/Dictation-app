@@ -23,6 +23,9 @@ interface ElectronAPI {
   onAudioDevicesRequest: (callback: () => void) => () => void;
   sendAudioDevicesResult: (devices: AudioDevice[]) => void;
 
+  // Permissions
+  notifyPermissionIssue: (permissionType: 'microphone' | 'accessibility') => void;
+
   // Groq API
   transcribeAudio: (
     filePath: string,

@@ -16,7 +16,6 @@ mac:
   category: public.app-category.productivity
   target: 
     - dmg
-    - zip
   icon: src/assets/logo/logo.icns
   darkModeSupport: true
   hardenedRuntime: true
@@ -32,11 +31,6 @@ mac:
     LSApplicationCategoryType: public.app-category.productivity
   type: development
   identity: null
-  binaries:
-    - Dictation App.app/Contents/MacOS/Dictation App
-  extraFiles:
-    - from: build/Info.plist
-      to: Contents/Info.plist
 
 dmg:
   contents:
@@ -46,5 +40,8 @@ dmg:
       y: 220
       type: link
       path: /Applications
+  window:
+    width: 540
+    height: 380
 
 publish: null 

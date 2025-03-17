@@ -27,7 +27,7 @@ global.popupWindow = null;
 
 // Only after setting up globals, import other components
 const { pasteTextAtCursor } = require('./components/clipboardUtils');
-const { checkMacOSPermissions } = require('./components/permissionsUtils');
+const { checkMacOSPermissions, recheckAccessibilityPermission } = require('./components/permissionsUtils');
 const { store, settings, initStore, ensureDirectories } = require('./components/storeUtils');
 const { groqClient, initGroqClient } = require('./components/groqClient');
 
@@ -181,6 +181,12 @@ app.whenReady().then(async () => {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
     logger.debug('Number of open windows:', { count: BrowserWindow.getAllWindows().length });
+
+    // Recheck permissions when app is activated
+    if (process.platform === 'darwin') {
+      logger.debug('Rechecking accessibility permissions on activate');
+      recheckAccessibilityPermission();
+    }
 
     if (BrowserWindow.getAllWindows().length === 0) {
       logger.debug('No windows open, creating main window');

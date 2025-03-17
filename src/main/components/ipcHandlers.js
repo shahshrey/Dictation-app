@@ -3,11 +3,44 @@ const fs = require('fs');
 const path = require('path');
 const { AUDIO_FILE_PATH, TEMP_DIR, DEFAULT_SAVE_DIR, GROQ_MODELS } = require('./constants');
 const { initGroqClient, transcribeRecording } = require('./groqClient');
+const { recheckAccessibilityPermission } = require('./permissionsUtils');
 const logger = require('../../shared/logger').default;
 
 // Set up IPC handlers
 const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManager) => {
   const { showPopupWindow, hidePopupWindow } = windowManager;
+  
+  // Handle permission issues
+  ipcMain.on('permission-issue', (_, permissionType) => {
+    logger.debug('Permission issue reported:', { permissionType });
+    
+    if (permissionType === 'accessibility') {
+      // Recheck accessibility permissions
+      recheckAccessibilityPermission();
+    } else if (permissionType === 'microphone') {
+      // Show dialog for microphone permission
+      dialog
+        .showMessageBox({
+          type: 'info',
+          title: 'Microphone Permission Required',
+          message: 'This app needs microphone permission to record audio.',
+          detail: 'Please allow microphone access in your system settings.',
+          buttons: ['Open System Preferences', 'Later'],
+          defaultId: 0,
+        })
+        .then(({ response }) => {
+          if (response === 0) {
+            // Open System Preferences to the Microphone pane
+            const command =
+              'open x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone';
+            require('child_process').exec(command);
+          }
+        })
+        .catch(error => {
+          logger.error('Error showing microphone permission dialog:', { error: error.message });
+        });
+    }
+  });
   
   // Get available audio input devices
   ipcMain.handle('get-audio-sources', async () => {

@@ -32,6 +32,14 @@ try {
       ipcRenderer.send(IPC_CHANNELS.AUDIO_DEVICES_RESULT, devices);
     },
 
+    // Permissions
+    notifyPermissionIssue: (permissionType: 'microphone' | 'accessibility') => {
+      logger.debug('Preload: notifyPermissionIssue called for permission type:', {
+        permissionType,
+      });
+      ipcRenderer.send('permission-issue', permissionType);
+    },
+
     // Groq API
     transcribeAudio: (filePath: string, options: { language?: string }) =>
       ipcRenderer.invoke('transcribe-audio', filePath, options),

@@ -60,64 +60,92 @@ export const useAudioRecording = ({
         video: false,
       };
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      const recorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm', // Explicitly set the MIME type
-      });
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const recorder = new MediaRecorder(stream, {
+          mimeType: 'audio/webm', // Explicitly set the MIME type
+        });
 
-      // Set up event handlers
-      recorder.ondataavailable = event => {
-        if (event.data.size > 0) {
-          logger.debug('Received audio chunk of size:', { size: event.data.size });
-          audioChunksRef.current.push(event.data);
+        // Set up event handlers
+        recorder.ondataavailable = event => {
+          if (event.data.size > 0) {
+            logger.debug('Received audio chunk of size:', { size: event.data.size });
+            audioChunksRef.current.push(event.data);
+          } else {
+            logger.warn('Received empty audio chunk');
+          }
+        };
+
+        recorder.onstop = () => {
+          logger.debug(`Recording stopped, collected ${audioChunksRef.current.length} chunks`);
+
+          // Combine chunks into a single blob
+          if (audioChunksRef.current.length === 0) {
+            logger.error('No audio chunks collected during recording');
+            setError('No audio data was captured during recording');
+            return;
+          }
+
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          logger.debug('Created audio blob of size:', { size: audioBlob.size });
+
+          // Call the callback with the audio blob
+          if (onRecordingComplete) {
+            onRecordingComplete(audioBlob);
+          }
+
+          // Stop all tracks in the stream
+          stream.getTracks().forEach(track => track.stop());
+
+          // Reset recording time
+          setRecordingTime(0);
+          setIsRecording(false);
+
+          if (timer) {
+            clearInterval(timer);
+            setTimer(null);
+          }
+        };
+
+        // Request data every second to ensure we get chunks even for short recordings
+        recorder.start(1000);
+        logger.debug('MediaRecorder started');
+        setMediaRecorder(recorder);
+        setIsRecording(true);
+
+        // Start timer
+        const intervalId = setInterval(() => {
+          setRecordingTime(prev => prev + 1);
+        }, 1000);
+
+        setTimer(intervalId);
+      } catch (mediaError) {
+        // Handle specific permission errors
+        if (mediaError instanceof DOMException) {
+          if (mediaError.name === 'NotAllowedError') {
+            logger.error('Microphone permission denied:', { error: mediaError.message });
+            setError(
+              'Microphone permission denied. Please allow microphone access in your system settings.'
+            );
+
+            // Notify the main process about permission issues
+            if (
+              window.electronAPI &&
+              typeof window.electronAPI.notifyPermissionIssue === 'function'
+            ) {
+              window.electronAPI.notifyPermissionIssue('microphone');
+            }
+          } else if (mediaError.name === 'NotFoundError') {
+            logger.error('No microphone found:', { error: mediaError.message });
+            setError('No microphone found. Please connect a microphone and try again.');
+          } else {
+            logger.error('Media error:', { error: mediaError.message, name: mediaError.name });
+            setError(`Media error: ${mediaError.message}`);
+          }
         } else {
-          logger.warn('Received empty audio chunk');
+          throw mediaError; // Re-throw non-DOMException errors to be caught by the outer catch
         }
-      };
-
-      recorder.onstop = () => {
-        logger.debug(`Recording stopped, collected ${audioChunksRef.current.length} chunks`);
-
-        // Combine chunks into a single blob
-        if (audioChunksRef.current.length === 0) {
-          logger.error('No audio chunks collected during recording');
-          setError('No audio data was captured during recording');
-          return;
-        }
-
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        logger.debug('Created audio blob of size:', { size: audioBlob.size });
-
-        // Call the callback with the audio blob
-        if (onRecordingComplete) {
-          onRecordingComplete(audioBlob);
-        }
-
-        // Stop all tracks in the stream
-        stream.getTracks().forEach(track => track.stop());
-
-        // Reset recording time
-        setRecordingTime(0);
-        setIsRecording(false);
-
-        if (timer) {
-          clearInterval(timer);
-          setTimer(null);
-        }
-      };
-
-      // Request data every second to ensure we get chunks even for short recordings
-      recorder.start(1000);
-      logger.debug('MediaRecorder started');
-      setMediaRecorder(recorder);
-      setIsRecording(true);
-
-      // Start timer
-      const intervalId = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
-
-      setTimer(intervalId);
+      }
     } catch (err) {
       setError(`Failed to start recording: ${err instanceof Error ? err.message : String(err)}`);
       logger.error('Recording error:', { error: err instanceof Error ? err.message : String(err) });
