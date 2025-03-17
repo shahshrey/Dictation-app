@@ -10,7 +10,7 @@ The application uses the `groq-sdk` npm package to interact with Groq's cloud-ba
 
 ```typescript
 // Initialize the Groq client with API key
-const GROQ_API_KEY = process.env.GROQ_API_KEY || settings.get('apiKey');
+const GROQ_API_KEY = settings.get('apiKey');
 const groq = new Groq({ apiKey: GROQ_API_KEY });
 ```
 
@@ -39,12 +39,12 @@ async function transcribeAudio(
   try {
     // Create a temporary file from the buffer
     const tempFilePath = await createTempAudioFile(audioBuffer);
-    
+
     // Set default options if not provided
     const model = options.model || 'whisper-large-v3-turbo';
     const language = options.language || 'en';
     const temperature = options.temperature || 0.0;
-    
+
     // Create a transcription job
     const transcription = await groq.audio.transcriptions.create({
       file: fs.createReadStream(tempFilePath),
@@ -54,17 +54,17 @@ async function transcribeAudio(
       response_format: 'verbose_json',
       temperature: temperature,
     });
-    
+
     // Clean up temporary file
     await fs.promises.unlink(tempFilePath);
-    
+
     return {
       text: transcription.text,
       metadata: {
         avgLogprob: transcription.avg_logprob,
         noSpeechProb: transcription.no_speech_prob,
-        compressionRatio: transcription.compression_ratio
-      }
+        compressionRatio: transcription.compression_ratio,
+      },
     };
   } catch (error) {
     logger.exception('Error during transcription:', error);
@@ -89,6 +89,7 @@ interface TranscriptionResult {
 ```
 
 Example response:
+
 ```json
 {
   "text": "This is a sample transcription of spoken audio.",
@@ -124,11 +125,11 @@ async function translateAudio(
   try {
     // Create a temporary file from the buffer
     const tempFilePath = await createTempAudioFile(audioBuffer);
-    
+
     // Set default options if not provided
     const model = options.model || 'whisper-large-v3';
     const temperature = options.temperature || 0.0;
-    
+
     // Create a translation job
     const translation = await groq.audio.translations.create({
       file: fs.createReadStream(tempFilePath),
@@ -137,17 +138,17 @@ async function translateAudio(
       response_format: 'verbose_json',
       temperature: temperature,
     });
-    
+
     // Clean up temporary file
     await fs.promises.unlink(tempFilePath);
-    
+
     return {
       text: translation.text,
       metadata: {
         avgLogprob: translation.avg_logprob,
         noSpeechProb: translation.no_speech_prob,
-        compressionRatio: translation.compression_ratio
-      }
+        compressionRatio: translation.compression_ratio,
+      },
     };
   } catch (error) {
     logger.exception('Error during translation:', error);
@@ -254,6 +255,7 @@ The Groq API provides valuable metadata that helps assess the quality of transcr
 ### Average Log Probability (`avgLogprob`)
 
 This value indicates the model's confidence in the transcription:
+
 - Values closer to 0 indicate higher confidence
 - Values below -0.5 may indicate potential issues with transcription quality
 - Typical good values range from -0.1 to -0.3
@@ -261,6 +263,7 @@ This value indicates the model's confidence in the transcription:
 ### No Speech Probability (`noSpeechProb`)
 
 This value indicates the probability that the audio contains no speech:
+
 - Values close to 0 indicate high confidence that speech is present
 - Values close to 1 indicate high confidence that no speech is present
 - Values above 0.5 may indicate sections of silence or non-speech audio
@@ -268,6 +271,7 @@ This value indicates the probability that the audio contains no speech:
 ### Compression Ratio (`compressionRatio`)
 
 This value relates to the information density of the transcription:
+
 - Typical values range from 1.0 to 2.0 for normal speech
 - Unusually high values may indicate repetitive speech or stuttering
 - Unusually low values may indicate very dense information or fast speech
@@ -281,7 +285,7 @@ try {
   // API call
 } catch (error) {
   logger.exception('Error description:', error);
-  
+
   // Categorize errors
   if (error.status === 401) {
     return { error: 'Authentication failed. Please check your API key.' };
@@ -303,7 +307,7 @@ The application implements basic rate limiting to prevent excessive API usage:
 const API_CALLS = {
   count: 0,
   resetTime: Date.now() + 60000,
-  limit: 10 // 10 calls per minute
+  limit: 10, // 10 calls per minute
 };
 
 function checkRateLimit() {
@@ -312,11 +316,11 @@ function checkRateLimit() {
     API_CALLS.count = 0;
     API_CALLS.resetTime = now + 60000;
   }
-  
+
   if (API_CALLS.count >= API_CALLS.limit) {
     throw new Error('Rate limit exceeded. Please try again later.');
   }
-  
+
   API_CALLS.count++;
 }
-``` 
+```

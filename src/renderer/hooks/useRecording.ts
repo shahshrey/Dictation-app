@@ -98,6 +98,47 @@ export const useRecording = ({
       }
     } else {
       logger.error('No audio device selected', null);
+
+      // Request audio devices refresh using browser API
+      try {
+        logger.info('No device selected, requesting microphone access to initialize devices');
+
+        // Request microphone access to get device labels
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Stop the stream immediately after getting access
+        stream.getTracks().forEach(track => track.stop());
+
+        // Get devices after permission is granted
+        const mediaDevices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputDevices = mediaDevices.filter(device => device.kind === 'audioinput');
+
+        if (audioInputDevices.length > 0) {
+          // Map to our AudioDevice type
+          const mappedDevices = audioInputDevices.map((device, i) => ({
+            id: device.deviceId,
+            name: device.label || `Microphone ${i + 1}`,
+            isDefault: device.deviceId === 'default' || device.deviceId === '',
+          }));
+
+          // Send devices to main process to update context
+          if (
+            window.electronAPI &&
+            typeof window.electronAPI.sendAudioDevicesResult === 'function'
+          ) {
+            window.electronAPI.sendAudioDevicesResult(mappedDevices);
+          }
+
+          // Wait a short time for the context to update
+          await new Promise(resolve => setTimeout(resolve, 500));
+
+          // Try recording again
+          await startAudioRecording();
+        } else {
+          logger.error('No audio input devices found', null);
+        }
+      } catch (error) {
+        logger.exception('Failed to access microphone', error);
+      }
     }
   };
 

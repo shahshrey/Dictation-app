@@ -1,10 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Transcription, AppSettings } from '../../shared/types';
 import { logger } from '../utils/logger';
 
 export const useTranscriptions = (settings: AppSettings) => {
   const [currentTranscription, setCurrentTranscription] = useState<Transcription | null>(null);
   const [recentTranscriptions, setRecentTranscriptions] = useState<Transcription[]>([]);
+
+  // Log when settings change, particularly the API key
+  useEffect(() => {
+    logger.debug(`useTranscriptions received settings update`);
+    logger.debug(`API key available in useTranscriptions: ${!!settings.apiKey}`);
+    logger.debug(
+      `API key length in useTranscriptions: ${settings.apiKey ? settings.apiKey.length : 0}`
+    );
+  }, [settings, settings.apiKey]);
 
   // Helper functions to reduce cognitive complexity
   const processTranscriptionsResult = (transcriptions: Transcription[]): void => {
@@ -156,22 +165,16 @@ export const useTranscriptions = (settings: AppSettings) => {
         `transcribeRecording API available: ${!!(window.electronAPI && typeof window.electronAPI.transcribeRecording === 'function')}`
       );
 
-      // Get API key from settings or use a default one for testing
-      let apiKey = settings.apiKey;
+      // Get API key from settings
+      const apiKey = settings.apiKey;
 
       // Check if API key is available
       if (!apiKey) {
         logger.warn('No API key in settings, checking .env file or using default');
 
-        // Try to get API key from environment
-        if (process.env.GROQ_API_KEY) {
-          apiKey = process.env.GROQ_API_KEY;
-          logger.info('Using API key from environment variable');
-        } else {
-          // For testing purposes only - in production, always require a valid API key
-          logger.error('No API key available. Please set your Groq API key in the settings.', null);
-          return;
-        }
+        // Error out since we don't have an API key
+        logger.error('No API key available. Please set your Groq API key in the settings.', null);
+        return;
       }
 
       if (window.electronAPI && typeof window.electronAPI.transcribeRecording === 'function') {

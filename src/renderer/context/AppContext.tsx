@@ -32,7 +32,7 @@ interface AppContextType {
   startRecording: () => Promise<void>;
   stopRecording: () => void;
   transcribeRecording: (language?: string) => Promise<void>;
-  saveTranscription: (id: string) => Promise<void>;
+  saveTranscription: (transcription: Transcription) => Promise<void>;
 }
 
 // Create the context with a default value
@@ -62,15 +62,25 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
 
   // Fetch audio devices and settings on component mount
   useEffect(() => {
-    refreshAudioDevices();
-    loadSettings().then(() => {
-      logger.info('Settings loaded');
-      logger.debug(`Settings: ${JSON.stringify(settings, null, 2)}`);
-      logger.debug(`API key available: ${!!settings.apiKey}`);
-      logger.debug(`Auto-transcribe enabled: ${settings.autoTranscribe}`);
-      logger.debug(`Language setting: ${settings.language}`);
-    });
-    refreshRecentTranscriptions();
+    const initializeApp = async () => {
+      try {
+        // Load settings first
+        await loadSettings();
+        logger.info('Settings loaded');
+        logger.debug(`Settings: ${JSON.stringify(settings, null, 2)}`);
+        logger.debug(`API key available: ${!!settings.apiKey}`);
+        logger.debug(`Auto-transcribe enabled: ${settings.autoTranscribe}`);
+        logger.debug(`Language setting: ${settings.language}`);
+
+        // Then load audio devices and transcriptions
+        await refreshAudioDevices();
+        await refreshRecentTranscriptions();
+      } catch (error) {
+        logger.exception('Error initializing app', error);
+      }
+    };
+
+    initializeApp();
 
     // Set up event listeners for the Home key and audio device requests
     let unsubscribeToggleRecording = () => {};
@@ -107,7 +117,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
         logger.exception('Error cleaning up event listeners', error);
       }
     };
-  }, [isRecording]);
+  }, [isRecording, settings.apiKey]);
 
   // Context value - memoize to prevent unnecessary re-renders
   const contextValue = useMemo(
@@ -146,6 +156,7 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
       selectedDevice,
       currentTranscription,
       recentTranscriptions,
+      settings.apiKey,
     ]
   );
 

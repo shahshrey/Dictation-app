@@ -12,13 +12,23 @@ export const useSettings = () => {
       logger.info('Loading settings...');
       if (window.electronAPI && typeof window.electronAPI.getSettings === 'function') {
         const loadedSettings = await window.electronAPI.getSettings();
-        logger.debug(`Loaded settings: ${JSON.stringify(loadedSettings, null, 2)}`);
+        logger.debug(
+          `Loaded settings: ${JSON.stringify(
+            {
+              ...loadedSettings,
+              apiKey: loadedSettings.apiKey ? '[API KEY PRESENT]' : 'null',
+            },
+            null,
+            2
+          )}`
+        );
 
         // First convert to unknown, then assert as AppSettings to avoid type errors
         const typedSettings = (loadedSettings as unknown as AppSettings) ?? DEFAULT_SETTINGS;
 
         // Log important settings
         logger.debug(`API key available: ${!!typedSettings.apiKey}`);
+        logger.debug(`API key length: ${typedSettings.apiKey ? typedSettings.apiKey.length : 0}`);
         logger.debug(`Auto-transcribe enabled: ${typedSettings.autoTranscribe}`);
         logger.debug(`Language setting: ${typedSettings.language}`);
 

@@ -25,15 +25,12 @@ const transcribeRecording = async (language, apiKey) => {
   global.logger.debug('API key length: ' + (apiKey ? apiKey.length : 0));
 
   try {
-    // Use the provided API key or fall back to the one in settings
-    const effectiveApiKey = apiKey || global.settings.apiKey;
-    
-    // Initialize Groq client with the effective API key
-    if (!effectiveApiKey) {
-      global.logger.error('No API key provided or found in settings', null);
+    // Use the provided API key directly without falling back to settings
+    if (!apiKey) {
+      global.logger.error('No API key provided', null);
       return {
         success: false,
-        error: 'No API key provided or found in settings',
+        error: 'No API key provided',
         id: '',
         text: '',
         timestamp: 0,
@@ -42,7 +39,7 @@ const transcribeRecording = async (language, apiKey) => {
     }
 
     global.logger.info('Initializing Groq client with API key');
-    const client = initGroqClient(effectiveApiKey);
+    const client = initGroqClient(apiKey);
     global.logger.debug('Groq client initialized successfully');
 
     // Get the path to the most recent recording

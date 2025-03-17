@@ -309,6 +309,14 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store, windowManage
 
   // Get settings
   ipcMain.handle('get-settings', () => {
+    // Log the settings being returned to the renderer
+    console.log('[DEBUG] Current settings from getSettings:', JSON.stringify({
+      ...settings,
+      apiKey: settings.apiKey ? '[API KEY PRESENT]' : 'null'
+    }));
+    console.log('[DEBUG] Current settings API key available:', !!settings.apiKey);
+    console.log('[DEBUG] Current settings API key length:', settings.apiKey ? settings.apiKey.length : 0);
+    
     return settings;
   });
 
