@@ -5,9 +5,17 @@ import { useAppContext } from '../../../context/AppContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 import { Label } from '../../ui/label';
 import { Input } from '../../ui/input';
+import { AudioDevice } from '../../../../shared/types';
 
 const SettingsPanel: React.FC = () => {
-  const { settings, updateSettings } = useAppContext();
+  const {
+    settings,
+    updateSettings,
+    audioDevices,
+    selectedDevice,
+    setSelectedDevice,
+    refreshAudioDevices,
+  } = useAppContext();
   const [listeningForHotkey, setListeningForHotkey] = useState(false);
   const hotkeyInputRef = useRef<HTMLInputElement>(null);
 
@@ -43,8 +51,40 @@ const SettingsPanel: React.FC = () => {
     }
   };
 
+  // Handle device selection
+  const handleDeviceChange = (deviceId: string): void => {
+    const device = audioDevices.find(d => d.id === deviceId);
+    if (device) {
+      setSelectedDevice(device);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      <div className="space-y-2">
+        <Label htmlFor="microphone-select">Select Microphone</Label>
+        <Select value={selectedDevice?.id ?? ''} onValueChange={handleDeviceChange}>
+          <SelectTrigger id="microphone-select" className="w-full">
+            <SelectValue placeholder="Select a microphone" />
+          </SelectTrigger>
+          <SelectContent>
+            {audioDevices.map((device: AudioDevice) => (
+              <SelectItem key={device.id} value={device.id}>
+                {device.name} {device.isDefault ? '(Default)' : ''}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => refreshAudioDevices()}
+          className="self-end mt-1"
+        >
+          Refresh Devices
+        </Button>
+      </div>
+
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label htmlFor="api-key" className="text-sm font-medium">
