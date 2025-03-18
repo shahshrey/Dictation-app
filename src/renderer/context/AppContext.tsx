@@ -90,10 +90,34 @@ export const AppContextProvider: React.FC<{ children: ReactNode }> = ({ children
       // Check if the API is available
       if (window.electronAPI && typeof window.electronAPI.onToggleRecording === 'function') {
         unsubscribeToggleRecording = window.electronAPI.onToggleRecording(() => {
+          logger.debug('Toggle recording event received from main process');
+          logger.debug('Current recording state:', { isRecording });
+          logger.debug('Selected device:', {
+            id: selectedDevice?.id,
+            name: selectedDevice?.name,
+          });
+
           if (isRecording) {
+            logger.debug('Stopping recording via toggle event');
             stopRecording();
           } else {
-            startRecording();
+            logger.debug('Starting recording via toggle event');
+
+            // If no device is selected, try to use default microphone
+            if (!selectedDevice) {
+              logger.debug('No device selected, will attempt to use default microphone');
+
+              // The startRecording function in useRecording will handle
+              // getting permission and selecting a default device if needed
+            }
+
+            startRecording()
+              .then(() => {
+                logger.debug('Recording started successfully via toggle event');
+              })
+              .catch(error => {
+                logger.exception('Failed to start recording via toggle event', error);
+              });
           }
         });
       }

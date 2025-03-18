@@ -1,10 +1,10 @@
 const { ipcMain, dialog } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { AUDIO_FILE_PATH, TEMP_DIR, GROQ_MODELS, DEFAULT_SETTINGS } = require('./constants');
+const { GROQ_MODELS, DEFAULT_SETTINGS } = require('./constants');
 const { initGroqClient, transcribeRecording } = require('./groqClient');
 const { recheckAccessibilityPermission } = require('./permissionsUtils');
-const { showPopupWindow, hidePopupWindow, setIgnoreMouseEvents, registerGlobalHotkey } = require('./windowManager');
+const { setIgnoreMouseEvents, registerGlobalHotkey } = require('./windowManager');
 const { 
   saveTranscription, 
   saveTranscriptionAs, 
@@ -65,57 +65,9 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store) => {
     }
   });
 
-  // Save the recorded audio blob sent from the renderer
-  ipcMain.handle('save-recording', async (_, arrayBuffer) => {
-    try {
-      logger.debug('Saving recording, buffer size:', { size: arrayBuffer.byteLength });
-
-      // Validate that we have actual data
-      if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-        logger.error('Error: Empty audio buffer received');
-        return { success: false, error: 'Empty audio buffer received' };
-      }
-
-      const buffer = Buffer.from(arrayBuffer);
-
-      // Ensure the temp directory exists
-      if (!fs.existsSync(TEMP_DIR)) {
-        fs.mkdirSync(TEMP_DIR, { recursive: true });
-      }
-
-      // Write the file
-      fs.writeFileSync(AUDIO_FILE_PATH, buffer, { encoding: 'binary' });
-
-      // Verify the file was written correctly
-      if (fs.existsSync(AUDIO_FILE_PATH)) {
-        const stats = fs.statSync(AUDIO_FILE_PATH);
-        logger.debug(`Recording saved successfully: ${AUDIO_FILE_PATH}, size: ${stats.size} bytes`);
-
-        if (stats.size === 0) {
-          logger.error('Error: File was saved but is empty');
-          return {
-            success: false,
-            error: 'File was saved but is empty',
-            filePath: AUDIO_FILE_PATH,
-          };
-        }
-
-        return { success: true, filePath: AUDIO_FILE_PATH, size: stats.size };
-      } else {
-        logger.error('Error: File was not saved');
-        return { success: false, error: 'File was not saved' };
-      }
-    } catch (error) {
-      logger.error('Failed to save recording:', { error: error.message });
-      return { success: false, error: String(error) };
-    }
-  });
-
-  // Get the path to the recording file
-  ipcMain.handle('get-recording-path', () => {
-    return AUDIO_FILE_PATH;
-  });
-
+  // NOTE: save-recording, get-recording-path, start-recording, and stop-recording
+  // handlers are now provided by the RecordingManager class
+  
   // Transcribe audio using Groq API
   ipcMain.handle('transcribe-audio', async (_, filePath, options) => {
     try {
@@ -306,29 +258,6 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store) => {
       return { success: true };
     } catch (error) {
       logger.error('Failed to save settings:', { error: error.message });
-      return { success: false, error: String(error) };
-    }
-  });
-
-  // Add handlers for recording state
-  ipcMain.handle('start-recording', async () => {
-    try {
-      global.isRecording = true;
-      showPopupWindow();
-      return { success: true };
-    } catch (error) {
-      logger.error('Failed to start recording:', { error: error.message });
-      return { success: false, error: String(error) };
-    }
-  });
-
-  ipcMain.handle('stop-recording', async () => {
-    try {
-      global.isRecording = false;
-      hidePopupWindow();
-      return { success: true };
-    } catch (error) {
-      logger.error('Failed to stop recording:', { error: error.message });
       return { success: false, error: String(error) };
     }
   });

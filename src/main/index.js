@@ -11,8 +11,8 @@ const logger = require('../shared/logger').default;
 // First import constants to prevent circular dependencies
 const { TEMP_DIR, DEFAULT_SAVE_DIR, GROQ_MODELS } = require('./components/constants');
 
-// Define AUDIO_FILE_PATH here instead of importing from constants to avoid circular dependency
-const AUDIO_FILE_PATH = path.join(TEMP_DIR, 'recording.webm');
+// Import the RecordingManager
+const { RecordingManager, AUDIO_FILE_PATH } = require('./services/recording');
 
 // Define global variables first to ensure they're available to all modules
 // IMPORTANT: These globals must be set before importing modules that might use them
@@ -23,6 +23,8 @@ global.GROQ_MODELS = GROQ_MODELS;
 global.isRecording = false;
 global.mainWindow = null;
 global.popupWindow = null;
+global.mainWindowMinimized = false;
+global.popupWindowMinimized = false;
 
 // Only after setting up globals, import other components
 const { pasteTextAtCursor } = require('./components/clipboardUtils');
@@ -39,7 +41,8 @@ const {
   hidePopupFromDock,
   showPopupWindow,
   setupDockMenu,
-  registerGlobalHotkey
+  registerGlobalHotkey,
+  restoreMinimizedWindows
 } = require('./components/windowManager');
 
 // Import IPC handlers last as they depend on all other components
@@ -48,8 +51,10 @@ const { setupIpcHandlers } = require('./components/ipcHandlers');
 // Lazy load components that aren't needed immediately
 let groqClient = null;
 let initGroqClient = null;
+let recordingManager = null;
 
 // Function to lazily load the Groq client
+// This function is used elsewhere in the codebase, do not remove
 const loadGroqClient = () => {
   if (!groqClient) {
     const groqModule = require('./components/groqClient');
@@ -92,6 +97,11 @@ app.whenReady().then(async () => {
   if (!global.mainWindow && mainWindowInstance) {
     global.mainWindow = mainWindowInstance;
   }
+
+  // Initialize the recording manager
+  logger.debug('Initializing recording manager');
+  recordingManager = RecordingManager.initialize(require('electron').ipcMain, global.mainWindow, global.popupWindow);
+  global.recordingManager = recordingManager;
 
   // Make sure the main window is created successfully
   if (!global.mainWindow) {
@@ -168,6 +178,22 @@ app.whenReady().then(async () => {
     // dock icon is clicked and there are no other windows open.
     logger.debug('Number of open windows:', { count: BrowserWindow.getAllWindows().length });
 
+    // First check if we have minimized windows that need to be restored
+    if (global.mainWindowMinimized || global.popupWindowMinimized) {
+      logger.debug('Minimized windows detected, restoring them');
+      restoreMinimizedWindows();
+      return;
+    }
+
+    // If main window exists but is not visible, show it
+    if (global.mainWindow && !global.mainWindow.isDestroyed()) {
+      if (!global.mainWindow.isVisible()) {
+        logger.debug('Main window exists but is not visible, showing it');
+        global.mainWindow.show();
+        global.mainWindow.focus();
+      }
+    }
+
     // Recheck permissions when app is activated, but defer it
     if (process.platform === 'darwin') {
       setTimeout(() => {
@@ -204,6 +230,12 @@ app.on('window-all-closed', () => {
     app.quit();
   } else {
     logger.debug('On macOS, app will remain running');
+
+    // Check if windows are just minimized rather than closed
+    if (global.mainWindowMinimized || global.popupWindowMinimized) {
+      logger.debug('Windows are minimized, not recreating them');
+      return;
+    }
 
     // Always ensure the popup window is visible, but defer it
     setTimeout(() => {

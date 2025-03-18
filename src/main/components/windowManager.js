@@ -131,6 +131,40 @@ const createWindow = () => {
       logger.debug('Main window blur event triggered');
     });
 
+    // Add event listeners for minimize and restore
+    mainWindowInstance.on('minimize', () => {
+      logger.debug('Main window minimize event triggered');
+      global.mainWindowMinimized = true;
+    });
+
+    mainWindowInstance.on('restore', () => {
+      logger.debug('Main window restore event triggered');
+      global.mainWindowMinimized = false;
+    });
+
+    // Handle macOS specific events
+    if (process.platform === 'darwin') {
+      // This event is emitted when the user clicks the dock icon
+      app.on('activate', () => {
+        logger.debug('App activate event triggered from dock icon click');
+        if (global.mainWindowMinimized) {
+          logger.debug('Main window is minimized, restoring it from dock click');
+          if (mainWindowInstance && !mainWindowInstance.isDestroyed()) {
+            try {
+              mainWindowInstance.restore();
+              mainWindowInstance.focus();
+              global.mainWindowMinimized = false;
+            } catch (error) {
+              logger.error('Error restoring main window from dock click:', { error: error.message });
+            }
+          }
+        } else if (!mainWindowInstance.isVisible()) {
+          mainWindowInstance.show();
+          mainWindowInstance.focus();
+        }
+      });
+    }
+
     logger.debug('Main window setup complete');
 
     return mainWindowInstance;
@@ -332,6 +366,17 @@ const createPopupWindow = () => {
       logger.debug('Popup window hide event triggered');
     });
 
+    // Add event listeners for minimize and restore
+    popupWindowInstance.on('minimize', () => {
+      logger.debug('Popup window minimize event triggered');
+      global.popupWindowMinimized = true;
+    });
+
+    popupWindowInstance.on('restore', () => {
+      logger.debug('Popup window restore event triggered');
+      global.popupWindowMinimized = false;
+    });
+
     logger.debug('Popup window setup complete');
 
     return popupWindowInstance;
@@ -355,6 +400,17 @@ const showPopupWindow = () => {
       if (global.popupWindow.isDestroyed()) {
         logger.debug('Popup window is destroyed, creating a new one');
         global.popupWindow = createPopupWindow();
+      }
+
+      // Check if window is minimized and restore it
+      if (global.popupWindowMinimized) {
+        logger.debug('Popup window is minimized, restoring it');
+        try {
+          global.popupWindow.restore();
+          global.popupWindowMinimized = false;
+        } catch (error) {
+          logger.error('Error restoring popup window:', { error: error.message });
+        }
       }
 
       if (!global.popupWindow.isVisible()) {
@@ -520,8 +576,13 @@ const handleHotkeyToggle = () => {
       global.mainWindow.focus();
     }
   } else {
-    // Ensure the main window is shown
-    if (!global.mainWindow.isVisible()) {
+    // Check if window is minimized and restore it
+    if (global.mainWindowMinimized) {
+      logger.debug('Main window is minimized, restoring it');
+      global.mainWindow.restore();
+      global.mainWindow.focus();
+      global.mainWindowMinimized = false;
+    } else if (!global.mainWindow.isVisible()) {
       global.mainWindow.show();
       global.mainWindow.focus();
     }
@@ -536,65 +597,52 @@ const handleHotkeyToggle = () => {
       showPopupWindow();
     }
   } else {
-    // Ensure the popup window is shown
-    if (!global.popupWindow.isVisible()) {
+    // Check if window is minimized and restore it
+    if (global.popupWindowMinimized) {
+      logger.debug('Popup window is minimized, restoring it');
+      global.popupWindow.restore();
+      global.popupWindowMinimized = false;
+    } else if (!global.popupWindow.isVisible()) {
       showPopupWindow();
     }
   }
   
-  logger.debug('Current recording state:', { isRecording: global.isRecording });
+  // Check if we have the new recordingManager available
+  if (global.recordingManager) {
+    logger.debug('Using RecordingManager for recording state management');
+    // The current recording state is available from the RecordingManager
+    logger.debug('Current recording state:', { isRecording: global.recordingManager.getIsRecording() });
+  } else {
+    // Fall back to global state for backward compatibility
+    logger.debug('Current recording state:', { isRecording: global.isRecording });
+  }
 
-  // Now safely send event to main window
+  // IMPORTANT: Do not toggle the global.isRecording state here anymore
+  // Instead, let the renderer process handle the recording state
+  // and just signal it to toggle recording
+  
+  // Now safely send event to main window to initiate actual recording
   if (global.mainWindow && !global.mainWindow.isDestroyed()) {
     logger.debug('Sending toggle-recording event to mainWindow');
     try {
       global.mainWindow.webContents.send('toggle-recording');
+      
+      // The renderer process will handle starting/stopping the actual recording
+      // and will call the appropriate IPC handlers (start-recording or stop-recording)
+      // which will then update the global.isRecording state
     } catch (error) {
       logger.error('Error sending toggle-recording event:', { error: error.message });
     }
   }
-
-  // Toggle recording state and update popup
-  logger.debug('Toggling recording state from', { from: global.isRecording, to: !global.isRecording });
-  global.isRecording = !global.isRecording;
   
-  if (global.isRecording) {
-    logger.debug('Starting recording');
-    // Show recording UI
-    if (global.popupWindow && !global.popupWindow.isDestroyed()) {
-      try {
-        // Update UI to show recording state
-        global.popupWindow.webContents.send('update-recording-state', true);
-      } catch (error) {
-        logger.error('Error updating popup window for recording:', { error: error.message });
-      }
-    }
-  } else {
-    logger.debug('Stopping recording');
-    // Update popup window to show not recording state
-    if (global.popupWindow && !global.popupWindow.isDestroyed()) {
-      logger.debug('Updating popup window to show not recording state');
-      try {
-        // Update UI to show not recording state
-        global.popupWindow.webContents.send('update-recording-state', false);
-        
-        global.popupWindow.setAlwaysOnTop(true, 'screen-saver');
-        if (typeof global.popupWindow.setVisibleOnAllWorkspaces === 'function') {
-          global.popupWindow.setVisibleOnAllWorkspaces(true, {
-            visibleOnFullScreen: true,
-            skipTransformProcessType: true,
-          });
-        }
-
-        // For macOS, ensure window level is set to floating
-        if (process.platform === 'darwin') {
-          if (typeof global.popupWindow.setWindowButtonVisibility === 'function') {
-            global.popupWindow.setWindowButtonVisibility(false);
-          }
-        }
-      } catch (error) {
-        logger.error('Error updating popup window:', { error: error.message });
-      }
+  // Also send event to popup window to update UI immediately
+  if (global.popupWindow && !global.popupWindow.isDestroyed()) {
+    try {
+      // We're not changing the recording state directly,
+      // but we want the popup to show loading state while waiting for confirmation
+      global.popupWindow.webContents.send('recording-toggle-requested');
+    } catch (error) {
+      logger.error('Error sending recording-toggle-requested event:', { error: error.message });
     }
   }
 };
@@ -637,6 +685,62 @@ const registerGlobalHotkey = (_, settings) => {
   }
 };
 
+// Restore minimized windows
+const restoreMinimizedWindows = () => {
+  logger.debug('restoreMinimizedWindows called');
+
+  // Restore main window if minimized
+  if (global.mainWindow && !global.mainWindow.isDestroyed() && global.mainWindowMinimized) {
+    logger.debug('Restoring minimized main window');
+    try {
+      // First check if the window is actually minimized
+      if (typeof global.mainWindow.isMinimized === 'function' && global.mainWindow.isMinimized()) {
+        global.mainWindow.restore();
+        logger.debug('Main window restored successfully');
+      } else {
+        // If not actually minimized but flag is set, just show it
+        global.mainWindow.show();
+        logger.debug('Main window shown (was not actually minimized)');
+      }
+      global.mainWindow.focus();
+      global.mainWindowMinimized = false;
+    } catch (error) {
+      logger.error('Error restoring main window:', { error: error.message });
+      // Try to show the window as a fallback
+      try {
+        global.mainWindow.show();
+      } catch (showError) {
+        logger.error('Error showing main window as fallback:', { error: showError.message });
+      }
+    }
+  }
+
+  // Restore popup window if minimized
+  if (global.popupWindow && !global.popupWindow.isDestroyed() && global.popupWindowMinimized) {
+    logger.debug('Restoring minimized popup window');
+    try {
+      // First check if the window is actually minimized
+      if (typeof global.popupWindow.isMinimized === 'function' && global.popupWindow.isMinimized()) {
+        global.popupWindow.restore();
+        logger.debug('Popup window restored successfully');
+      } else {
+        // If not actually minimized but flag is set, just show it
+        global.popupWindow.show();
+        logger.debug('Popup window shown (was not actually minimized)');
+      }
+      global.popupWindowMinimized = false;
+    } catch (error) {
+      logger.error('Error restoring popup window:', { error: error.message });
+      // Try to show the window as a fallback
+      try {
+        global.popupWindow.show();
+      } catch (showError) {
+        logger.error('Error showing popup window as fallback:', { error: showError.message });
+      }
+    }
+  }
+};
+
 module.exports = {
   mainWindow,
   popupWindow,
@@ -649,5 +753,6 @@ module.exports = {
   setupDockMenu,
   setIgnoreMouseEvents,
   handleHotkeyToggle,
-  registerGlobalHotkey
+  registerGlobalHotkey,
+  restoreMinimizedWindows
 }; 
