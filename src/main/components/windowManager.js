@@ -123,6 +123,26 @@ const createWindow = () => {
     // Add event listeners to track window state
     mainWindowInstance.on('close', () => {
       logger.debug('Main window close event triggered');
+      
+      // When the main window is closed, properly clean up and prepare for full quit
+      global.mainWindow = null;
+      global.mainWindowMinimized = false;
+      
+      // If there's a popup window, close it too
+      if (global.popupWindow && typeof global.popupWindow.isDestroyed === 'function' && !global.popupWindow.isDestroyed()) {
+        try {
+          global.popupWindow.close();
+        } catch (error) {
+          logger.error('Error closing popup window during main window close:', { error: error.message });
+        }
+      }
+      
+      // If we're running on macOS, force the app to quit
+      if (process.platform === 'darwin') {
+        setTimeout(() => {
+          app.exit(0);
+        }, 100);
+      }
     });
 
     mainWindowInstance.on('closed', () => {
@@ -382,6 +402,10 @@ const createPopupWindow = () => {
     // Add event listeners to track window state
     popupWindowInstance.on('close', () => {
       logger.debug('Popup window close event triggered');
+      
+      // When the popup window is manually closed, clean up properly
+      global.popupWindow = null;
+      global.popupWindowMinimized = false;
     });
 
     popupWindowInstance.on('closed', () => {
@@ -428,13 +452,13 @@ const showPopupWindow = () => {
     }
 
     if (global.popupWindow) {
-      if (global.popupWindow.isDestroyed()) {
+      if (typeof global.popupWindow.isDestroyed === 'function' && global.popupWindow.isDestroyed()) {
         logger.debug('Popup window is destroyed, creating a new one');
         global.popupWindow = createPopupWindow();
       }
 
       // Check if window is minimized and restore it
-      if (global.popupWindowMinimized) {
+      if (global.popupWindowMinimized && global.popupWindow && typeof global.popupWindow.isDestroyed === 'function' && !global.popupWindow.isDestroyed()) {
         logger.debug('Popup window is minimized, restoring it');
         try {
           global.popupWindow.restore();
@@ -444,7 +468,7 @@ const showPopupWindow = () => {
         }
       }
 
-      if (!global.popupWindow.isVisible()) {
+      if (global.popupWindow && typeof global.popupWindow.isDestroyed === 'function' && !global.popupWindow.isDestroyed() && typeof global.popupWindow.isVisible === 'function' && !global.popupWindow.isVisible()) {
         logger.debug('Showing popup window');
         try {
           // Force show the popup window
@@ -469,7 +493,7 @@ const showPopupWindow = () => {
           
           // Force show again after a short delay to ensure it's visible
           setTimeout(() => {
-            if (global.popupWindow && !global.popupWindow.isDestroyed() && !global.popupWindow.isVisible()) {
+            if (global.popupWindow && typeof global.popupWindow.isDestroyed === 'function' && !global.popupWindow.isDestroyed() && typeof global.popupWindow.isVisible === 'function' && !global.popupWindow.isVisible()) {
               logger.debug('Forcing popup window to show again');
               global.popupWindow.show();
             }
@@ -479,11 +503,11 @@ const showPopupWindow = () => {
           // Try to recreate the window if showing fails
           logger.debug('Attempting to recreate popup window after show error');
           global.popupWindow = createPopupWindow();
-          if (global.popupWindow && !global.popupWindow.isDestroyed()) {
+          if (global.popupWindow && typeof global.popupWindow.isDestroyed === 'function' && !global.popupWindow.isDestroyed()) {
             global.popupWindow.show();
           }
         }
-      } else {
+      } else if (global.popupWindow && typeof global.popupWindow.isDestroyed === 'function' && !global.popupWindow.isDestroyed()) {
         logger.debug('Popup window is already visible');
         // Ensure it's always on top even if already visible
         global.popupWindow.setAlwaysOnTop(true, 'screen-saver');
@@ -600,7 +624,7 @@ const handleHotkeyToggle = () => {
   global.mainWindowShowRequested = false;
   
   // Ensure main window exists but don't show it
-  if (!global.mainWindow || global.mainWindow.isDestroyed()) {
+  if (!global.mainWindow || (typeof global.mainWindow.isDestroyed === 'function' && global.mainWindow.isDestroyed())) {
     logger.debug('Main window does not exist or is destroyed, recreating it but keeping hidden');
     global.mainWindow = createWindow();
     // Instead of showing it, make sure it's loaded but remains hidden
@@ -609,14 +633,14 @@ const handleHotkeyToggle = () => {
       global.mainWindow.webContents.once('did-finish-load', () => {
         logger.debug('Main window loaded but kept hidden');
         // If somehow the window is visible, hide it
-        if (global.mainWindow.isVisible()) {
+        if (global.mainWindow && typeof global.mainWindow.isVisible === 'function' && global.mainWindow.isVisible()) {
           global.mainWindow.hide();
         }
       });
       
       // Also hide if it gets focus unexpectedly
       global.mainWindow.on('focus', () => {
-        if (!global.mainWindowShowRequested) {
+        if (!global.mainWindowShowRequested && global.mainWindow && typeof global.mainWindow.isDestroyed === 'function' && !global.mainWindow.isDestroyed()) {
           logger.debug('Main window focused unexpectedly during hotkey, hiding it');
           global.mainWindow.hide();
         }
@@ -627,13 +651,13 @@ const handleHotkeyToggle = () => {
     logger.debug('Main window exists, keeping it hidden');
     
     // If somehow the window is visible, hide it
-    if (global.mainWindow.isVisible()) {
+    if (global.mainWindow && typeof global.mainWindow.isVisible === 'function' && global.mainWindow.isVisible()) {
       global.mainWindow.hide();
     }
   }
   
   // Ensure popup window exists and is visible
-  if (!global.popupWindow || global.popupWindow.isDestroyed()) {
+  if (!global.popupWindow || (typeof global.popupWindow.isDestroyed === 'function' && global.popupWindow.isDestroyed())) {
     logger.debug('Popup window does not exist or is destroyed, recreating it');
     global.popupWindow = createPopupWindow();
     
@@ -643,11 +667,11 @@ const handleHotkeyToggle = () => {
     }
   } else {
     // Check if window is minimized and restore it
-    if (global.popupWindowMinimized) {
+    if (global.popupWindowMinimized && global.popupWindow && typeof global.popupWindow.isDestroyed === 'function' && !global.popupWindow.isDestroyed()) {
       logger.debug('Popup window is minimized, restoring it');
       global.popupWindow.restore();
       global.popupWindowMinimized = false;
-    } else if (!global.popupWindow.isVisible()) {
+    } else if (global.popupWindow && typeof global.popupWindow.isVisible === 'function' && !global.popupWindow.isVisible()) {
       showPopupWindow();
     }
   }
@@ -664,11 +688,11 @@ const handleHotkeyToggle = () => {
   
   // Now safely send event to main window to initiate actual recording
   // This is critical to ensure recording works even when the window is hidden
-  if (global.mainWindow && !global.mainWindow.isDestroyed()) {
+  if (global.mainWindow && typeof global.mainWindow.isDestroyed === 'function' && !global.mainWindow.isDestroyed()) {
     logger.debug('Sending toggle-recording event to mainWindow');
     try {
       // Make sure the window is loaded before sending the event
-      if (global.mainWindow.webContents.isLoading()) {
+      if (typeof global.mainWindow.webContents.isLoading === 'function' && global.mainWindow.webContents.isLoading()) {
         logger.debug('Main window is still loading, waiting for it to finish loading before sending toggle-recording event');
         global.mainWindow.webContents.once('did-finish-load', () => {
           // Set the flag to false to ensure window doesn't show
@@ -677,7 +701,8 @@ const handleHotkeyToggle = () => {
           
           // Double-check the window is hidden after sending event
           setTimeout(() => {
-            if (global.mainWindow && !global.mainWindow.isDestroyed() && global.mainWindow.isVisible()) {
+            if (global.mainWindow && typeof global.mainWindow.isDestroyed === 'function' && !global.mainWindow.isDestroyed() && 
+                typeof global.mainWindow.isVisible === 'function' && global.mainWindow.isVisible()) {
               logger.debug('Window became visible after toggle-recording, hiding it');
               global.mainWindow.hide();
             }
@@ -690,7 +715,8 @@ const handleHotkeyToggle = () => {
         
         // Double-check the window is hidden after sending event
         setTimeout(() => {
-          if (global.mainWindow && !global.mainWindow.isDestroyed() && global.mainWindow.isVisible()) {
+          if (global.mainWindow && typeof global.mainWindow.isDestroyed === 'function' && !global.mainWindow.isDestroyed() && 
+              typeof global.mainWindow.isVisible === 'function' && global.mainWindow.isVisible()) {
             logger.debug('Window became visible after toggle-recording, hiding it');
             global.mainWindow.hide();
           }
@@ -702,7 +728,7 @@ const handleHotkeyToggle = () => {
   }
   
   // Also send event to popup window to update UI immediately
-  if (global.popupWindow && !global.popupWindow.isDestroyed()) {
+  if (global.popupWindow && typeof global.popupWindow.isDestroyed === 'function' && !global.popupWindow.isDestroyed()) {
     try {
       // We're not changing the recording state directly,
       // but we want the popup to show loading state while waiting for confirmation
@@ -756,7 +782,7 @@ const restoreMinimizedWindows = () => {
   logger.debug('restoreMinimizedWindows called');
 
   // Restore main window if minimized
-  if (global.mainWindow && !global.mainWindow.isDestroyed() && global.mainWindowMinimized) {
+  if (global.mainWindow && typeof global.mainWindow.isDestroyed === 'function' && !global.mainWindow.isDestroyed() && global.mainWindowMinimized) {
     logger.debug('Restoring minimized main window');
     try {
       // First check if the window is actually minimized
@@ -782,7 +808,7 @@ const restoreMinimizedWindows = () => {
   }
 
   // Restore popup window if minimized
-  if (global.popupWindow && !global.popupWindow.isDestroyed() && global.popupWindowMinimized) {
+  if (global.popupWindow && typeof global.popupWindow.isDestroyed === 'function' && !global.popupWindow.isDestroyed() && global.popupWindowMinimized) {
     logger.debug('Restoring minimized popup window');
     try {
       // First check if the window is actually minimized

@@ -9,6 +9,7 @@ const path = require('path');
 const logger = require('../shared/logger').default;
 
 // First import constants to prevent circular dependencies
+// TEMP_DIR is used by other modules, so keep it even if it appears unused here
 const { TEMP_DIR, DEFAULT_SAVE_DIR, GROQ_MODELS } = require('./components/constants');
 
 // Import the RecordingManager
@@ -25,6 +26,10 @@ global.mainWindow = null;
 global.popupWindow = null;
 global.mainWindowMinimized = false;
 global.popupWindowMinimized = false;
+global.isQuitting = false; // Track when we're intentionally quitting the app
+
+// Export TEMP_DIR so it can be imported by other modules
+exports.TEMP_DIR = TEMP_DIR;
 
 // Only after setting up globals, import other components
 const { pasteTextAtCursor } = require('./components/clipboardUtils');
@@ -65,6 +70,9 @@ const loadGroqClient = () => {
   }
   return { groqClient, initGroqClient };
 };
+
+// Make loadGroqClient available globally for other modules
+global.loadGroqClient = loadGroqClient;
 
 // Function to lazily load permission utilities
 const loadPermissionUtils = () => {
@@ -179,6 +187,13 @@ app.whenReady().then(async () => {
 
   app.on('activate', () => {
     logger.debug('App activate event triggered');
+    
+    // If we're in the process of quitting, don't recreate windows
+    if (global.isQuitting) {
+      logger.debug('App is quitting, ignoring activate event');
+      return;
+    }
+    
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
     logger.debug('Number of open windows:', { count: BrowserWindow.getAllWindows().length });
@@ -192,12 +207,16 @@ app.whenReady().then(async () => {
 
     // If main window exists but is not visible, show it
     // This is what we want to happen when the dock icon is clicked
-    if (global.mainWindow && !global.mainWindow.isDestroyed()) {
+    if (global.mainWindow && !global.mainWindow.isDestroyed && typeof global.mainWindow.isDestroyed === 'function' && !global.mainWindow.isDestroyed()) {
       if (!global.mainWindow.isVisible()) {
         logger.debug('Main window exists but is not visible, showing it');
         global.mainWindow.show();
         global.mainWindow.focus();
       }
+    } else {
+      // If main window doesn't exist or is destroyed, create a new one
+      logger.debug('Main window does not exist or is destroyed, creating a new one');
+      global.mainWindow = createWindow();
     }
 
     // Recheck permissions when app is activated, but defer it
@@ -227,27 +246,6 @@ app.whenReady().then(async () => {
     } else {
       logger.debug('Windows already open, not creating new ones');
     }
-  });
-
-  logger.debug('App initialization complete');
-});
-
-// Quit when all windows are closed, except on macOS.
-app.on('window-all-closed', () => {
-  logger.debug('All windows closed event triggered');
-  logger.debug('Platform:', { platform: process.platform });
-
-  if (process.platform !== 'darwin') {
-    logger.debug('Not on macOS, quitting app');
-    app.quit();
-  } else {
-    logger.debug('On macOS, app will remain running');
-
-    // Check if windows are just minimized rather than closed
-    if (global.mainWindowMinimized || global.popupWindowMinimized) {
-      logger.debug('Windows are minimized, not recreating them');
-      return;
-    }
 
     // Always ensure the popup window is visible, but defer it
     setTimeout(() => {
@@ -257,9 +255,9 @@ app.on('window-all-closed', () => {
         (typeof global.popupWindow.isDestroyed === 'function' && global.popupWindow.isDestroyed())
       ) {
         logger.debug('Popup window does not exist or is destroyed, recreating it');
-        createPopupWindow();
+        global.popupWindow = createPopupWindow();
         showPopupWindow();
-      } else if (global.popupWindow && !global.popupWindow.isVisible()) {
+      } else if (global.popupWindow && !global.popupWindow.isDestroyed() && !global.popupWindow.isVisible()) {
         logger.debug('Popup window exists but is not visible, showing it');
         showPopupWindow();
       } else {
@@ -270,7 +268,33 @@ app.on('window-all-closed', () => {
       logger.debug('Ensuring app stays in dock');
       app.dock.show();
     }, 300);
+  });
+
+  logger.debug('App initialization complete');
+});
+
+// Quit when all windows are closed, even on macOS.
+app.on('window-all-closed', () => {
+  logger.debug('All windows closed event triggered');
+  logger.debug('Platform:', { platform: process.platform });
+
+  // Clean up all window references
+  logger.debug('Cleaning up window references');
+  if (global.mainWindow) {
+    global.mainWindow = null;
   }
+  
+  if (global.popupWindow) {
+    global.popupWindow = null;
+  }
+  
+  // Reset window minimized flags
+  global.mainWindowMinimized = false;
+  global.popupWindowMinimized = false;
+
+  // Always quit the app when all windows are closed, even on macOS
+  logger.debug('Quitting app after all windows closed');
+  app.quit();
 });
 
 // Unregister all shortcuts when app is about to quit
@@ -284,7 +308,7 @@ app.on('will-quit', () => {
   // Close the popup window if it exists
   if (global.popupWindow) {
     logger.debug('Popup window exists, checking if destroyed');
-    if (!global.popupWindow.isDestroyed()) {
+    if (typeof global.popupWindow.isDestroyed === 'function' && !global.popupWindow.isDestroyed()) {
       logger.debug('Closing popup window');
       try {
         global.popupWindow.close();
@@ -300,15 +324,63 @@ app.on('will-quit', () => {
     logger.debug('No popup window to close');
   }
 
+  // Also clean up the main window reference
+  if (global.mainWindow) {
+    if (typeof global.mainWindow.isDestroyed === 'function' && !global.mainWindow.isDestroyed()) {
+      try {
+        global.mainWindow.close();
+      } catch (error) {
+        logger.error('Error closing main window:', { error: error.message });
+      }
+    }
+    global.mainWindow = null;
+  }
+
   logger.debug('App cleanup complete');
 });
 
 // Add a handler for the before-quit event
 app.on('before-quit', () => {
   logger.debug('App before-quit event triggered');
+  
+  // Make sure to unregister all shortcuts
+  globalShortcut.unregisterAll();
+  
+  // Set a flag to indicate we're intentionally quitting
+  global.isQuitting = true;
+  
+  // Close windows explicitly if they still exist
+  if (global.mainWindow && typeof global.mainWindow.isDestroyed === 'function' && !global.mainWindow.isDestroyed()) {
+    try {
+      global.mainWindow.removeAllListeners();
+      global.mainWindow.close();
+    } catch (error) {
+      logger.error('Error closing main window during quit:', { error: error.message });
+    }
+  }
+  
+  if (global.popupWindow && typeof global.popupWindow.isDestroyed === 'function' && !global.popupWindow.isDestroyed()) {
+    try {
+      global.popupWindow.removeAllListeners();
+      global.popupWindow.close();
+    } catch (error) {
+      logger.error('Error closing popup window during quit:', { error: error.message });
+    }
+  }
 });
 
 // Add a handler for the quit event
 app.on('quit', () => {
   logger.debug('App quit event triggered');
+  
+  // Final cleanup
+  global.mainWindow = null;
+  global.popupWindow = null;
+  global.mainWindowMinimized = false;
+  global.popupWindowMinimized = false;
+  
+  // On macOS, ensure we're really quitting
+  if (process.platform === 'darwin') {
+    app.exit(0);
+  }
 });
