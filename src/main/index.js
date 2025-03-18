@@ -113,10 +113,15 @@ app.whenReady().then(async () => {
   logger.debug('Setting up IPC handlers');
   setupIpcHandlers(global.mainWindow, global.popupWindow, settings, getStore());
 
-  // Show the main window immediately
+  // Explicitly DON'T show the main window at startup
   if (global.mainWindow && !global.mainWindow.isDestroyed()) {
-    global.mainWindow.show();
-    global.mainWindow.focus();
+    logger.debug('Main window created, but keeping it hidden at startup');
+    
+    // Ensure the window loads its content even though it's hidden
+    // This is crucial for recording functionality to work properly
+    global.mainWindow.webContents.once('did-finish-load', () => {
+      logger.debug('Main window content loaded while hidden');
+    });
   }
 
   // Defer non-essential operations
@@ -186,6 +191,7 @@ app.whenReady().then(async () => {
     }
 
     // If main window exists but is not visible, show it
+    // This is what we want to happen when the dock icon is clicked
     if (global.mainWindow && !global.mainWindow.isDestroyed()) {
       if (!global.mainWindow.isVisible()) {
         logger.debug('Main window exists but is not visible, showing it');
@@ -205,7 +211,13 @@ app.whenReady().then(async () => {
 
     if (BrowserWindow.getAllWindows().length === 0) {
       logger.debug('No windows open, creating main window');
-      createWindow();
+      const mainWindow = createWindow();
+      
+      // Show the main window since this was triggered by dock icon click
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
 
       // Defer popup window creation
       setTimeout(() => {

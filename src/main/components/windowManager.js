@@ -48,7 +48,7 @@ const createWindow = () => {
 
   try {
     logger.debug('Creating main browser window');
-    // Create the browser window.
+    // Create the browser window with settings to keep it completely hidden
     const mainWindowInstance = new BrowserWindow({
       width: 800,
       height: 600,
@@ -62,8 +62,20 @@ const createWindow = () => {
         contextIsolation: true,
         nodeIntegration: false,
         webSecurity: false, // Allow loading local resources
+        backgroundThrottling: false // Don't throttle in background
       },
-      show: false, // Don't show until ready
+      show: false, // Never show until explicitly requested
+      backgroundColor: '#FFFFFF', // Use a background color to ensure proper loading
+      focusable: false, // Make it non-focusable to prevent it from stealing focus
+      skipTaskbar: true, // Hide from taskbar
+      hasShadow: false, // No shadow
+      titleBarStyle: 'hidden', // Hide title bar
+      enableLargerThanScreen: false, // Disable ability to be larger than screen
+      minimizable: false, // Cannot be minimized
+      maximizable: false, // Cannot be maximized
+      closable: true, // Can be closed
+      autoHideMenuBar: true, // Hide menu bar
+      paintWhenInitiallyHidden: true // Still paint when hidden to enable background processing
     });
     
     // IMPORTANT: Store the window in the global state
@@ -73,8 +85,8 @@ const createWindow = () => {
 
     // For macOS packaged app, ensure window is created properly
     if (process.platform === 'darwin' && app.isPackaged) {
-      mainWindowInstance.setVisibleOnAllWorkspaces(true);
-      app.dock.show();
+      // Still show in dock but don't set visible on all workspaces
+      app.dock.show(); // Still show in dock
     }
 
     logger.debug('Loading index.html file');
@@ -89,21 +101,14 @@ const createWindow = () => {
       mainWindowInstance.loadFile(path.join(app.getAppPath(), 'dist/index.html'));
     }
 
-    // Show window when ready to show
+    // Window is ready to show, but we'll keep it hidden unless explicitly requested
     mainWindowInstance.once('ready-to-show', () => {
-      logger.debug('Main window ready to show, showing window');
-      if (process.platform === 'darwin' && app.isPackaged) {
-        app.focus({ steal: true });
-        mainWindowInstance.showInactive();
-        mainWindowInstance.show();
-        mainWindowInstance.setAlwaysOnTop(true);
-        setTimeout(() => {
-          mainWindowInstance.setAlwaysOnTop(false);
-          mainWindowInstance.focus();
-        }, 1000);
-      } else {
-        mainWindowInstance.show();
-        mainWindowInstance.focus();
+      logger.debug('Main window ready to show, but keeping it hidden by default');
+      // We're explicitly not showing the window here
+      
+      // Set size to 0,0 to ensure it's not visible even if somehow activated
+      if (app.isPackaged) {
+        mainWindowInstance.setSize(0, 0);
       }
     });
 
@@ -125,6 +130,12 @@ const createWindow = () => {
 
     mainWindowInstance.on('focus', () => {
       logger.debug('Main window focus event triggered');
+      // If the app is packaged and window gets focus, hide it right away
+      // unless it was intentionally shown via dock click
+      if (app.isPackaged && !global.mainWindowShowRequested) {
+        logger.debug('Hiding main window that got focus unintentionally');
+        mainWindowInstance.hide();
+      }
     });
 
     mainWindowInstance.on('blur', () => {
@@ -142,15 +153,24 @@ const createWindow = () => {
       global.mainWindowMinimized = false;
     });
 
+    // Special flag to track when showing window is intended
+    global.mainWindowShowRequested = false;
+
     // Handle macOS specific events
     if (process.platform === 'darwin') {
       // This event is emitted when the user clicks the dock icon
       app.on('activate', () => {
         logger.debug('App activate event triggered from dock icon click');
+        
+        // Set the flag indicating this show is requested by user
+        global.mainWindowShowRequested = true;
+        
         if (global.mainWindowMinimized) {
           logger.debug('Main window is minimized, restoring it from dock click');
           if (mainWindowInstance && !mainWindowInstance.isDestroyed()) {
             try {
+              // Set proper size before showing
+              mainWindowInstance.setSize(800, 600);
               mainWindowInstance.restore();
               mainWindowInstance.focus();
               global.mainWindowMinimized = false;
@@ -159,9 +179,18 @@ const createWindow = () => {
             }
           }
         } else if (!mainWindowInstance.isVisible()) {
+          // Show window when dock icon is clicked
+          logger.debug('Main window is not visible, showing it from dock click');
+          // Set proper size before showing
+          mainWindowInstance.setSize(800, 600);
           mainWindowInstance.show();
           mainWindowInstance.focus();
         }
+        
+        // Reset the flag after a short delay
+        setTimeout(() => {
+          global.mainWindowShowRequested = false;
+        }, 1000);
       });
     }
 
@@ -565,29 +594,43 @@ const handleHotkeyToggle = () => {
   logger.debug('mainWindow exists:', { exists: !!global.mainWindow });
   logger.debug('popupWindow exists:', { exists: !!global.popupWindow });
   
-  // Ensure windows exist
+  // Ensure we're not showing the main window by setting this flag
+  global.mainWindowShowRequested = false;
+  
+  // Ensure main window exists but don't show it
   if (!global.mainWindow || global.mainWindow.isDestroyed()) {
-    logger.debug('Main window does not exist or is destroyed, recreating it');
+    logger.debug('Main window does not exist or is destroyed, recreating it but keeping hidden');
     global.mainWindow = createWindow();
-    
-    // Ensure the main window is shown
+    // Instead of showing it, make sure it's loaded but remains hidden
     if (global.mainWindow) {
-      global.mainWindow.show();
-      global.mainWindow.focus();
+      // Make sure the window loads its content but stays hidden
+      global.mainWindow.webContents.once('did-finish-load', () => {
+        logger.debug('Main window loaded but kept hidden');
+        // If somehow the window is visible, hide it
+        if (global.mainWindow.isVisible()) {
+          global.mainWindow.hide();
+        }
+      });
+      
+      // Also hide if it gets focus unexpectedly
+      global.mainWindow.on('focus', () => {
+        if (!global.mainWindowShowRequested) {
+          logger.debug('Main window focused unexpectedly during hotkey, hiding it');
+          global.mainWindow.hide();
+        }
+      });
     }
   } else {
-    // Check if window is minimized and restore it
-    if (global.mainWindowMinimized) {
-      logger.debug('Main window is minimized, restoring it');
-      global.mainWindow.restore();
-      global.mainWindow.focus();
-      global.mainWindowMinimized = false;
-    } else if (!global.mainWindow.isVisible()) {
-      global.mainWindow.show();
-      global.mainWindow.focus();
+    // Don't restore or show the main window at all
+    logger.debug('Main window exists, keeping it hidden');
+    
+    // If somehow the window is visible, hide it
+    if (global.mainWindow.isVisible()) {
+      global.mainWindow.hide();
     }
   }
   
+  // Ensure popup window exists and is visible
   if (!global.popupWindow || global.popupWindow.isDestroyed()) {
     logger.debug('Popup window does not exist or is destroyed, recreating it');
     global.popupWindow = createPopupWindow();
@@ -616,20 +659,41 @@ const handleHotkeyToggle = () => {
     // Fall back to global state for backward compatibility
     logger.debug('Current recording state:', { isRecording: global.isRecording });
   }
-
-  // IMPORTANT: Do not toggle the global.isRecording state here anymore
-  // Instead, let the renderer process handle the recording state
-  // and just signal it to toggle recording
   
   // Now safely send event to main window to initiate actual recording
+  // This is critical to ensure recording works even when the window is hidden
   if (global.mainWindow && !global.mainWindow.isDestroyed()) {
     logger.debug('Sending toggle-recording event to mainWindow');
     try {
-      global.mainWindow.webContents.send('toggle-recording');
-      
-      // The renderer process will handle starting/stopping the actual recording
-      // and will call the appropriate IPC handlers (start-recording or stop-recording)
-      // which will then update the global.isRecording state
+      // Make sure the window is loaded before sending the event
+      if (global.mainWindow.webContents.isLoading()) {
+        logger.debug('Main window is still loading, waiting for it to finish loading before sending toggle-recording event');
+        global.mainWindow.webContents.once('did-finish-load', () => {
+          // Set the flag to false to ensure window doesn't show
+          global.mainWindowShowRequested = false;
+          global.mainWindow.webContents.send('toggle-recording');
+          
+          // Double-check the window is hidden after sending event
+          setTimeout(() => {
+            if (global.mainWindow && !global.mainWindow.isDestroyed() && global.mainWindow.isVisible()) {
+              logger.debug('Window became visible after toggle-recording, hiding it');
+              global.mainWindow.hide();
+            }
+          }, 100);
+        });
+      } else {
+        // Set the flag to false to ensure window doesn't show
+        global.mainWindowShowRequested = false;
+        global.mainWindow.webContents.send('toggle-recording');
+        
+        // Double-check the window is hidden after sending event
+        setTimeout(() => {
+          if (global.mainWindow && !global.mainWindow.isDestroyed() && global.mainWindow.isVisible()) {
+            logger.debug('Window became visible after toggle-recording, hiding it');
+            global.mainWindow.hide();
+          }
+        }, 100);
+      }
     } catch (error) {
       logger.error('Error sending toggle-recording event:', { error: error.message });
     }
