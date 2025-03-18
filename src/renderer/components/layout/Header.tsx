@@ -4,11 +4,15 @@ import { Button } from '../ui/button';
 import { ThemeToggle } from './theme-toggle';
 import SettingsModal from '../features/settings/SettingsModal';
 import AppLogo from '../ui/app-logo';
-import { Settings } from 'lucide-react';
+import { Settings, Minimize } from 'lucide-react';
 
 const Header: React.FC = () => {
   const { isRecording } = useAppContext();
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const handleMinimize = () => {
+    window.electronAPI.minimizeMainWindow();
+  };
 
   return (
     <header className="bg-primary text-primary-foreground shadow-md">
@@ -23,6 +27,16 @@ const Header: React.FC = () => {
         )}
 
         <div className="ml-auto flex items-center">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-primary-foreground"
+            onClick={handleMinimize}
+            title="Minimize"
+          >
+            <Minimize className="h-5 w-5" />
+          </Button>
+
           <ThemeToggle />
 
           <Button

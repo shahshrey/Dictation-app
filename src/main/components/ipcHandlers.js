@@ -4,7 +4,7 @@ const path = require('path');
 const { GROQ_MODELS, DEFAULT_SETTINGS } = require('./constants');
 const { initGroqClient, transcribeRecording } = require('./groqClient');
 const { recheckAccessibilityPermission } = require('./permissionsUtils');
-const { setIgnoreMouseEvents, registerGlobalHotkey } = require('./windowManager');
+const { setIgnoreMouseEvents, registerGlobalHotkey, minimizeMainWindow } = require('./windowManager');
 const { 
   saveTranscription, 
   saveTranscriptionAs, 
@@ -265,6 +265,11 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store) => {
   // Window management
   ipcMain.handle('set-ignore-mouse-events', (event, ignore, options = { forward: true }) => {
     return setIgnoreMouseEvents(ignore, options);
+  });
+
+  // Add handler for minimizing the main window
+  ipcMain.handle('minimize-main-window', () => {
+    return minimizeMainWindow();
   });
 };
 

@@ -85,6 +85,7 @@ interface ElectronAPI {
 
   // Window management
   setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) => Promise<boolean>;
+  minimizeMainWindow: () => Promise<boolean>;
 
   // Event listeners
   onToggleRecording: (callback: () => void) => () => void;

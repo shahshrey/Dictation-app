@@ -65,7 +65,7 @@ const createWindow = () => {
       hasShadow: false,
       titleBarStyle: 'default',
       enableLargerThanScreen: false,
-      minimizable: false,
+      minimizable: true,
       maximizable: false,
       closable: true,
       autoHideMenuBar: true,
@@ -578,6 +578,21 @@ const restoreMinimizedWindows = () => {
   }
 };
 
+const minimizeMainWindow = () => {
+  if (global.mainWindow && typeof global.mainWindow.isDestroyed === 'function' && !global.mainWindow.isDestroyed()) {
+    try {
+      global.mainWindow.minimize();
+      global.mainWindowMinimized = true;
+      logger.debug('Main window minimized');
+      return true;
+    } catch (error) {
+      logger.error('Error minimizing main window:', { error: error.message });
+      return false;
+    }
+  }
+  return false;
+};
+
 module.exports = {
   mainWindow,
   popupWindow,
@@ -591,5 +606,6 @@ module.exports = {
   setIgnoreMouseEvents,
   handleHotkeyToggle,
   registerGlobalHotkey,
-  restoreMinimizedWindows
+  restoreMinimizedWindows,
+  minimizeMainWindow
 }; 

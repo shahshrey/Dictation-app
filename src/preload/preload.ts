@@ -112,6 +112,9 @@ try {
     // Window management
     setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) =>
       ipcRenderer.invoke('set-ignore-mouse-events', ignore, options),
+
+    // Add minimize window function
+    minimizeMainWindow: () => ipcRenderer.invoke('minimize-main-window'),
   };
 
   logger.debug('API methods being exposed:', { methods: Object.keys(api) });
