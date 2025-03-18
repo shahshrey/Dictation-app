@@ -62,7 +62,9 @@ const createWindow = () => {
         contextIsolation: true,
         nodeIntegration: false,
         webSecurity: false, // Allow loading local resources
-        backgroundThrottling: false // Don't throttle in background
+        backgroundThrottling: false, // Don't throttle in background
+        // Add audio capture flag to ensure macOS recognizes microphone activity
+        audioCapture: true
       },
       show: false, // Never show until explicitly requested
       backgroundColor: '#FFFFFF', // Use a background color to ensure proper loading
