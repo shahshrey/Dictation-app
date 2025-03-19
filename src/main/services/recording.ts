@@ -5,6 +5,7 @@ import * as os from 'os';
 import { AudioDevice, IPC_CHANNELS } from '../../shared/types';
 import { AUDIO_SETTINGS } from '../../shared/constants';
 import logger from '../../shared/logger';
+import { updateTrayMenu } from '../components/trayManager';
 
 // Define constants for audio recording
 const TEMP_DIR = path.join(os.tmpdir(), 'voice-vibe');
@@ -125,6 +126,9 @@ export class RecordingManager {
         (global as Record<string, unknown>).isRecording = true;
       }
 
+      // Update tray menu to reflect recording state
+      updateTrayMenu();
+
       if (this.mainWindow) {
         // Send the sourceId to the renderer to start recording
         this.mainWindow.webContents.send('recording-source-selected', sourceId);
@@ -162,6 +166,9 @@ export class RecordingManager {
         // Using type assertion to avoid TypeScript errors
         (global as Record<string, unknown>).isRecording = false;
       }
+
+      // Update tray menu to reflect recording state
+      updateTrayMenu();
 
       // Update popup window to show not recording state
       if (this.popupWindow && !this.popupWindow.isDestroyed()) {

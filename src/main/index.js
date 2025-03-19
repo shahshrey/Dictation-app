@@ -3,7 +3,7 @@
 const {
   app,
   BrowserWindow,
-  globalShortcut,
+  globalShortcut
 } = require('electron');
 const path = require('path');
 const logger = require('../shared/logger').default;
@@ -50,6 +50,9 @@ const {
   restoreMinimizedWindows
 } = require('./components/windowManager');
 
+// Import the tray manager
+const { createTray, updateTrayMenu, destroyTray } = require('./components/trayManager');
+
 // Import IPC handlers last as they depend on all other components
 const { setupIpcHandlers } = require('./components/ipcHandlers');
 
@@ -85,6 +88,18 @@ const loadPermissionUtils = () => {
 app.whenReady().then(async () => {
   logger.debug('App ready event triggered');
 
+  // Set the app name for proper display in the menubar
+  if (process.platform === 'darwin') {
+    app.setName('Voice Vibe');
+    // On macOS, don't show the app in the dock if we're using the menubar
+    if (!app.dock) {
+      logger.debug('app.dock is not available - not hiding dock icon');
+    } else {
+      logger.debug('Hiding dock icon since we use menubar');
+      app.dock.hide();
+    }
+  }
+
   // Initialize store first as it's critical
   logger.debug('Initializing store');
   const storeInitialized = await initStore();
@@ -98,6 +113,13 @@ app.whenReady().then(async () => {
     loadSettingsFromFile();
   }
 
+  // Initialize the system tray early in the startup process
+  logger.debug('Creating system tray');
+  global.tray = createTray();
+  
+  // Make tray-related functions available globally
+  global.updateTrayMenu = updateTrayMenu;
+  
   // Create main window immediately for better perceived performance
   logger.debug('Creating main window');
   const mainWindowInstance = createWindow();
@@ -105,6 +127,10 @@ app.whenReady().then(async () => {
   if (!global.mainWindow && mainWindowInstance) {
     global.mainWindow = mainWindowInstance;
   }
+  
+  // Make createWindow and showPopupWindow available globally
+  global.createWindow = createWindow;
+  global.showPopupWindow = showPopupWindow;
 
   // Initialize the recording manager
   logger.debug('Initializing recording manager');
@@ -166,15 +192,26 @@ app.whenReady().then(async () => {
         const { checkMacOSPermissions } = loadPermissionUtils();
         checkMacOSPermissions();
 
-        // Ensure the app stays in the dock on macOS, but the popup doesn't
-        logger.debug('On macOS, setting app to stay in dock');
-        app.dock.show();
-
-        // Set the dock icon
-        app.dock.setIcon(path.join(app.getAppPath(), 'src/assets/logo/logo.png'));
-
-        // Set up the dock menu
-        setupDockMenu();
+        // We're using the tray instead of the dock
+        if (global.tray) {
+          // If we need the dock for debugging, show it
+          if (process.env.NODE_ENV === 'development') {
+            logger.debug('Dev mode: showing dock icon for debugging');
+            app.dock.show();
+            // Set the dock icon
+            app.dock.setIcon(path.join(app.getAppPath(), 'src/assets/logo/logo.png'));
+            // Set up the dock menu
+            setupDockMenu();
+          }
+        } else {
+          // Fallback to dock if tray fails
+          logger.debug('Tray not available, showing dock');
+          app.dock.show();
+          // Set the dock icon
+          app.dock.setIcon(path.join(app.getAppPath(), 'src/assets/logo/logo.png'));
+          // Set up the dock menu
+          setupDockMenu();
+        }
       }, 1000);
     }
 
@@ -276,8 +313,7 @@ app.whenReady().then(async () => {
 // Quit when all windows are closed, even on macOS.
 app.on('window-all-closed', () => {
   logger.debug('All windows closed event triggered');
-  logger.debug('Platform:', { platform: process.platform });
-
+  
   // Clean up all window references
   logger.debug('Cleaning up window references');
   if (global.mainWindow) {
@@ -292,9 +328,12 @@ app.on('window-all-closed', () => {
   global.mainWindowMinimized = false;
   global.popupWindowMinimized = false;
 
-  // Always quit the app when all windows are closed, even on macOS
-  logger.debug('Quitting app after all windows closed');
-  app.quit();
+  // Don't quit the app when all windows are closed
+  // The app will continue running in the system tray
+  logger.debug('Windows closed but app continues running in system tray');
+  
+  // Update the tray menu to reflect the current state
+  updateTrayMenu();
 });
 
 // Unregister all shortcuts when app is about to quit
@@ -303,6 +342,10 @@ app.on('will-quit', () => {
 
   logger.debug('Unregistering all global shortcuts');
   globalShortcut.unregisterAll();
+  
+  // Destroy the tray
+  logger.debug('Destroying system tray');
+  destroyTray();
 
   logger.debug('Checking if popup window exists');
   // Close the popup window if it exists

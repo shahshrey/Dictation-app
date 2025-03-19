@@ -271,6 +271,28 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store) => {
   ipcMain.handle('minimize-main-window', () => {
     return minimizeMainWindow();
   });
+  
+  // Add handler for controlling the tray
+  ipcMain.handle('tray-status', () => {
+    return { 
+      trayExists: !!global.tray,
+      updateTrayExists: typeof global.updateTrayMenu === 'function'
+    };
+  });
+  
+  // Force tray menu update
+  ipcMain.handle('update-tray-menu', () => {
+    if (global.updateTrayMenu && typeof global.updateTrayMenu === 'function') {
+      try {
+        global.updateTrayMenu();
+        return { success: true };
+      } catch (error) {
+        logger.error('Error updating tray menu:', { error: error.message });
+        return { success: false, error: String(error) };
+      }
+    }
+    return { success: false, error: 'Update tray menu function not available' };
+  });
 };
 
 module.exports = {

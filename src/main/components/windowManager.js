@@ -93,7 +93,15 @@ const createWindow = () => {
       mainWindowInstance.webContents.openDevTools();
     }
 
-    mainWindowInstance.on('close', () => {
+    mainWindowInstance.on('close', (event) => {
+      // If the app is not actually quitting, prevent the window from being closed
+      if (!global.isQuitting) {
+        event.preventDefault();
+        mainWindowInstance.hide();
+        return false;
+      }
+      
+      // Otherwise proceed with normal close behavior
       global.mainWindow = null;
       global.mainWindowMinimized = false;
       
@@ -103,12 +111,6 @@ const createWindow = () => {
         } catch (error) {
           logger.error('Error closing popup window during main window close:', { error: error.message });
         }
-      }
-      
-      if (process.platform === 'darwin') {
-        setTimeout(() => {
-          app.exit(0);
-        }, 100);
       }
     });
 
@@ -291,7 +293,15 @@ const createPopupWindow = () => {
       }
     });
 
-    popupWindowInstance.on('close', () => {
+    popupWindowInstance.on('close', (event) => {
+      // If the app is not actually quitting, prevent the window from being closed
+      if (!global.isQuitting) {
+        event.preventDefault();
+        popupWindowInstance.hide();
+        return false;
+      }
+      
+      // Otherwise proceed with normal close behavior
       global.popupWindow = null;
       global.popupWindowMinimized = false;
     });
