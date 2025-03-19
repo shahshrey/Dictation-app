@@ -127,6 +127,9 @@ try {
 
     // Add minimize window function
     minimizeMainWindow: () => ipcRenderer.invoke('minimize-main-window'),
+
+    // Clipboard utilities
+    pasteTextAtCursor: (text: string) => ipcRenderer.invoke('paste-text-at-cursor', text),
   };
 
   logger.debug('API methods being exposed:', { methods: Object.keys(api) });

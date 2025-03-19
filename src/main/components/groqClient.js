@@ -112,6 +112,7 @@ const transcribeRecording = async (language, apiKey) => {
 
       logger.debug('Transcription successful, text length: ' + transcription.text.length);
       logger.debug('Transcription text: ' + transcription.text.substring(0, 100) + '...');
+      logger.debug('DEBUGGING: global.pasteTextAtCursor is available: ' + !!global.pasteTextAtCursor);
 
       // Generate a unique ID for the transcription
       const id = `transcription-${Date.now()}`;
@@ -172,16 +173,6 @@ const transcribeRecording = async (language, apiKey) => {
         // Continue even if saving fails
       }
 
-      // Paste the transcribed text at the current cursor position
-      logger.debug('Attempting to paste transcribed text at cursor position');
-      try {
-        await global.pasteTextAtCursor(transcription.text);
-        logger.debug('Paste operation initiated');
-      } catch (pasteError) {
-        logger.error('Failed to paste text at cursor position', { error: pasteError.message });
-        // Continue even if pasting fails
-      }
-
       // Add a small delay to ensure file system operations are complete
       await new Promise(resolve => setTimeout(resolve, 500));
     
@@ -193,7 +184,7 @@ const transcribeRecording = async (language, apiKey) => {
         duration,
         language: transcriptionParams.language,
         filePath, // Include the file path for debugging
-        pastedAtCursor: true, // Indicate that the text was pasted at the cursor
+        pastedAtCursor: false, // Indicate that the text was NOT pasted at the cursor by this function
       };
     } catch (transcriptionError) {
       logger.error('Error during Groq API transcription call', { error: transcriptionError.message });

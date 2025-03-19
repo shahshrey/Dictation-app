@@ -336,6 +336,18 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store) => {
     }
     return { success: false, error: 'Update tray menu function not available' };
   });
+
+  // Add handler for pasting text at cursor position
+  ipcMain.handle('paste-text-at-cursor', async (_, text) => {
+    try {
+      const { pasteTextAtCursor } = require('./clipboardUtils');
+      const result = await pasteTextAtCursor(text);
+      return { success: result };
+    } catch (error) {
+      logger.error('Error pasting text at cursor:', { error: error.message });
+      return { success: false, error: String(error) };
+    }
+  });
 };
 
 module.exports = {

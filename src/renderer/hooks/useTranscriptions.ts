@@ -173,7 +173,7 @@ export const useTranscriptions = (settings: AppSettings) => {
         logger.warn('No API key in settings, checking .env file or using default');
 
         // Error out since we don't have an API key
-        logger.error('No API key available. Please set your Groq API key in the settings.', null);
+        logger.error('No API key available. Please set your Groq API key in the settings.', {});
         return;
       }
 
@@ -194,7 +194,7 @@ export const useTranscriptions = (settings: AppSettings) => {
             logger.debug(`Transcription success: ${result.success}`);
             logger.debug(`Transcription result: ${JSON.stringify(result, null, 2)}`);
           } else {
-            logger.error('Received null or undefined result from transcribeRecording', null);
+            logger.error('Received null or undefined result from transcribeRecording', {});
             return;
           }
 
@@ -225,6 +225,22 @@ export const useTranscriptions = (settings: AppSettings) => {
               logger.debug('Transcribed text was pasted at cursor position');
             } else {
               logger.debug('Transcribed text was not pasted at cursor position');
+
+              // Paste text at cursor since it wasn't already pasted by the main process
+              if (
+                window.electronAPI &&
+                typeof window.electronAPI.pasteTextAtCursor === 'function'
+              ) {
+                try {
+                  await window.electronAPI.pasteTextAtCursor(result.text);
+                  logger.debug('Pasted transcribed text at cursor position from renderer');
+                } catch (pasteError) {
+                  logger.exception(
+                    'Failed to paste text at cursor position from renderer',
+                    pasteError
+                  );
+                }
+              }
             }
 
             // Save the transcription to JSON
@@ -246,7 +262,7 @@ export const useTranscriptions = (settings: AppSettings) => {
               await refreshRecentTranscriptions();
             }, 2000);
           } else if (result.error) {
-            logger.error(`Transcription error: ${result.error}`, null);
+            logger.error(`Transcription error: ${result.error}`, {});
             // You could add error handling UI here
           }
         } catch (ipcError) {

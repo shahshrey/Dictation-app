@@ -91,6 +91,9 @@ interface ElectronAPI {
   setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) => Promise<boolean>;
   minimizeMainWindow: () => Promise<boolean>;
 
+  // Clipboard utilities
+  pasteTextAtCursor: (text: string) => Promise<{ success: boolean; error?: string }>;
+
   // Event listeners
   onToggleRecording: (callback: () => void) => () => void;
 }
