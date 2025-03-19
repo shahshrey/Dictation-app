@@ -8,9 +8,11 @@ const {
 const path = require('path');
 const logger = require('../shared/logger').default;
 
-// First import constants to prevent circular dependencies
-// TEMP_DIR is used by other modules, so keep it even if it appears unused here
-const { TEMP_DIR, DEFAULT_SAVE_DIR, GROQ_MODELS } = require('./components/constants');
+// Import services first
+const { GROQ_MODELS } = require('./services/groq');
+
+// Import other constants 
+const { TEMP_DIR, DEFAULT_SAVE_DIR } = require('./components/constants');
 
 // Import the RecordingManager
 const { RecordingManager, AUDIO_FILE_PATH } = require('./services/recording');
@@ -65,9 +67,10 @@ let recordingManager = null;
 // This function is used elsewhere in the codebase, do not remove
 const loadGroqClient = () => {
   if (!groqClient) {
-    const groqModule = require('./components/groqClient');
-    groqClient = groqModule.groqClient;
-    initGroqClient = groqModule.initGroqClient;
+    // Use the TypeScript service instead of the JavaScript module
+    const groqService = require('./services/groq').default;
+    groqClient = groqService.groqClient;
+    initGroqClient = groqService.initGroqClient;
     global.initGroqClient = initGroqClient;
     global.groqClient = groqClient;
   }
@@ -143,8 +146,12 @@ app.whenReady().then(async () => {
     global.mainWindow = createWindow();
   }
 
-  // Set up IPC handlers early
+  // Set up IPC handlers
   logger.debug('Setting up IPC handlers');
+  // Set up Groq API with the TypeScript service first
+  const { setupGroqAPI } = require('./services/groq');
+  setupGroqAPI(require('electron').ipcMain);
+  // Then set up regular IPC handlers
   setupIpcHandlers(global.mainWindow, global.popupWindow, settings, getStore());
 
   // Explicitly DON'T show the main window at startup

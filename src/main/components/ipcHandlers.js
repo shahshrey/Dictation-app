@@ -1,8 +1,8 @@
 const { ipcMain, dialog } = require('electron');
 const fs = require('fs');
 const path = require('path');
-const { GROQ_MODELS, DEFAULT_SETTINGS } = require('./constants');
-const { initGroqClient, transcribeRecording } = require('./groqClient');
+const { DEFAULT_SETTINGS } = require('./constants');
+const groqService = require('../services/groq').default;
 const { recheckAccessibilityPermission } = require('./permissionsUtils');
 const { setIgnoreMouseEvents, registerGlobalHotkey, minimizeMainWindow } = require('./windowManager');
 const { 
@@ -16,6 +16,9 @@ const {
 } = require('./storageManager');
 const { STORAGE_CHANNELS } = require('../../shared/storage');
 const logger = require('../../shared/logger').default;
+
+// Import the GROQ_MODELS from the groq service
+const { GROQ_MODELS } = require('../services/groq');
 
 // Set up IPC handlers
 const setupIpcHandlers = (mainWindow, popupWindow, settings, store) => {
@@ -62,92 +65,6 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store) => {
     } catch (error) {
       logger.error('Failed to get audio sources:', { error: error.message });
       return [];
-    }
-  });
-
-  // NOTE: save-recording, get-recording-path, start-recording, and stop-recording
-  // handlers are now provided by the RecordingManager class
-  
-  // Transcribe audio using Groq API
-  ipcMain.handle('transcribe-audio', async (_, filePath, options) => {
-    try {
-      const groqClient = initGroqClient(settings.apiKey);
-
-      if (!groqClient) {
-        return { success: false, error: 'Groq API key not set' };
-      }
-
-      logger.debug(`Using Groq model: ${options?.model || settings.transcriptionModel || GROQ_MODELS.TRANSCRIPTION.MULTILINGUAL} for transcription with language: ${options?.language || 'en'}`);
-      
-      if (!fs.existsSync(filePath)) {
-        logger.error('Audio file not found:', { filePath });
-        return { success: false, error: 'Audio file not found' };
-      }
-
-      const audioFile = fs.createReadStream(filePath);
-
-      // Choose the appropriate model based on options or settings
-      let model =
-        options?.model || settings.transcriptionModel || GROQ_MODELS.TRANSCRIPTION.MULTILINGUAL;
-
-      // Force English model if language is English
-      if (options?.language === 'en') {
-        model = GROQ_MODELS.TRANSCRIPTION.ENGLISH;
-      }
-
-      // Default to English if no language is specified or if 'auto' is specified
-      const language =
-        options?.language === 'auto' || !options?.language ? 'en' : options?.language;
-
-      const transcription = await groqClient.audio.transcriptions.create({
-        file: audioFile,
-        model: model,
-        language: language,
-      });
-
-      return {
-        success: true,
-        text: transcription.text,
-        language: language,
-        model: model,
-      };
-    } catch (error) {
-      logger.error('Failed to transcribe audio:', { error: error.message });
-      return { success: false, error: String(error) };
-    }
-  });
-
-  // Translate audio using Groq API
-  ipcMain.handle('translate-audio', async (_, filePath) => {
-    try {
-      const groqClient = initGroqClient(settings.apiKey);
-
-      if (!groqClient) {
-        return { success: false, error: 'Groq API key not set' };
-      }
-
-      if (!fs.existsSync(filePath)) {
-        logger.error('Audio file not found:', { filePath });
-        return { success: false, error: 'Audio file not found' };
-      }
-
-      const audioFile = fs.createReadStream(filePath);
-
-      logger.debug(`Using Groq model: ${GROQ_MODELS.TRANSLATION} for translation`);
-
-      const translation = await groqClient.audio.translations.create({
-        file: audioFile,
-        model: GROQ_MODELS.TRANSLATION,
-      });
-
-      return {
-        success: true,
-        text: translation.text,
-        model: GROQ_MODELS.TRANSLATION,
-      };
-    } catch (error) {
-      logger.error('Failed to translate audio:', { error: error.message });
-      return { success: false, error: String(error) };
     }
   });
 
@@ -221,14 +138,6 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store) => {
       logger.error('API key validation failed:', { error: error.message });
       return false;
     }
-  });
-
-  // Transcribe the most recent recording using Groq API
-  // This handler takes the language and API key from the renderer
-  // and returns a transcription object with the transcribed text
-  ipcMain.handle('transcribe-recording', async (_, language, apiKey) => {
-    // Use the transcribeRecording function from groqClient.js
-    return await transcribeRecording(language, apiKey);
   });
 
   // Get settings

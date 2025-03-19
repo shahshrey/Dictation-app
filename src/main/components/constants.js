@@ -1,26 +1,17 @@
 // Define constants
 const path = require('path');
 const os = require('os');
+const { AUDIO_SETTINGS } = require('../../shared/constants');
 
 const TEMP_DIR = path.join(os.tmpdir(), 'voice-vibe');
-const AUDIO_FILE_PATH = path.join(TEMP_DIR, 'recording.webm');
+const AUDIO_FILE_PATH = path.join(TEMP_DIR, `recording.${AUDIO_SETTINGS.FILE_FORMAT}`);
 const DEFAULT_SAVE_DIR = path.join(os.homedir(), 'Documents', 'Voice Vibe');
-
-// Define Groq API models
-const GROQ_MODELS = {
-  TRANSCRIPTION: {
-    MULTILINGUAL: 'whisper-large-v3',
-    MULTILINGUAL_TURBO: 'whisper-large-v3-turbo',
-    ENGLISH: 'distil-whisper-large-v3-en',
-  },
-  TRANSLATION: 'whisper-large-v3',
-};
-
+const GROQ_MODELS = require('../services/groq').GROQ_MODELS;
 // Default settings
 const DEFAULT_SETTINGS = {
   apiKey: '',
   defaultLanguage: 'auto',
-  transcriptionModel: GROQ_MODELS.TRANSCRIPTION.MULTILINGUAL,
+  transcriptionModel: GROQ_MODELS.TRANSCRIPTION.ENGLISH,
   showNotifications: true,
   saveTranscriptionsAutomatically: false,
 };
@@ -29,6 +20,5 @@ module.exports = {
   TEMP_DIR,
   AUDIO_FILE_PATH,
   DEFAULT_SAVE_DIR,
-  GROQ_MODELS,
   DEFAULT_SETTINGS
 }; 
