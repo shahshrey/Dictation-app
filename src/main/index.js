@@ -56,7 +56,7 @@ const {
 const { createTray, updateTrayMenu, destroyTray } = require('./components/trayManager');
 
 // Import IPC handlers last as they depend on all other components
-const { setupIpcHandlers } = require('./components/ipcHandlers');
+const { setupIpcHandlers } = require('./services/ipcHandlers');
 
 // Lazy load components that aren't needed immediately
 let groqClient = null;
