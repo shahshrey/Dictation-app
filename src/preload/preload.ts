@@ -52,6 +52,12 @@ try {
       return ipcRenderer.invoke('transcribe-recording', language, apiKey);
     },
 
+    // API validation
+    testApiKey: (apiKey: string) => {
+      logger.debug('Preload: testApiKey called with API key available:', { available: !!apiKey });
+      return ipcRenderer.invoke('testApiKey', apiKey);
+    },
+
     // File storage
     saveTranscription: (
       transcription: Transcription,
@@ -84,6 +90,12 @@ try {
     openFile: (path: string) => {
       logger.debug('Preload: openFile called for path:', { path });
       return ipcRenderer.invoke(STORAGE_CHANNELS.OPEN_FILE, path);
+    },
+
+    // Directory picker
+    showDirectoryPicker: () => {
+      logger.debug('Preload: showDirectoryPicker called');
+      return ipcRenderer.invoke('showDirectoryPicker');
     },
 
     // Event listeners

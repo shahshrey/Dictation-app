@@ -2,7 +2,6 @@ import React, { Suspense } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
 import { LoadingSpinner } from '../../ui/loading-spinner';
-import SettingsPanel from '../settings/SettingsPanel';
 import TranscriptionHistory from './TranscriptionHistory';
 
 const Home: React.FC = () => {
@@ -15,7 +14,6 @@ const Home: React.FC = () => {
         <Tabs defaultValue="history" className="w-full">
           <TabsList className="w-full justify-start mb-4">
             <TabsTrigger value="history">History</TabsTrigger>
-            <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
 
           <TabsContent value="history" className="h-full">
@@ -27,18 +25,6 @@ const Home: React.FC = () => {
               }
             >
               <TranscriptionHistory />
-            </Suspense>
-          </TabsContent>
-
-          <TabsContent value="settings">
-            <Suspense
-              fallback={
-                <div className="flex justify-center">
-                  <LoadingSpinner />
-                </div>
-              }
-            >
-              <SettingsPanel />
             </Suspense>
           </TabsContent>
         </Tabs>

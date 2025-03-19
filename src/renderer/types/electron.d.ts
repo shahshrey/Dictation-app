@@ -65,6 +65,9 @@ interface ElectronAPI {
     pastedAtCursor?: boolean;
   }>;
 
+  // API validation
+  testApiKey: (apiKey: string) => Promise<boolean>;
+
   // File storage
   saveTranscription: (
     transcription: Transcription,
@@ -76,6 +79,7 @@ interface ElectronAPI {
   getTranscription: (id: string) => Promise<GetTranscriptionResult>;
   deleteTranscription: (id: string) => Promise<DeleteTranscriptionResult>;
   openFile: (path: string) => Promise<OpenFileResult>;
+  showDirectoryPicker: () => Promise<string | null>;
 
   // Settings
   getSettings: () => Promise<Record<string, unknown>>;

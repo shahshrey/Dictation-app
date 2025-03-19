@@ -180,6 +180,49 @@ const setupIpcHandlers = (mainWindow, popupWindow, settings, store) => {
     return openFile(filePath);
   });
 
+  // Show directory picker dialog
+  ipcMain.handle('showDirectoryPicker', async () => {
+    try {
+      const result = await dialog.showOpenDialog({
+        properties: ['openDirectory', 'createDirectory'],
+        title: 'Select Directory for Saving Transcriptions',
+      });
+
+      if (result.canceled || result.filePaths.length === 0) {
+        return null;
+      }
+      
+      return result.filePaths[0];
+    } catch (error) {
+      logger.error('Error showing directory picker:', { error: error.message });
+      return null;
+    }
+  });
+
+  // Test API key validity by making a simple request to the Groq API
+  ipcMain.handle('testApiKey', async (_, apiKey) => {
+    try {
+      if (!apiKey || !apiKey.trim()) {
+        return false;
+      }
+
+      // Import the Groq SDK directly for validation
+      const Groq = require('groq-sdk');
+      
+      // Create a temporary Groq client with the provided API key
+      const groqClient = new Groq({ apiKey });
+      
+      // Make a simple request to validate the API key
+      const modelsResponse = await groqClient.models.list();
+      
+      // If we get a response, the API key is valid
+      return Array.isArray(modelsResponse.data);
+    } catch (error) {
+      logger.error('API key validation failed:', { error: error.message });
+      return false;
+    }
+  });
+
   // Transcribe the most recent recording using Groq API
   // This handler takes the language and API key from the renderer
   // and returns a transcription object with the transcribed text
