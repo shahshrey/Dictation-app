@@ -1,6 +1,7 @@
 import { AudioDevice } from '../../shared/types';
 import { useAudioRecording } from './useAudioRecording';
-import { logger } from '../shared/logger';
+import logger from '../../shared/logger';
+import { playStartSound, playStopSound } from '../utils/audioFeedback';
 
 interface UseRecordingProps {
   selectedDevice: AudioDevice | null;
@@ -93,6 +94,9 @@ export const useRecording = ({
     try {
       logger.debug('Starting recording...');
 
+      // Play the start sound
+      playStartSound();
+
       if (selectedDevice) {
         logger.debug('Using selected device:', {
           id: selectedDevice.id,
@@ -176,6 +180,9 @@ export const useRecording = ({
   // Stop recording
   const stopRecording = (): void => {
     stopAudioRecording();
+
+    // Play the stop sound
+    playStopSound();
   };
 
   return {
