@@ -3,7 +3,7 @@ import { setupPermissionHandlers } from './permissions';
 import { setupAudioHandlers } from './audio';
 import { setupStorageHandlers } from './storageIpc';
 import { setupFileDialogHandlers } from './fileDialog';
-import { setupApiKeyValidatorHandlers } from './apiKeyValidator';
+import { setupApiKeyValidatorHandlers } from './groq/apiKeyValidator';
 import { setupSettingsHandlers } from './settings';
 import { setupWindowHandlers } from './window';
 import { setupTrayHandlers } from './tray';
@@ -43,4 +43,4 @@ const setupIpcHandlers = (
   setupClipboardHandlers();
 };
 
-export { setupIpcHandlers }; 
+export { setupIpcHandlers };

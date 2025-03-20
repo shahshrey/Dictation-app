@@ -1,18 +1,16 @@
 import { dialog, shell } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
-import { TEMP_DIR, DEFAULT_SAVE_DIR } from '../components/constants';
+import { TEMP_DIR, DEFAULT_SAVE_DIR } from './constants';
 import logger from '../../shared/logger';
-import { 
-  Transcription, 
-} from '../../shared/types';
+import { Transcription } from '../../shared/types';
 import {
   SaveTranscriptionOptions,
   SaveTranscriptionResult,
   GetTranscriptionsResult,
   GetTranscriptionResult,
   DeleteTranscriptionResult,
-  OpenFileResult
+  OpenFileResult,
 } from '../../shared/storage';
 
 interface TranscriptionWithStats {
@@ -27,7 +25,7 @@ interface TranscriptionWithStats {
  * Save transcription to a file
  */
 export const saveTranscription = async (
-  transcription: Transcription, 
+  transcription: Transcription,
   options: SaveTranscriptionOptions = {}
 ): Promise<SaveTranscriptionResult> => {
   try {
@@ -100,7 +98,7 @@ export const getRecentTranscriptions = async (): Promise<GetTranscriptionsResult
             stats: {
               createdAt: stats.birthtime,
               modifiedAt: stats.mtime,
-            }
+            },
           };
         } catch (error) {
           logger.error(`Error processing file ${file}:`, { error: (error as Error).message });
@@ -111,9 +109,9 @@ export const getRecentTranscriptions = async (): Promise<GetTranscriptionsResult
       .sort((a, b) => b.stats.modifiedAt.getTime() - a.stats.modifiedAt.getTime())
       .slice(0, 10);
 
-    return { 
-      success: true, 
-      transcriptions: files.map(f => f.transcription)
+    return {
+      success: true,
+      transcriptions: files.map(f => f.transcription),
     };
   } catch (error) {
     logger.error('Failed to get recent transcriptions:', { error: (error as Error).message });
@@ -134,7 +132,10 @@ export const getTranscriptions = async (): Promise<Transcription[]> => {
     // Force a directory read to get the latest files
     const files = fs
       .readdirSync(DEFAULT_SAVE_DIR, { withFileTypes: true })
-      .filter(dirent => dirent.isFile() && dirent.name.endsWith('.json') && dirent.name !== 'transcriptions.json')
+      .filter(
+        dirent =>
+          dirent.isFile() && dirent.name.endsWith('.json') && dirent.name !== 'transcriptions.json'
+      )
       .map(dirent => {
         const filePath = path.join(DEFAULT_SAVE_DIR, dirent.name);
 
@@ -145,20 +146,24 @@ export const getTranscriptions = async (): Promise<Transcription[]> => {
             const content = fs.readFileSync(filePath, { encoding: 'utf-8' });
             transcription = JSON.parse(content) as Transcription;
           } catch (readError) {
-            logger.error(`Failed to read or parse file ${filePath}:`, { error: (readError as Error).message });
+            logger.error(`Failed to read or parse file ${filePath}:`, {
+              error: (readError as Error).message,
+            });
             return null; // Skip this file if we can't read or parse it
           }
 
           // Return the parsed transcription
           return transcription;
         } catch (error) {
-          logger.error(`Failed to process file ${dirent.name}:`, { error: (error as Error).message });
+          logger.error(`Failed to process file ${dirent.name}:`, {
+            error: (error as Error).message,
+          });
           return null;
         }
       })
       .filter((item): item is Transcription => item !== null)
       .sort((a, b) => b.timestamp - a.timestamp);
-    
+
     return files;
   } catch (error) {
     logger.error('Failed to get transcriptions:', { error: (error as Error).message });
@@ -175,7 +180,8 @@ export const getTranscription = async (id: string): Promise<GetTranscriptionResu
       return { success: false, error: 'Save directory does not exist' };
     }
 
-    const files = fs.readdirSync(DEFAULT_SAVE_DIR)
+    const files = fs
+      .readdirSync(DEFAULT_SAVE_DIR)
       .filter(file => file.endsWith('.json') && file !== 'transcriptions.json');
 
     for (const file of files) {
@@ -183,7 +189,7 @@ export const getTranscription = async (id: string): Promise<GetTranscriptionResu
         const filePath = path.join(DEFAULT_SAVE_DIR, file);
         const content = fs.readFileSync(filePath, { encoding: 'utf-8' });
         const transcription = JSON.parse(content) as Transcription;
-        
+
         if (transcription.id === id) {
           return { success: true, transcription };
         }
@@ -208,7 +214,8 @@ export const deleteTranscription = async (id: string): Promise<DeleteTranscripti
       return { success: false, error: 'Save directory does not exist' };
     }
 
-    const files = fs.readdirSync(DEFAULT_SAVE_DIR)
+    const files = fs
+      .readdirSync(DEFAULT_SAVE_DIR)
       .filter(file => file.endsWith('.json') && file !== 'transcriptions.json');
 
     for (const file of files) {
@@ -216,7 +223,7 @@ export const deleteTranscription = async (id: string): Promise<DeleteTranscripti
         const filePath = path.join(DEFAULT_SAVE_DIR, file);
         const content = fs.readFileSync(filePath, { encoding: 'utf-8' });
         const transcription = JSON.parse(content) as Transcription;
-        
+
         if (transcription.id === id) {
           fs.unlinkSync(filePath);
           return { success: true };
@@ -267,4 +274,4 @@ export const ensureStorageDirectories = (): void => {
       logger.error('Failed to create save directory:', { error: (error as Error).message });
     }
   }
-}; 
+};

@@ -5,7 +5,7 @@ import * as os from 'os';
 import { AudioDevice, IPC_CHANNELS } from '../../shared/types';
 import { AUDIO_SETTINGS } from '../../shared/constants';
 import logger from '../../shared/logger';
-import { updateTrayMenu } from '../components/trayManager';
+import { updateTrayMenu } from './trayManager';
 
 // Define constants for audio recording
 const TEMP_DIR = path.join(os.tmpdir(), 'voice-vibe');

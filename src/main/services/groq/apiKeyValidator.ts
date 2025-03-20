@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron';
-import logger from '../../shared/logger';
+import logger from '../../../shared/logger';
 
 /**
  * Sets up API key validation IPC handlers
@@ -15,13 +15,13 @@ export const setupApiKeyValidatorHandlers = (): void => {
       // Import the Groq SDK dynamically to avoid loading it unnecessarily
       // Using dynamic import for TypeScript compatibility
       const { default: Groq } = await import('groq-sdk');
-      
+
       // Create a temporary Groq client with the provided API key
       const groqClient = new Groq({ apiKey });
-      
+
       // Make a simple request to validate the API key
       const modelsResponse = await groqClient.models.list();
-      
+
       // If we get a response, the API key is valid
       return Array.isArray(modelsResponse.data);
     } catch (error) {
@@ -31,4 +31,4 @@ export const setupApiKeyValidatorHandlers = (): void => {
   });
 };
 
-export default { setupApiKeyValidatorHandlers }; 
+export default { setupApiKeyValidatorHandlers };

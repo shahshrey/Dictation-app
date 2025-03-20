@@ -12,7 +12,7 @@ const logger = require('../shared/logger').default;
 const { GROQ_MODELS } = require('./services/groq');
 
 // Import other constants 
-const { TEMP_DIR, DEFAULT_SAVE_DIR } = require('./components/constants');
+const { TEMP_DIR, DEFAULT_SAVE_DIR } = require('./services/constants');
 
 // Import the RecordingManager
 const { RecordingManager, AUDIO_FILE_PATH } = require('./services/recording');
@@ -34,8 +34,8 @@ global.isQuitting = false; // Track when we're intentionally quitting the app
 exports.TEMP_DIR = TEMP_DIR;
 
 // Only after setting up globals, import other components
-const { pasteTextAtCursor } = require('./components/clipboardUtils');
-const { getStore, settings, initStore, ensureDirectories, loadSettingsFromFile } = require('./components/storeUtils');
+const { pasteTextAtCursor } = require('./services/clipboard').default;
+const { getStore, settings, initStore, ensureDirectories, loadSettingsFromFile } = require('./services/StoreService');
 
 // Set additional globals needed by other modules
 global.settings = settings;
@@ -43,17 +43,17 @@ global.pasteTextAtCursor = pasteTextAtCursor;
 
 // Import window manager after other globals are set
 const {
-  createWindow,
+  createMainWindow: createWindow,
   createPopupWindow,
   hidePopupFromDock,
   showPopupWindow,
   setupDockMenu,
   registerGlobalHotkey,
   restoreMinimizedWindows
-} = require('./components/windowManager');
+} = require('./services/window/index');
 
 // Import the tray manager
-const { createTray, updateTrayMenu, destroyTray } = require('./components/trayManager');
+const { createTray, updateTrayMenu, destroyTray } = require('./services/trayManager');
 
 // Import IPC handlers last as they depend on all other components
 const { setupIpcHandlers } = require('./services/ipcHandlers');
@@ -82,7 +82,7 @@ global.loadGroqClient = loadGroqClient;
 
 // Function to lazily load permission utilities
 const loadPermissionUtils = () => {
-  const { checkMacOSPermissions, recheckAccessibilityPermission } = require('./components/permissionsUtils');
+  const { checkMacOSPermissions, recheckAccessibilityPermission } = require('./services/permissions');
   return { checkMacOSPermissions, recheckAccessibilityPermission };
 };
 

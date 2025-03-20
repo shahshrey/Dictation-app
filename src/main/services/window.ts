@@ -1,23 +1,16 @@
-import { ipcMain } from 'electron';
-import { setIgnoreMouseEvents, minimizeMainWindow } from '../components/windowManager';
-
-interface MouseEventsOptions {
-  forward: boolean;
-}
+import { setupWindowHandlers } from './window/index';
 
 /**
  * Sets up window-related IPC handlers
  */
-export const setupWindowHandlers = (): void => {
-  // Window management
-  ipcMain.handle('set-ignore-mouse-events', (event, ignore: boolean, options: MouseEventsOptions = { forward: true }) => {
-    return setIgnoreMouseEvents(ignore, options);
-  });
-
-  // Add handler for minimizing the main window
-  ipcMain.handle('minimize-main-window', () => {
-    return minimizeMainWindow();
-  });
+export const setupHandlers = (): void => {
+  setupWindowHandlers();
 };
 
-export default { setupWindowHandlers }; 
+// Re-export everything from the window directory
+export * from './window';
+
+// Explicitly export the setupWindowHandlers function
+export { setupWindowHandlers };
+
+export default { setupHandlers };
