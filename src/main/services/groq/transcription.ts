@@ -13,12 +13,14 @@ import {
 import { getAudioFilePath, getTempDir } from '../path-constants';
 import * as path from 'path';
 
+// Maximum file size for audio processing (10MB)
+const MAX_AUDIO_FILE_SIZE = 10 * 1024 * 1024;
+
 /**
  * Process transcription text with Groq LLM to improve clarity
  */
 export const processTranscriptionText = async (text: string, apiKey: string): Promise<string> => {
   try {
-    logger.debug('Processing transcription text:', { text });
     if (!text) return '';
 
     const client = initGroqClient(apiKey);
@@ -70,6 +72,19 @@ const normalizeLanguage = (language: string): string => {
 };
 
 /**
+ * Checks file size before processing
+ */
+const checkFileSize = (filePath: string): boolean => {
+  try {
+    const stats = fs.statSync(filePath);
+    return stats.size <= MAX_AUDIO_FILE_SIZE;
+  } catch (error) {
+    logger.error('Failed to check file size:', { error: (error as Error).message });
+    return false;
+  }
+};
+
+/**
  * Transcribe a recording file using Groq API
  */
 export const transcribeRecording = async (
@@ -93,6 +108,11 @@ export const transcribeRecording = async (
       return { success: false, error: 'Invalid audio file' };
     }
 
+    // Check file size before processing
+    if (!checkFileSize(originalAudioFilePath)) {
+      return { success: false, error: 'Audio file too large (max 10MB)' };
+    }
+
     const fileStats = getFileStats(originalAudioFilePath);
     if (!fileStats) {
       return { success: false, error: 'Failed to get file stats' };
@@ -113,10 +133,10 @@ export const transcribeRecording = async (
 
     // Copy the audio file from temporary location to permanent location with unique name
     fs.copyFileSync(originalAudioFilePath, permanentAudioFilePath);
-    logger.debug('Audio file copied to permanent location:', { path: permanentAudioFilePath });
 
-    // Use the permanent file for transcription
-    const audioFile = fs.createReadStream(permanentAudioFilePath);
+    // Use the original file for transcription instead of creating a new read stream
+    // This avoids having multiple copies of the same file in memory
+    const audioFile = fs.createReadStream(originalAudioFilePath);
 
     // Prepare transcription parameters
     const normalizedLanguage = normalizeLanguage(language);
@@ -127,14 +147,12 @@ export const transcribeRecording = async (
       model,
       language: normalizedLanguage,
     };
-    console.log('transcriptionParams', JSON.stringify(transcriptionParams));
+
     const transcription = await client.audio.transcriptions.create(transcriptionParams);
     const rawText = transcription.text;
 
     // Process the transcription
-    logger.debug('Raw transcription text:', { rawText });
     const processedText = await processTranscriptionText(rawText, apiKey);
-    logger.debug('Processed transcription text:', { processedText });
 
     // Create metadata using our pre-generated ID
     const timestamp = Date.now();
@@ -157,9 +175,6 @@ export const transcribeRecording = async (
 
     // Save to file with our consistent ID
     const { filePath } = saveTranscriptionToFile(transcriptionObject);
-
-    // Add a small delay to ensure file system operations are complete
-    await new Promise(resolve => setTimeout(resolve, 500));
 
     return {
       success: true,
@@ -203,6 +218,11 @@ export const handleTranscribeAudio = async (
       return { success: false, error: 'Audio file not found' };
     }
 
+    // Check file size before processing
+    if (!checkFileSize(filePath)) {
+      return { success: false, error: 'Audio file too large (max 10MB)' };
+    }
+
     // Generate a unique ID for both transcript and audio files
     const datePart = new Date()
       .toISOString()
@@ -219,9 +239,9 @@ export const handleTranscribeAudio = async (
 
     // Create a copy of the file with the unique ID as filename
     fs.copyFileSync(filePath, newFilePath);
-    logger.debug('Audio file copied with unique ID:', { path: newFilePath });
 
-    const audioFile = fs.createReadStream(newFilePath);
+    // Use the original file for streaming to API to avoid duplicate file handles
+    const audioFile = fs.createReadStream(filePath);
     const language = normalizeLanguage(options.language || 'auto');
     const model = options.model || selectTranscriptionModel(language);
 
@@ -246,22 +266,24 @@ export const handleTranscribeAudio = async (
       source: 'upload',
       confidence: 0.95,
       audioFilePath: newFilePath,
+      title: `Upload ${new Date(timestamp).toLocaleString()}`,
     };
 
-    const { filePath: transcriptPath } = saveTranscriptionToFile(transcriptionObject);
+    // Save transcript to file
+    const { filePath: transcriptFilePath } = saveTranscriptionToFile(transcriptionObject);
 
     return {
       success: true,
+      id: fileId,
       text: processedText,
       rawText: transcription.text,
       language,
       model,
       audioFilePath: newFilePath,
-      transcriptFilePath: transcriptPath,
-      id: fileId,
+      transcriptFilePath,
     };
   } catch (error) {
-    logger.error('Failed to transcribe audio:', { error: (error as Error).message });
+    logger.error('Failed to transcribe audio file', { error: (error as Error).message });
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),

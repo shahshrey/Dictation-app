@@ -6,15 +6,6 @@ export const useTranscriptions = (settings: AppSettings) => {
   const [currentTranscription, setCurrentTranscription] = useState<Transcription | null>(null);
   const [recentTranscriptions, setRecentTranscriptions] = useState<Transcription[]>([]);
 
-  // Log when settings change, particularly the API key
-  useEffect(() => {
-    logger.debug(`useTranscriptions received settings update`);
-    logger.debug(`API key available in useTranscriptions: ${!!settings.apiKey}`);
-    logger.debug(
-      `API key length in useTranscriptions: ${settings.apiKey ? settings.apiKey.length : 0}`
-    );
-  }, [settings, settings.apiKey]);
-
   // Helper functions to reduce cognitive complexity
   const processTranscriptionsResult = (transcriptions: Transcription[]): void => {
     if (Array.isArray(transcriptions) && transcriptions.length > 0) {
@@ -40,7 +31,6 @@ export const useTranscriptions = (settings: AppSettings) => {
       return false;
     }
 
-    logger.debug('Calling getTranscriptions IPC method...');
     try {
       const transcriptions = await window.electronAPI.getTranscriptions();
 
@@ -61,10 +51,8 @@ export const useTranscriptions = (settings: AppSettings) => {
       return false;
     }
 
-    logger.debug('Falling back to getRecentTranscriptions IPC method...');
     try {
       const result = await window.electronAPI.getRecentTranscriptions();
-      logger.debug(`Recent transcriptions result: ${JSON.stringify(result, null, 2)}`);
 
       if (result && result.success && result.transcriptions) {
         // Only use JSON transcriptions
@@ -75,9 +63,7 @@ export const useTranscriptions = (settings: AppSettings) => {
       }
 
       // If we get here, we didn't find any valid transcriptions
-      logger.warn(
-        `getRecentTranscriptions returned no valid transcriptions: ${JSON.stringify(result, null, 2)}`
-      );
+      logger.warn('getRecentTranscriptions returned no valid transcriptions');
       setRecentTranscriptions([]);
       return true;
     } catch (error) {
@@ -89,15 +75,6 @@ export const useTranscriptions = (settings: AppSettings) => {
   // Refresh recent transcriptions
   const refreshRecentTranscriptions = async (): Promise<void> => {
     try {
-      logger.debug('Attempting to refresh recent transcriptions...');
-      logger.debug(`electronAPI available: ${!!window.electronAPI}`);
-      logger.debug(
-        `getTranscriptions method available: ${!!(window.electronAPI && typeof window.electronAPI.getTranscriptions === 'function')}`
-      );
-      logger.debug(
-        `getRecentTranscriptions method available: ${!!(window.electronAPI && typeof window.electronAPI.getRecentTranscriptions === 'function')}`
-      );
-
       // Try primary method first
       const primarySuccess = await fetchTranscriptionsWithPrimaryMethod();
 
@@ -156,142 +133,84 @@ export const useTranscriptions = (settings: AppSettings) => {
   // Transcribe recording
   const transcribeRecording = async (language?: string): Promise<void> => {
     try {
-      logger.debug(
-        `Attempting to transcribe recording with language: ${language ?? settings.language}`
-      );
-      logger.debug(`API key available: ${!!settings.apiKey}`);
-      logger.debug(`API key length: ${settings.apiKey ? settings.apiKey.length : 0}`);
-      logger.debug(
-        `transcribeRecording API available: ${!!(window.electronAPI && typeof window.electronAPI.transcribeRecording === 'function')}`
-      );
-
       // Get API key from settings
       const apiKey = settings.apiKey;
 
       // Check if API key is available
       if (!apiKey) {
-        logger.warn('No API key in settings, checking .env file or using default');
-
-        // Error out since we don't have an API key
         logger.error('No API key available. Please set your Groq API key in the settings.', {});
         return;
       }
 
       if (window.electronAPI && typeof window.electronAPI.transcribeRecording === 'function') {
-        logger.debug('Calling transcribeRecording IPC method...');
-        try {
-          // Log the parameters being sent
-          logger.debug(`Sending language: ${language ?? settings.language}`);
-          logger.debug(`API key length being sent: ${apiKey.length}`);
+        const result = await window.electronAPI.transcribeRecording(
+          language ?? settings.language,
+          apiKey
+        );
 
-          const result = await window.electronAPI.transcribeRecording(
-            language ?? settings.language,
-            apiKey
-          );
-
-          logger.debug(`Transcription result received: ${!!result}`);
-          if (result) {
-            logger.debug(`Transcription success: ${result.success}`);
-            logger.debug(`Transcription result: ${JSON.stringify(result, null, 2)}`);
-          } else {
-            logger.error('Received null or undefined result from transcribeRecording', {});
-            return;
-          }
-
-          if (result.success) {
-            logger.debug(`Transcription successful, text length: ${result.text.length}`);
-
-            // Calculate word count if not provided
-            const wordCount = result.wordCount ?? result.text.split(/\s+/).length;
-
-            // Create enhanced transcription object
-            const transcription: Transcription = {
-              id: result.id,
-              text: result.text,
-              timestamp: result.timestamp,
-              duration: result.duration,
-              language: result.language ?? settings.language,
-              pastedAtCursor: result.pastedAtCursor,
-              wordCount,
-              source: 'recording',
-              title: `Recording ${new Date(result.timestamp).toLocaleString()}`,
-              confidence: result.confidence,
-              audioFilePath: result.audioFilePath,
-            };
-
-            setCurrentTranscription(transcription);
-
-            // Log whether the text was pasted at the cursor
-            if (result.pastedAtCursor) {
-              logger.debug('Transcribed text was pasted at cursor position');
-            } else {
-              logger.debug('Transcribed text was not pasted at cursor position');
-
-              // Paste text at cursor since it wasn't already pasted by the main process
-              if (
-                window.electronAPI &&
-                typeof window.electronAPI.pasteTextAtCursor === 'function'
-              ) {
-                try {
-                  await window.electronAPI.pasteTextAtCursor(result.text);
-                  logger.debug('Pasted transcribed text at cursor position from renderer');
-                } catch (pasteError) {
-                  logger.exception(
-                    'Failed to paste text at cursor position from renderer',
-                    pasteError
-                  );
-                }
-              }
-            }
-
-            // Note: The transcription is already saved by the main process in the Groq service,
-            // so we don't need to save it again here to avoid creating duplicate files.
-
-            // Refresh the list of transcriptions immediately
-            await refreshRecentTranscriptions();
-
-            // Add a second refresh after a delay to ensure we get the latest data
-            setTimeout(async () => {
-              logger.debug('Performing delayed refresh of transcriptions');
-              await refreshRecentTranscriptions();
-            }, 2000);
-          } else if (result.error) {
-            logger.error(`Transcription error: ${result.error}`, {});
-            // You could add error handling UI here
-          }
-        } catch (ipcError) {
-          logger.exception('Error calling transcribeRecording IPC method', ipcError);
+        if (!result) {
+          logger.error('Received null or undefined result from transcribeRecording', {});
+          return;
         }
-      } else {
-        logger.warn('transcribeRecording API not available');
+
+        if (result.success) {
+          // Calculate word count if not provided
+          const wordCount = result.wordCount ?? result.text.split(/\s+/).length;
+
+          // Create enhanced transcription object
+          const transcription: Transcription = {
+            id: result.id,
+            text: result.text,
+            timestamp: result.timestamp,
+            duration: result.duration,
+            language: result.language ?? settings.language,
+            pastedAtCursor: result.pastedAtCursor,
+            wordCount,
+            source: 'recording',
+            title: `Recording ${new Date(result.timestamp).toLocaleString()}`,
+            confidence: result.confidence,
+            audioFilePath: result.audioFilePath,
+          };
+
+          setCurrentTranscription(transcription);
+
+          // Paste text at cursor if it wasn't already pasted by the main process
+          if (
+            !result.pastedAtCursor &&
+            window.electronAPI &&
+            typeof window.electronAPI.pasteTextAtCursor === 'function'
+          ) {
+            try {
+              await window.electronAPI.pasteTextAtCursor(result.text);
+            } catch (pasteError) {
+              logger.exception('Failed to paste text at cursor position from renderer', pasteError);
+            }
+          }
+
+          // Refresh the list of transcriptions immediately
+          await refreshRecentTranscriptions();
+        } else if (result.error) {
+          logger.error(`Transcription failed: ${result.error}`, {});
+        }
       }
     } catch (error) {
       logger.exception('Failed to transcribe recording', error);
     }
   };
 
-  // Save transcription
-  const saveTranscription = async (transcription: Transcription): Promise<void> => {
-    try {
-      if (window.electronAPI && typeof window.electronAPI.saveTranscription === 'function') {
-        await window.electronAPI.saveTranscription(transcription);
-        refreshRecentTranscriptions();
-      } else {
-        logger.warn('saveTranscription API not available');
-      }
-    } catch (error) {
-      logger.exception('Failed to save transcription', error);
-    }
-  };
+  // Effect to refresh transcriptions when settings change
+  useEffect(() => {
+    refreshRecentTranscriptions();
+  }, [settings]);
 
+  // Public API
   return {
     currentTranscription,
-    setCurrentTranscription,
     recentTranscriptions,
     refreshRecentTranscriptions,
-    transcribeRecording,
-    saveTranscription,
     getTranscriptionById,
     deleteTranscription,
+    transcribeRecording,
+    setCurrentTranscription,
   };
 };
