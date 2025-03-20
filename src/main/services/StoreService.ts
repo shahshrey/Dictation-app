@@ -4,7 +4,7 @@ import path from 'path';
 import { app } from 'electron';
 import Store from 'electron-store';
 import logger from '../../shared/logger';
-import { ensureStorageDirectories } from './storageManager';
+import { ensureStorageDirectories } from './storage/storageManager';
 import { DEFAULT_SETTINGS } from './constants';
 
 // Define types for our settings

@@ -5,7 +5,7 @@
 
 import { Tray, Menu, app, nativeImage, BrowserWindow, MenuItemConstructorOptions } from 'electron';
 import path from 'path';
-import logger from '../../shared/logger';
+import logger from '../../../shared/logger';
 import fs from 'fs';
 
 // Constants for icon dimensions and application name

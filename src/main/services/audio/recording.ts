@@ -2,10 +2,10 @@ import { IpcMain, BrowserWindow } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { AudioDevice, IPC_CHANNELS } from '../../shared/types';
-import { AUDIO_SETTINGS } from '../../shared/constants';
-import logger from '../../shared/logger';
-import { updateTrayMenu } from './trayManager';
+import { AudioDevice, IPC_CHANNELS } from '../../../shared/types';
+import { AUDIO_SETTINGS } from '../../../shared/constants';
+import logger from '../../../shared/logger';
+import { updateTrayMenu } from '../tray/trayManager';
 
 // Define constants for audio recording
 const TEMP_DIR = path.join(os.tmpdir(), 'voice-vibe');

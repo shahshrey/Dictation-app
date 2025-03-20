@@ -2,8 +2,8 @@ import { IpcMain, dialog } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { Transcription } from '../../shared/types';
-import logger from '../../shared/logger';
+import { Transcription } from '../../../shared/types';
+import logger from '../../../shared/logger';
 
 // Define constants for file storage
 const DEFAULT_SAVE_DIR = path.join(os.homedir(), 'Documents', 'Voice Vibe');

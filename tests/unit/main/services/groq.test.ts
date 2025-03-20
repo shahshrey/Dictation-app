@@ -2,7 +2,7 @@ import { IpcMain, app } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Groq } from 'groq-sdk';
-import { setupGroqAPI } from '../../../../src/main/services/groq';
+import { setupGroqAPI } from '../../../../src/main/services/groq/groq';
 
 // Mock the required modules
 jest.mock('fs');

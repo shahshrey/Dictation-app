@@ -1,7 +1,7 @@
 import * as path from 'path';
 import * as os from 'os';
 import { AUDIO_SETTINGS } from '../../shared/constants';
-import { GROQ_MODELS } from './groq';
+import { GROQ_MODELS } from './groq/groq';
 
 // Define constants
 export const TEMP_DIR: string = path.join(os.tmpdir(), 'voice-vibe');

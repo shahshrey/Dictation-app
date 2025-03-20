@@ -1,9 +1,9 @@
 import { dialog, shell } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
-import { TEMP_DIR, DEFAULT_SAVE_DIR } from './constants';
-import logger from '../../shared/logger';
-import { Transcription } from '../../shared/types';
+import { TEMP_DIR, DEFAULT_SAVE_DIR } from '../constants';
+import logger from '../../../shared/logger';
+import { Transcription } from '../../../shared/types';
 import {
   SaveTranscriptionOptions,
   SaveTranscriptionResult,
@@ -11,7 +11,7 @@ import {
   GetTranscriptionResult,
   DeleteTranscriptionResult,
   OpenFileResult,
-} from '../../shared/storage';
+} from '../../../shared/storage';
 
 interface TranscriptionWithStats {
   transcription: Transcription;

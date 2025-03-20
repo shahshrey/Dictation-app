@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow } from 'electron';
-import logger from '../../shared/logger';
+import logger from '../../../shared/logger';
 
 interface AudioSource {
   id: string;

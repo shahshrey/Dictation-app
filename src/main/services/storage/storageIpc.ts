@@ -8,7 +8,7 @@ import {
   deleteTranscription,
   openFile
 } from './storageManager';
-import { STORAGE_CHANNELS } from '../../shared/storage';
+import { STORAGE_CHANNELS } from '../../../shared/storage';
 
 /**
  * Sets up storage-related IPC handlers

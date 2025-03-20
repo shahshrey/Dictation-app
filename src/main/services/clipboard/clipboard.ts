@@ -1,6 +1,6 @@
 import { ipcMain, clipboard } from 'electron';
 import { exec } from 'child_process';
-import logger from '../../shared/logger';
+import logger from '../../../shared/logger';
 
 /**
  * Pastes text at the current cursor position

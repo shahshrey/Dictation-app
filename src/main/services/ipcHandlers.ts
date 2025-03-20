@@ -1,13 +1,13 @@
 import { BrowserWindow } from 'electron';
-import { setupPermissionHandlers } from './permissions';
-import { setupAudioHandlers } from './audio';
-import { setupStorageHandlers } from './storageIpc';
-import { setupFileDialogHandlers } from './fileDialog';
+import { setupPermissionHandlers } from './permissions/permissions';
+import { setupAudioHandlers } from './audio/audio';
+import { setupStorageHandlers } from './storage/storageIpc';
+import { setupFileDialogHandlers } from './storage/fileDialog';
 import { setupApiKeyValidatorHandlers } from './groq/apiKeyValidator';
-import { setupSettingsHandlers } from './settings';
-import { setupWindowHandlers } from './window';
-import { setupTrayHandlers } from './tray';
-import { setupClipboardHandlers } from './clipboard';
+import { setupSettingsHandlers } from './storage/settings';
+import { setupWindowHandlers } from './window/window';
+import { setupTrayHandlers } from './tray/tray';
+import { setupClipboardHandlers } from './clipboard/clipboard';
 
 type Store = {
   set: (settings: Record<string, unknown>) => void;

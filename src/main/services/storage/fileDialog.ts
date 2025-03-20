@@ -1,5 +1,5 @@
 import { ipcMain, dialog } from 'electron';
-import logger from '../../shared/logger';
+import logger from '../../../shared/logger';
 
 /**
  * Sets up file dialog related IPC handlers

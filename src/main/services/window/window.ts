@@ -1,4 +1,4 @@
-import { setupWindowHandlers } from './window/index';
+import { setupWindowHandlers } from './index';
 
 /**
  * Sets up window-related IPC handlers

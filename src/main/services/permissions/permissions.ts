@@ -2,7 +2,7 @@ import { ipcMain, dialog, systemPreferences, app, screen } from 'electron';
 import { exec } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import logger from '../../shared/logger';
+import logger from '../../../shared/logger';
 
 // Define type for permission cache structure
 interface PermissionCache {

@@ -1,9 +1,9 @@
 import { ipcMain, app } from 'electron';
 import fs from 'fs';
 import path from 'path';
-import logger from '../../shared/logger';
-import { DEFAULT_SETTINGS } from './constants';
-import { registerGlobalHotkey } from './window/hotkeyManager';
+import logger from '../../../shared/logger';
+import { DEFAULT_SETTINGS } from '../constants';
+import { registerGlobalHotkey } from '../window/hotkeyManager';
 import { BrowserWindow } from 'electron';
 
 type Store = {

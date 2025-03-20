@@ -15,7 +15,7 @@ const { GROQ_MODELS } = require('./services/groq');
 const { TEMP_DIR, DEFAULT_SAVE_DIR } = require('./services/constants');
 
 // Import the RecordingManager
-const { RecordingManager, AUDIO_FILE_PATH } = require('./services/recording');
+const { RecordingManager, AUDIO_FILE_PATH } = require('./services/audio/recording');
 
 // Define global variables first to ensure they're available to all modules
 // IMPORTANT: These globals must be set before importing modules that might use them
@@ -34,7 +34,7 @@ global.isQuitting = false; // Track when we're intentionally quitting the app
 exports.TEMP_DIR = TEMP_DIR;
 
 // Only after setting up globals, import other components
-const { pasteTextAtCursor } = require('./services/clipboard').default;
+const { pasteTextAtCursor } = require('./services/clipboard/clipboard').default;
 const { getStore, settings, initStore, ensureDirectories, loadSettingsFromFile } = require('./services/StoreService');
 
 // Set additional globals needed by other modules
@@ -53,7 +53,7 @@ const {
 } = require('./services/window/index');
 
 // Import the tray manager
-const { createTray, updateTrayMenu, destroyTray } = require('./services/trayManager');
+const { createTray, updateTrayMenu, destroyTray } = require('./services/tray/trayManager');
 
 // Import IPC handlers last as they depend on all other components
 const { setupIpcHandlers } = require('./services/ipcHandlers');
@@ -82,7 +82,7 @@ global.loadGroqClient = loadGroqClient;
 
 // Function to lazily load permission utilities
 const loadPermissionUtils = () => {
-  const { checkMacOSPermissions, recheckAccessibilityPermission } = require('./services/permissions');
+  const { checkMacOSPermissions, recheckAccessibilityPermission } = require('./services/permissions/permissions');
   return { checkMacOSPermissions, recheckAccessibilityPermission };
 };
 

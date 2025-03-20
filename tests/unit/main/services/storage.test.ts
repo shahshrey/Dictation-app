@@ -87,7 +87,7 @@ jest.mock('path', () => ({
 
 // Import the module under test
 import * as fs from 'fs';
-import { setupFileStorage } from '../../../../src/main/services/storage';
+import { setupFileStorage } from '../../../../src/main/services/storage/storage';
 
 describe('Storage Service', () => {
   let mockIpcMain: { handle: jest.Mock };
