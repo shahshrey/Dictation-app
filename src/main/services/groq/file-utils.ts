@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import logger from '../../../shared/logger';
 import { TranscriptionObject } from './types';
-import { DEFAULT_SAVE_DIR } from './constants';
+import { DEFAULT_SAVE_DIR } from '../path-constants';
 
 /**
  * Save transcription to a file

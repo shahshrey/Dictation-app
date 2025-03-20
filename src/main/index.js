@@ -12,7 +12,7 @@ const logger = require('../shared/logger').default;
 const { GROQ_MODELS } = require('./services/groq');
 
 // Import other constants 
-const { TEMP_DIR, DEFAULT_SAVE_DIR } = require('./services/constants');
+const { TEMP_DIR, DEFAULT_SAVE_DIR } = require('./services/path-constants');
 
 // Import the RecordingManager
 const { RecordingManager, AUDIO_FILE_PATH } = require('./services/audio/recording');

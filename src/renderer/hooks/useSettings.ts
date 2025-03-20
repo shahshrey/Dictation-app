@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { AppSettings } from '../../shared/types';
-import { DEFAULT_SETTINGS } from '../../shared/constants';
+import { DEFAULT_RENDERER_SETTINGS, RendererSettings } from '../../shared/constants';
 import logger from '../../shared/logger';
 
 export const useSettings = () => {
-  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<RendererSettings>(DEFAULT_RENDERER_SETTINGS);
 
   // Load settings
   const loadSettings = async (): Promise<void> => {
@@ -23,8 +22,9 @@ export const useSettings = () => {
           )}`
         );
 
-        // First convert to unknown, then assert as AppSettings to avoid type errors
-        const typedSettings = (loadedSettings as unknown as AppSettings) ?? DEFAULT_SETTINGS;
+        // First convert to unknown, then assert as RendererSettings to avoid type errors
+        const typedSettings =
+          (loadedSettings as unknown as RendererSettings) ?? DEFAULT_RENDERER_SETTINGS;
 
         // Log important settings
         logger.debug(`API key available: ${!!typedSettings.apiKey}`);
@@ -37,16 +37,16 @@ export const useSettings = () => {
       }
 
       logger.warn('getSettings API not available, using default settings');
-      setSettings(DEFAULT_SETTINGS);
+      setSettings(DEFAULT_RENDERER_SETTINGS);
     } catch (error) {
       logger.exception('Failed to load settings', error);
       // Fall back to default settings
-      setSettings(DEFAULT_SETTINGS);
+      setSettings(DEFAULT_RENDERER_SETTINGS);
     }
   };
 
   // Update settings
-  const updateSettings = async (newSettings: Partial<AppSettings>): Promise<void> => {
+  const updateSettings = async (newSettings: Partial<RendererSettings>): Promise<void> => {
     try {
       const updatedSettings = { ...settings, ...newSettings };
       logger.debug('Updating settings...');

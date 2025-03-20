@@ -5,15 +5,10 @@ import { app } from 'electron';
 import Store from 'electron-store';
 import logger from '../../shared/logger';
 import { ensureStorageDirectories } from './storage/storageManager';
-import { DEFAULT_SETTINGS } from './constants';
+import { DEFAULT_MAIN_SETTINGS, MainProcessSettings } from '../../shared/constants';
 
 // Define types for our settings
-export interface AppSettings {
-  apiKey: string;
-  defaultLanguage: string;
-  transcriptionModel: string;
-  showNotifications: boolean;
-  saveTranscriptionsAutomatically: boolean;
+export interface AppSettings extends MainProcessSettings {
   [key: string]: unknown; // Allow for additional properties with unknown type
 }
 
@@ -33,7 +28,7 @@ declare global {
 export class StoreService {
   private static instance: StoreService;
   private store: ElectronStore<AppSettings> | null = null;
-  private settings: AppSettings = { ...DEFAULT_SETTINGS };
+  private settings: AppSettings = { ...DEFAULT_MAIN_SETTINGS };
 
   private constructor() {}
 
@@ -54,7 +49,7 @@ export class StoreService {
   public async init(): Promise<boolean> {
     try {
       this.store = new Store<AppSettings>({
-        defaults: DEFAULT_SETTINGS as AppSettings,
+        defaults: DEFAULT_MAIN_SETTINGS as AppSettings,
         name: 'settings',
         watch: false, // Disable watching for changes to improve performance
       }) as ElectronStore<AppSettings>;

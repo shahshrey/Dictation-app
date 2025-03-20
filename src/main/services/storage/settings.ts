@@ -2,7 +2,7 @@ import { ipcMain, app } from 'electron';
 import fs from 'fs';
 import path from 'path';
 import logger from '../../../shared/logger';
-import { DEFAULT_SETTINGS } from '../constants';
+import { DEFAULT_MAIN_SETTINGS } from '../../../shared/constants';
 import { registerGlobalHotkey } from '../window/hotkeyManager';
 import { BrowserWindow } from 'electron';
 
@@ -65,7 +65,7 @@ export const setupSettingsHandlers = (
       return settings;
     } catch (error) {
       logger.error('Error in get-settings handler:', { error: (error as Error).message });
-      return { ...DEFAULT_SETTINGS };
+      return { ...DEFAULT_MAIN_SETTINGS };
     }
   });
 

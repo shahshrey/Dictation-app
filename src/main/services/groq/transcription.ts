@@ -10,7 +10,7 @@ import {
   TranscribeAudioResult,
   TranscribeOptions,
 } from './types';
-import { AUDIO_FILE_PATH } from './constants';
+import { AUDIO_FILE_PATH } from '../path-constants';
 
 /**
  * Process transcription text with Groq LLM to improve clarity
@@ -34,7 +34,8 @@ export const processTranscriptionText = async (text: string, apiKey: string): Pr
                     4. Do not add any commentary or extra text.
                     5. Create bullet points from the text if appropriate.
                     6. If the text is a long Paragraph, preserve the original meaning and structure but make it more readable.
-                    7. you MUST ONLY return the cleaned transcription text and nothing else`,
+                    7. Don't provide any headers or titles.
+                    8. you MUST ONLY return the cleaned transcription text and nothing else`,
         },
         {
           role: 'user',

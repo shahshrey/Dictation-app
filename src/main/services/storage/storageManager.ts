@@ -1,7 +1,7 @@
 import { dialog, shell } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
-import { TEMP_DIR, DEFAULT_SAVE_DIR } from '../constants';
+import { TEMP_DIR, DEFAULT_SAVE_DIR } from '../path-constants';
 import logger from '../../../shared/logger';
 import { Transcription } from '../../../shared/types';
 import {

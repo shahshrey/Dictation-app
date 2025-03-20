@@ -1,5 +1,5 @@
 import { AppSettings } from '../../src/shared/types';
-import { DEFAULT_SETTINGS } from '../../src/shared/constants';
+import { DEFAULT_RENDERER_SETTINGS } from '../../src/shared/constants';
 
 // Mock the electron module
 const mockElectron = {
@@ -12,7 +12,7 @@ jest.mock('electron', () => mockElectron);
 
 // Mock the window.electronAPI
 const mockElectronAPI = {
-  getSettings: jest.fn().mockResolvedValue(DEFAULT_SETTINGS),
+  getSettings: jest.fn().mockResolvedValue(DEFAULT_RENDERER_SETTINGS),
   saveSettings: jest.fn().mockResolvedValue({ success: true }),
   startRecording: jest.fn().mockResolvedValue({ success: true }),
   stopRecording: jest.fn().mockResolvedValue({ success: true }),
@@ -58,7 +58,7 @@ describe('Electron Application', () => {
   it('should save settings via IPC', async () => {
     // Create test settings
     const testSettings = {
-      ...DEFAULT_SETTINGS,
+      ...DEFAULT_RENDERER_SETTINGS,
       apiKey: 'test-api-key-' + Date.now(),
     };
 
@@ -284,7 +284,7 @@ describe('UI Interaction Tests', () => {
 
     // Simulate saving settings
     await window.electronAPI.saveSettings({
-      ...DEFAULT_SETTINGS,
+      ...DEFAULT_RENDERER_SETTINGS,
       apiKey: testApiKey,
       language: 'fr',
     });

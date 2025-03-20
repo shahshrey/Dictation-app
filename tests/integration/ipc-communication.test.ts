@@ -1,5 +1,5 @@
 import { IPC_CHANNELS } from '../../src/shared/types';
-import { DEFAULT_SETTINGS } from '../../src/shared/constants';
+import { DEFAULT_RENDERER_SETTINGS } from '../../src/shared/constants';
 import * as path from 'path';
 import { AppSettings } from '../../src/shared/types';
 import * as fs from 'fs';
@@ -42,7 +42,7 @@ describe('IPC Communication', () => {
   }));
 
   // Mock settings store
-  const mockSettings = { ...DEFAULT_SETTINGS, apiKey: 'test-api-key' };
+  const mockSettings = { ...DEFAULT_RENDERER_SETTINGS, apiKey: 'test-api-key' };
 
   // Mock transcription result
   const mockTranscriptionResult = {
@@ -403,7 +403,7 @@ describe.skip('Real IPC Communication with Spectron', () => {
   it('should save settings via IPC', async () => {
     // Create test settings
     const testSettings = {
-      ...DEFAULT_SETTINGS,
+      ...DEFAULT_RENDERER_SETTINGS,
       apiKey: 'test-api-key-' + Date.now(),
     };
 
@@ -462,7 +462,7 @@ describe.skip('Real IPC Communication with Spectron', () => {
     try {
       // Step 1: Set up test settings with the temporary directory
       const testSettings = {
-        ...DEFAULT_SETTINGS,
+        ...DEFAULT_RENDERER_SETTINGS,
         apiKey: process.env.TEST_API_KEY || 'test-api-key',
         transcriptionSavePath: tempDir,
         saveTranscriptions: true,

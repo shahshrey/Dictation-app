@@ -1,10 +1,14 @@
 import {
   APP_NAME,
   APP_VERSION,
-  DEFAULT_SETTINGS,
+  DEFAULT_RENDERER_SETTINGS,
   STORAGE_PATHS,
   AUDIO_SETTINGS,
   UI_CONSTANTS,
+  DEFAULT_MAIN_SETTINGS,
+  TEMP_DIR,
+  DEFAULT_SAVE_DIR,
+  AUDIO_FILE_PATH,
 } from '../../../src/shared/constants';
 
 describe('Shared Constants', () => {
@@ -27,31 +31,64 @@ describe('Shared Constants', () => {
     });
   });
 
-  describe('DEFAULT_SETTINGS', () => {
+  describe('DEFAULT_RENDERER_SETTINGS', () => {
     it('should be defined', () => {
-      expect(DEFAULT_SETTINGS).toBeDefined();
-      expect(typeof DEFAULT_SETTINGS).toBe('object');
+      expect(DEFAULT_RENDERER_SETTINGS).toBeDefined();
+      expect(typeof DEFAULT_RENDERER_SETTINGS).toBe('object');
     });
 
     it('should have the required properties', () => {
-      expect(DEFAULT_SETTINGS).toHaveProperty('apiKey');
-      expect(DEFAULT_SETTINGS).toHaveProperty('selectedMicrophone');
-      expect(DEFAULT_SETTINGS).toHaveProperty('language');
-      expect(DEFAULT_SETTINGS).toHaveProperty('theme');
-      expect(DEFAULT_SETTINGS).toHaveProperty('saveTranscriptions');
-      expect(DEFAULT_SETTINGS).toHaveProperty('transcriptionSavePath');
-      expect(DEFAULT_SETTINGS).toHaveProperty('autoTranscribe');
-      expect(DEFAULT_SETTINGS).toHaveProperty('hotkey');
+      expect(DEFAULT_RENDERER_SETTINGS).toHaveProperty('apiKey');
+      expect(DEFAULT_RENDERER_SETTINGS).toHaveProperty('selectedMicrophone');
+      expect(DEFAULT_RENDERER_SETTINGS).toHaveProperty('language');
+      expect(DEFAULT_RENDERER_SETTINGS).toHaveProperty('theme');
+      expect(DEFAULT_RENDERER_SETTINGS).toHaveProperty('saveTranscriptions');
+      expect(DEFAULT_RENDERER_SETTINGS).toHaveProperty('transcriptionSavePath');
+      expect(DEFAULT_RENDERER_SETTINGS).toHaveProperty('autoTranscribe');
+      expect(DEFAULT_RENDERER_SETTINGS).toHaveProperty('hotkey');
     });
 
     it('should have the correct default values', () => {
-      expect(DEFAULT_SETTINGS.apiKey).toBe('');
-      expect(DEFAULT_SETTINGS.selectedMicrophone).toBe('');
-      expect(DEFAULT_SETTINGS.language).toBe('en');
-      expect(DEFAULT_SETTINGS.theme).toBe('system');
-      expect(DEFAULT_SETTINGS.saveTranscriptions).toBe(true);
-      expect(DEFAULT_SETTINGS.autoTranscribe).toBe(false);
-      expect(DEFAULT_SETTINGS.hotkey).toBe('Home');
+      expect(DEFAULT_RENDERER_SETTINGS.apiKey).toBe('');
+      expect(DEFAULT_RENDERER_SETTINGS.selectedMicrophone).toBe('');
+      expect(DEFAULT_RENDERER_SETTINGS.language).toBe('en');
+      expect(DEFAULT_RENDERER_SETTINGS.theme).toBe('system');
+      expect(DEFAULT_RENDERER_SETTINGS.saveTranscriptions).toBe(true);
+      expect(DEFAULT_RENDERER_SETTINGS.autoTranscribe).toBe(false);
+      expect(DEFAULT_RENDERER_SETTINGS.hotkey).toBe('Home');
+    });
+  });
+
+  describe('DEFAULT_MAIN_SETTINGS', () => {
+    it('should be defined', () => {
+      expect(DEFAULT_MAIN_SETTINGS).toBeDefined();
+      expect(typeof DEFAULT_MAIN_SETTINGS).toBe('object');
+    });
+
+    it('should have the required properties', () => {
+      expect(DEFAULT_MAIN_SETTINGS).toHaveProperty('apiKey');
+      expect(DEFAULT_MAIN_SETTINGS).toHaveProperty('defaultLanguage');
+      expect(DEFAULT_MAIN_SETTINGS).toHaveProperty('transcriptionModel');
+      expect(DEFAULT_MAIN_SETTINGS).toHaveProperty('showNotifications');
+      expect(DEFAULT_MAIN_SETTINGS).toHaveProperty('saveTranscriptionsAutomatically');
+    });
+
+    it('should have the correct default values', () => {
+      expect(DEFAULT_MAIN_SETTINGS.apiKey).toBe('');
+      expect(DEFAULT_MAIN_SETTINGS.defaultLanguage).toBe('auto');
+      expect(DEFAULT_MAIN_SETTINGS.showNotifications).toBe(true);
+      expect(DEFAULT_MAIN_SETTINGS.saveTranscriptionsAutomatically).toBe(false);
+    });
+  });
+
+  describe('File paths', () => {
+    it('should be defined', () => {
+      expect(TEMP_DIR).toBeDefined();
+      expect(DEFAULT_SAVE_DIR).toBeDefined();
+      expect(AUDIO_FILE_PATH).toBeDefined();
+      expect(typeof TEMP_DIR).toBe('string');
+      expect(typeof DEFAULT_SAVE_DIR).toBe('string');
+      expect(typeof AUDIO_FILE_PATH).toBe('string');
     });
   });
 
