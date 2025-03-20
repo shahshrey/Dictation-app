@@ -18,7 +18,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 // Set default log level based on environment
 // In production, only show errors and warnings
 // In development, show all logs
-const DEFAULT_LOG_LEVEL = isProduction ? LOG_LEVELS.warn : LOG_LEVELS.debug;
+const DEFAULT_LOG_LEVEL = isProduction ? LOG_LEVELS.warn : LOG_LEVELS.info;
 
 // Create a browser-compatible logger with production optimizations
 const browserLogger = {

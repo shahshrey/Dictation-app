@@ -354,6 +354,31 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onOpenChange }) => 
                         </Select>
                       </div>
                     </div>
+
+                    <div className="mt-4">
+                      <Label htmlFor="system-prompt" className="text-sm font-medium">
+                        Transcription System Prompt
+                      </Label>
+                      <div className="mt-1">
+                        <textarea
+                          id="system-prompt"
+                          value={formValues.transcriptionSystemPrompt || ''}
+                          onChange={e =>
+                            handleInputChange('transcriptionSystemPrompt', e.target.value)
+                          }
+                          placeholder="Custom instructions for transcription processing"
+                          className="w-full h-32 px-3 py-2 text-sm border rounded-md resize-y bg-background border-input focus:outline-none focus:ring-2 focus:ring-ring"
+                          aria-describedby="system-prompt-description"
+                        />
+                        <p
+                          id="system-prompt-description"
+                          className="text-xs text-muted-foreground mt-1"
+                        >
+                          Instructions for the AI to process transcriptions. Leave empty to use the
+                          default prompt.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

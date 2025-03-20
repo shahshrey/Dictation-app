@@ -46,6 +46,7 @@ export interface AppSettings {
   audioSavePath: string;
   autoTranscribe: boolean;
   hotkey: string;
+  transcriptionSystemPrompt?: string; // Custom system prompt for transcription
 }
 
 // Audio related types

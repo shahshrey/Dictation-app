@@ -19,18 +19,21 @@ const MAX_AUDIO_FILE_SIZE = 10 * 1024 * 1024;
 /**
  * Process transcription text with Groq LLM to improve clarity
  */
-export const processTranscriptionText = async (text: string, apiKey: string): Promise<string> => {
+export const processTranscriptionText = async (
+  text: string,
+  apiKey: string,
+  customSystemPrompt?: string
+): Promise<string> => {
   try {
     if (!text) return '';
 
     const client = initGroqClient(apiKey);
     if (!client) return text;
 
-    const completion = await client.chat.completions.create({
-      messages: [
-        {
-          role: 'system',
-          content: `You are an expert transcription editor. Your task is to:
+    // Default system prompt if not provided
+    const systemPrompt =
+      customSystemPrompt ||
+      `You are an expert transcription editor. Your task is to:
                     1. Clean up the transcribed text
                     2. Improve clarity while preserving meaning
                     3. Format using markdown
@@ -38,7 +41,14 @@ export const processTranscriptionText = async (text: string, apiKey: string): Pr
                     5. Create bullet points from the text if appropriate.
                     6. If the text is a long Paragraph, preserve the original meaning and structure but make it more readable.
                     7. Don't provide any headers or titles.
-                    8. you MUST ONLY return the cleaned transcription text and nothing else`,
+                    8. you MUST ONLY return the cleaned transcription text and nothing else`;
+
+    logger.warn('Processing transcription text with system prompt:', { systemPrompt });
+    const completion = await client.chat.completions.create({
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt,
         },
         {
           role: 'user',
@@ -151,8 +161,11 @@ export const transcribeRecording = async (
     const transcription = await client.audio.transcriptions.create(transcriptionParams);
     const rawText = transcription.text;
 
-    // Process the transcription
-    const processedText = await processTranscriptionText(rawText, apiKey);
+    // Get the custom system prompt from global settings if available
+    const customSystemPrompt = global.settings?.transcriptionSystemPrompt;
+
+    // Process the transcription with the custom prompt if available
+    const processedText = await processTranscriptionText(rawText, apiKey, customSystemPrompt);
 
     // Create metadata using our pre-generated ID
     const timestamp = Date.now();
@@ -251,7 +264,15 @@ export const handleTranscribeAudio = async (
       language,
     });
 
-    const processedText = await processTranscriptionText(transcription.text, apiKey);
+    // Get the custom system prompt from global settings if available
+    const customSystemPrompt = global.settings?.transcriptionSystemPrompt;
+
+    // Process the transcription with the custom prompt if available
+    const processedText = await processTranscriptionText(
+      transcription.text,
+      apiKey,
+      customSystemPrompt
+    );
 
     // Create and save transcript with the same ID
     const timestamp = Date.now();

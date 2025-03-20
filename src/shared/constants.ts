@@ -39,6 +39,7 @@ export interface RendererSettings {
   audioSavePath: string;
   autoTranscribe: boolean;
   hotkey: string;
+  transcriptionSystemPrompt?: string; // Custom system prompt for transcription
 }
 
 // Renderer Default Settings
@@ -52,6 +53,7 @@ export const DEFAULT_RENDERER_SETTINGS: RendererSettings = {
   audioSavePath: '',
   autoTranscribe: false,
   hotkey: 'Home', // Default hotkey is Home
+  transcriptionSystemPrompt: '', // Empty string means use the default prompt
 };
 
 // Main Process Settings Interface
@@ -61,6 +63,7 @@ export interface MainProcessSettings {
   transcriptionModel: string;
   showNotifications: boolean;
   saveTranscriptionsAutomatically: boolean;
+  transcriptionSystemPrompt: string; // Custom system prompt for transcription processing
 }
 
 // Define constants for Groq models to avoid direct dependency on the module
@@ -81,6 +84,15 @@ export const DEFAULT_MAIN_SETTINGS: MainProcessSettings = {
   transcriptionModel: GROQ_MODEL_CONSTANTS.TRANSCRIPTION.ENGLISH,
   showNotifications: true,
   saveTranscriptionsAutomatically: false,
+  transcriptionSystemPrompt: `You are an expert transcription editor. Your task is to:
+1. Clean up the transcribed text
+2. Improve clarity while preserving meaning
+3. Format using markdown
+4. Do not add any commentary or extra text.
+5. Create bullet points from the text if appropriate.
+6. If the text is a long Paragraph, preserve the original meaning and structure but make it more readable.
+7. Don't provide any headers or titles.
+8. you MUST ONLY return the cleaned transcription text and nothing else`,
 };
 
 // For backward compatibility - should be replaced with specific settings in the codebase
