@@ -11,7 +11,7 @@ const TEST_TRANSCRIPTION = {
   source: 'test',
 };
 const MOCK_HOME_DIR = '/mock/home';
-const MOCK_SAVE_DIR = `${MOCK_HOME_DIR}/Documents/Dictation App`;
+const MOCK_SAVE_DIR = `${MOCK_HOME_DIR}/Documents/Voice Vibe`;
 const MOCK_DATE = new Date('2023-01-01T12:00:00Z');
 const MOCK_TIMESTAMP = '2023-01-01T12-00-00-000Z';
 const MOCK_FILENAME = `transcription_${MOCK_TIMESTAMP}.json`;

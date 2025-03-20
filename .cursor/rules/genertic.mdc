@@ -3,7 +3,7 @@ description:
 globs: 
 alwaysApply: true
 ---
-1. Always use codebase_search with target_directories="{{/Users/shrey.shah@vivun.com/shrey.sh/Dictation app/src}}" first to find existing core files
+1. Always use codebase_search with target_directories="{{/Users/shrey.shah@vivun.com/shrey.sh/Voice Vibe/src}}" first to find existing core files
 2. Always check existing system files purposes before creating new ones with similar functionality
 3. Always list the cursor rules youre using
 

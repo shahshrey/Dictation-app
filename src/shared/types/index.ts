@@ -42,6 +42,7 @@ export interface AppSettings {
   theme: 'light' | 'dark' | 'system';
   saveTranscriptions: boolean;
   transcriptionSavePath: string;
+  audioSavePath: string;
   autoTranscribe: boolean;
   hotkey: string;
 }

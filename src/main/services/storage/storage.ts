@@ -1,34 +1,44 @@
 import { IpcMain, dialog } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import { Transcription } from '../../../shared/types';
 import logger from '../../../shared/logger';
+import { getSaveDir } from '../path-constants';
 
 // Define constants for file storage
-const DEFAULT_SAVE_DIR = path.join(os.homedir(), 'Documents', 'Voice Vibe');
 const DEFAULT_FILENAME = 'transcription';
-const TRANSCRIPTIONS_JSON = path.join(DEFAULT_SAVE_DIR, 'transcriptions.json');
 
-// Ensure save directory exists
-try {
-  if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
-    fs.mkdirSync(DEFAULT_SAVE_DIR, { recursive: true });
+// Helper function to get the transcriptions JSON file path
+const getTranscriptionsJsonPath = (): string => {
+  const saveDir = getSaveDir();
+  return path.join(saveDir, 'transcriptions.json');
+};
+
+// Ensure save directory exists at runtime
+const ensureSaveDir = (): void => {
+  const saveDir = getSaveDir();
+  try {
+    if (!fs.existsSync(saveDir)) {
+      fs.mkdirSync(saveDir, { recursive: true });
+    }
+  } catch (error) {
+    logger.error('Failed to create save directory:', { error: (error as Error).message });
   }
-} catch (error) {
-  logger.error('Failed to create save directory:', { error: (error as Error).message });
-}
+};
 
 // Helper function to read transcriptions from JSON file
 const readTranscriptionsFromJson = (): Transcription[] => {
   try {
-    if (!fs.existsSync(TRANSCRIPTIONS_JSON)) {
+    const transcriptionsJsonPath = getTranscriptionsJsonPath();
+    ensureSaveDir();
+
+    if (!fs.existsSync(transcriptionsJsonPath)) {
       // Create empty transcriptions file if it doesn't exist
-      fs.writeFileSync(TRANSCRIPTIONS_JSON, JSON.stringify([], null, 2), { encoding: 'utf-8' });
+      fs.writeFileSync(transcriptionsJsonPath, JSON.stringify([], null, 2), { encoding: 'utf-8' });
       return [];
     }
 
-    const data = fs.readFileSync(TRANSCRIPTIONS_JSON, { encoding: 'utf-8' });
+    const data = fs.readFileSync(transcriptionsJsonPath, { encoding: 'utf-8' });
     return JSON.parse(data) as Transcription[];
   } catch (error) {
     logger.error('Failed to read transcriptions from JSON:', { error: (error as Error).message });
@@ -36,34 +46,27 @@ const readTranscriptionsFromJson = (): Transcription[] => {
   }
 };
 
-// Helper function to write transcriptions to JSON file
-const writeTranscriptionsToJson = (transcriptions: Transcription[]): boolean => {
-  try {
-    fs.writeFileSync(TRANSCRIPTIONS_JSON, JSON.stringify(transcriptions, null, 2), {
-      encoding: 'utf-8',
-    });
-    return true;
-  } catch (error) {
-    logger.error('Failed to write transcriptions to JSON:', { error: (error as Error).message });
-    return false;
-  }
-};
-
-// Helper function to add or update a transcription in the JSON file
+// Helper function to save transcription to JSON database
 const saveTranscriptionToJson = (transcription: Transcription): boolean => {
   try {
+    ensureSaveDir();
+    const transcriptionsJsonPath = getTranscriptionsJsonPath();
+
+    // Read existing transcriptions
     const transcriptions = readTranscriptionsFromJson();
-    const existingIndex = transcriptions.findIndex(t => t.id === transcription.id);
 
-    if (existingIndex >= 0) {
-      // Update existing transcription
-      transcriptions[existingIndex] = transcription;
-    } else {
-      // Add new transcription
-      transcriptions.push(transcription);
-    }
+    // Add new transcription at the beginning
+    transcriptions.unshift(transcription);
 
-    return writeTranscriptionsToJson(transcriptions);
+    // Limit to 100 transcriptions
+    const limitedTranscriptions = transcriptions.slice(0, 100);
+
+    // Write back to file
+    fs.writeFileSync(transcriptionsJsonPath, JSON.stringify(limitedTranscriptions, null, 2), {
+      encoding: 'utf-8',
+    });
+
+    return true;
   } catch (error) {
     logger.error('Failed to save transcription to JSON:', { error: (error as Error).message });
     return false;
@@ -106,12 +109,11 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
       saveTranscriptionToJson(transcription);
 
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const defaultPath = path.join(DEFAULT_SAVE_DIR, `${DEFAULT_FILENAME}_${timestamp}.json`);
+      const saveDir = getSaveDir();
+      const defaultPath = path.join(saveDir, `${DEFAULT_FILENAME}_${timestamp}.json`);
 
       // Ensure directory exists before showing dialog
-      if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
-        fs.mkdirSync(DEFAULT_SAVE_DIR, { recursive: true });
-      }
+      ensureSaveDir();
 
       const { canceled, filePath } = await dialog.showSaveDialog({
         title: 'Save Transcription',
@@ -145,15 +147,9 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
   // Get recent transcriptions
   logger.debug('Registering get-recent-transcriptions handler...');
   ipcMain.handle('get-recent-transcriptions', async () => {
-    logger.debug('get-recent-transcriptions handler called');
     try {
-      // Get transcriptions from JSON
-      const jsonTranscriptions = readTranscriptionsFromJson();
-
-      return {
-        success: true,
-        transcriptions: jsonTranscriptions.sort((a, b) => b.timestamp - a.timestamp).slice(0, 10),
-      };
+      const transcriptions = readTranscriptionsFromJson().slice(0, 10);
+      return { success: true, transcriptions };
     } catch (error) {
       logger.error('Failed to get recent transcriptions:', { error: (error as Error).message });
       return { success: false, error: String(error) };
@@ -209,7 +205,11 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
       const filteredTranscriptions = transcriptions.filter(t => t.id !== id);
 
       if (filteredTranscriptions.length < transcriptions.length) {
-        writeTranscriptionsToJson(filteredTranscriptions);
+        // Write back all transcriptions to the JSON file
+        const transcriptionsJsonPath = getTranscriptionsJsonPath();
+        fs.writeFileSync(transcriptionsJsonPath, JSON.stringify(filteredTranscriptions, null, 2), {
+          encoding: 'utf-8',
+        });
         return { success: true };
       }
 
@@ -231,3 +231,6 @@ export const setupFileStorage = (ipcMain: IpcMain): void => {
     logger.debug('No registered IPC channels found');
   }
 };
+
+// Export for tests
+export { readTranscriptionsFromJson, saveTranscriptionToJson };

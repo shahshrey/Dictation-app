@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import logger from '../../../shared/logger';
 import { TranscriptionObject } from './types';
-import { DEFAULT_SAVE_DIR } from '../path-constants';
+import { getSaveDir } from '../path-constants';
 
 /**
  * Save transcription to a file
@@ -11,11 +11,14 @@ export const saveTranscriptionToFile = (transcriptionObj: TranscriptionObject): 
   try {
     const timestampStr = new Date().toISOString().replace(/[:.]/g, '-');
     const fullFilename = `transcription_${timestampStr}.json`;
-    const filePath = path.join(DEFAULT_SAVE_DIR, fullFilename);
+
+    // Use dynamic path getter to get the save directory from settings
+    const saveDir = getSaveDir();
+    const filePath = path.join(saveDir, fullFilename);
 
     // Ensure save directory exists
-    if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
-      fs.mkdirSync(DEFAULT_SAVE_DIR, { recursive: true });
+    if (!fs.existsSync(saveDir)) {
+      fs.mkdirSync(saveDir, { recursive: true });
     }
 
     // Write the file

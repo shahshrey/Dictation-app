@@ -1,14 +1,15 @@
 import { IpcMain, BrowserWindow } from 'electron';
 import * as fs from 'fs';
 import { AudioDevice, IPC_CHANNELS } from '../../../shared/types';
-import { TEMP_DIR, AUDIO_FILE_PATH } from '../path-constants';
+import { getTempDir, getAudioFilePath } from '../path-constants';
 import logger from '../../../shared/logger';
 import { updateTrayMenu } from '../tray/trayManager';
 
 // Ensure temp directory exists
 try {
-  if (!fs.existsSync(TEMP_DIR)) {
-    fs.mkdirSync(TEMP_DIR, { recursive: true });
+  const tempDir = getTempDir();
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
   }
 } catch (error) {
   logger.error('Failed to create temp directory:', { error: (error as Error).message });
@@ -222,29 +223,33 @@ export class RecordingManager {
 
       const buffer = Buffer.from(arrayBuffer);
 
+      // Get the paths using the dynamic getters
+      const tempDir = getTempDir();
+      const audioFilePath = getAudioFilePath();
+
       // Ensure the temp directory exists
-      if (!fs.existsSync(TEMP_DIR)) {
-        fs.mkdirSync(TEMP_DIR, { recursive: true });
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
       }
 
       // Write the file
-      fs.writeFileSync(AUDIO_FILE_PATH, buffer, { encoding: 'binary' });
+      fs.writeFileSync(audioFilePath, buffer, { encoding: 'binary' });
 
       // Verify the file was written correctly
-      if (fs.existsSync(AUDIO_FILE_PATH)) {
-        const stats = fs.statSync(AUDIO_FILE_PATH);
-        logger.debug(`Recording saved successfully: ${AUDIO_FILE_PATH}, size: ${stats.size} bytes`);
+      if (fs.existsSync(audioFilePath)) {
+        const stats = fs.statSync(audioFilePath);
+        logger.debug(`Recording saved successfully: ${audioFilePath}, size: ${stats.size} bytes`);
 
         if (stats.size === 0) {
           logger.error('Error: File was saved but is empty');
           return {
             success: false,
             error: 'File was saved but is empty',
-            filePath: AUDIO_FILE_PATH,
+            filePath: audioFilePath,
           };
         }
 
-        return { success: true, filePath: AUDIO_FILE_PATH, size: stats.size };
+        return { success: true, filePath: audioFilePath, size: stats.size };
       } else {
         logger.error('Error: File was not saved');
         return { success: false, error: 'File was not saved' };
@@ -259,7 +264,7 @@ export class RecordingManager {
    * Get the path to the saved recording
    */
   private getRecordingPath(): string {
-    return AUDIO_FILE_PATH;
+    return getAudioFilePath();
   }
 
   /**
@@ -274,5 +279,5 @@ export class RecordingManager {
   }
 }
 
-// Export constants for use in other modules
-export { TEMP_DIR, AUDIO_FILE_PATH };
+// Export function to get audio file path for use in other modules
+export { getTempDir, getAudioFilePath };

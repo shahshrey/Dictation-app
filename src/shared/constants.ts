@@ -36,6 +36,7 @@ export interface RendererSettings {
   theme: 'light' | 'dark' | 'system';
   saveTranscriptions: boolean;
   transcriptionSavePath: string;
+  audioSavePath: string;
   autoTranscribe: boolean;
   hotkey: string;
 }
@@ -48,6 +49,7 @@ export const DEFAULT_RENDERER_SETTINGS: RendererSettings = {
   theme: 'system',
   saveTranscriptions: true,
   transcriptionSavePath: '',
+  audioSavePath: '',
   autoTranscribe: false,
   hotkey: 'Home', // Default hotkey is Home
 };

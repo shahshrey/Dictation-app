@@ -1,30 +1,45 @@
-import React, { Suspense } from 'react';
-import Header from './layout/Header';
+import React, { Suspense, useState } from 'react';
 import DictationPopup from './features/dictation/DictationPopup';
 import { ThemeProvider } from './layout/ThemeProvider';
-import Home from './features/home/Home';
 import { LoadingSpinner } from './ui/loading-spinner';
+import Layout from './layout/Layout';
+
+// Lazy load the pages for better performance
+const Home = React.lazy(() => import('./features/home/Home'));
+const Dictionary = React.lazy(() => import('./features/dictionary/Dictionary'));
+const History = React.lazy(() => import('./features/history/History'));
 
 const App: React.FC = () => {
+  const [currentPage, setCurrentPage] = useState<string>('home');
+
+  // Render the current page based on navigation state
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'home':
+        return <Home />;
+      case 'dictionary':
+        return <Dictionary />;
+      case 'history':
+        return <History />;
+      default:
+        return <Home />;
+    }
+  };
+
   return (
     <ThemeProvider defaultTheme="system">
-      <div className="flex flex-col h-screen bg-background">
-        <Header />
-
-        <div className="container mx-auto flex-1 py-3 flex flex-col">
-          <Suspense
-            fallback={
-              <div className="flex justify-center">
-                <LoadingSpinner />
-              </div>
-            }
-          >
-            <Home />
-          </Suspense>
-        </div>
-
-        <DictationPopup />
-      </div>
+      <Layout currentPage={currentPage} onNavigate={setCurrentPage}>
+        <Suspense
+          fallback={
+            <div className="flex justify-center items-center h-full">
+              <LoadingSpinner />
+            </div>
+          }
+        >
+          {renderPage()}
+        </Suspense>
+      </Layout>
+      <DictationPopup />
     </ThemeProvider>
   );
 };

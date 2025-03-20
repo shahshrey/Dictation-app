@@ -1,6 +1,6 @@
-# Tests for Dictation App
+# Tests for Voice Vibe
 
-This directory contains tests for the Dictation App.
+This directory contains tests for the Voice Vibe.
 
 ## Structure
 

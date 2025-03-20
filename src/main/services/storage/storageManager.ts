@@ -1,7 +1,7 @@
 import { dialog, shell } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
-import { TEMP_DIR, DEFAULT_SAVE_DIR } from '../path-constants';
+import { getSaveDir, getTempDir } from '../path-constants';
 import logger from '../../../shared/logger';
 import { Transcription } from '../../../shared/types';
 import {
@@ -33,7 +33,15 @@ export const saveTranscription = async (
     const format = 'json';
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fullFilename = `${filename}_${timestamp}.${format}`;
-    const filePath = path.join(DEFAULT_SAVE_DIR, fullFilename);
+
+    // Use dynamic path getter to get the save directory from settings
+    const saveDir = getSaveDir();
+    const filePath = path.join(saveDir, fullFilename);
+
+    // Ensure the directory exists
+    if (!fs.existsSync(saveDir)) {
+      fs.mkdirSync(saveDir, { recursive: true });
+    }
 
     fs.writeFileSync(filePath, JSON.stringify(transcription, null, 2), { encoding: 'utf-8' });
 
@@ -52,7 +60,14 @@ export const saveTranscriptionAs = async (
 ): Promise<SaveTranscriptionResult> => {
   try {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const defaultPath = path.join(DEFAULT_SAVE_DIR, `transcription_${timestamp}.json`);
+    // Use dynamic path getter to get the save directory from settings
+    const saveDir = getSaveDir();
+    const defaultPath = path.join(saveDir, `transcription_${timestamp}.json`);
+
+    // Ensure the directory exists
+    if (!fs.existsSync(saveDir)) {
+      fs.mkdirSync(saveDir, { recursive: true });
+    }
 
     const { canceled, filePath } = await dialog.showSaveDialog({
       title: 'Save Transcription',
@@ -81,16 +96,19 @@ export const saveTranscriptionAs = async (
  */
 export const getRecentTranscriptions = async (): Promise<GetTranscriptionsResult> => {
   try {
-    if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
+    // Use dynamic path getter to get the save directory from settings
+    const saveDir = getSaveDir();
+
+    if (!fs.existsSync(saveDir)) {
       return { success: true, transcriptions: [] };
     }
 
     const files = fs
-      .readdirSync(DEFAULT_SAVE_DIR)
+      .readdirSync(saveDir)
       .filter(file => file.endsWith('.json') && file !== 'transcriptions.json')
       .map(file => {
         try {
-          const filePath = path.join(DEFAULT_SAVE_DIR, file);
+          const filePath = path.join(saveDir, file);
           const stats = fs.statSync(filePath);
           const content = fs.readFileSync(filePath, { encoding: 'utf-8' });
           return {
@@ -124,20 +142,23 @@ export const getRecentTranscriptions = async (): Promise<GetTranscriptionsResult
  */
 export const getTranscriptions = async (): Promise<Transcription[]> => {
   try {
-    if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
+    // Use dynamic path getter to get the save directory from settings
+    const saveDir = getSaveDir();
+
+    if (!fs.existsSync(saveDir)) {
       logger.debug('Main process: Save directory does not exist');
       return [];
     }
 
     // Force a directory read to get the latest files
     const files = fs
-      .readdirSync(DEFAULT_SAVE_DIR, { withFileTypes: true })
+      .readdirSync(saveDir, { withFileTypes: true })
       .filter(
         dirent =>
           dirent.isFile() && dirent.name.endsWith('.json') && dirent.name !== 'transcriptions.json'
       )
       .map(dirent => {
-        const filePath = path.join(DEFAULT_SAVE_DIR, dirent.name);
+        const filePath = path.join(saveDir, dirent.name);
 
         try {
           // Read file content
@@ -176,17 +197,20 @@ export const getTranscriptions = async (): Promise<Transcription[]> => {
  */
 export const getTranscription = async (id: string): Promise<GetTranscriptionResult> => {
   try {
-    if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
+    // Use dynamic path getter to get the save directory from settings
+    const saveDir = getSaveDir();
+
+    if (!fs.existsSync(saveDir)) {
       return { success: false, error: 'Save directory does not exist' };
     }
 
     const files = fs
-      .readdirSync(DEFAULT_SAVE_DIR)
+      .readdirSync(saveDir)
       .filter(file => file.endsWith('.json') && file !== 'transcriptions.json');
 
     for (const file of files) {
       try {
-        const filePath = path.join(DEFAULT_SAVE_DIR, file);
+        const filePath = path.join(saveDir, file);
         const content = fs.readFileSync(filePath, { encoding: 'utf-8' });
         const transcription = JSON.parse(content) as Transcription;
 
@@ -210,17 +234,20 @@ export const getTranscription = async (id: string): Promise<GetTranscriptionResu
  */
 export const deleteTranscription = async (id: string): Promise<DeleteTranscriptionResult> => {
   try {
-    if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
+    // Use dynamic path getter to get the save directory from settings
+    const saveDir = getSaveDir();
+
+    if (!fs.existsSync(saveDir)) {
       return { success: false, error: 'Save directory does not exist' };
     }
 
     const files = fs
-      .readdirSync(DEFAULT_SAVE_DIR)
+      .readdirSync(saveDir)
       .filter(file => file.endsWith('.json') && file !== 'transcriptions.json');
 
     for (const file of files) {
       try {
-        const filePath = path.join(DEFAULT_SAVE_DIR, file);
+        const filePath = path.join(saveDir, file);
         const content = fs.readFileSync(filePath, { encoding: 'utf-8' });
         const transcription = JSON.parse(content) as Transcription;
 
@@ -233,7 +260,7 @@ export const deleteTranscription = async (id: string): Promise<DeleteTranscripti
       }
     }
 
-    return { success: false, error: 'Transcription not found' };
+    return { success: false, error: 'Transcription not found or could not be deleted' };
   } catch (error) {
     logger.error('Failed to delete transcription:', { error: (error as Error).message });
     return { success: false, error: String(error) };
@@ -241,7 +268,7 @@ export const deleteTranscription = async (id: string): Promise<DeleteTranscripti
 };
 
 /**
- * Open a file
+ * Open a file with the default application
  */
 export const openFile = (filePath: string): OpenFileResult => {
   try {
@@ -257,19 +284,23 @@ export const openFile = (filePath: string): OpenFileResult => {
  * Ensure directories exist
  */
 export const ensureStorageDirectories = (): void => {
+  // Get directories from settings
+  const tempDir = getTempDir();
+  const saveDir = getSaveDir();
+
   // Ensure temp directory exists
-  if (!fs.existsSync(TEMP_DIR)) {
+  if (!fs.existsSync(tempDir)) {
     try {
-      fs.mkdirSync(TEMP_DIR, { recursive: true });
+      fs.mkdirSync(tempDir, { recursive: true });
     } catch (error) {
       logger.error('Failed to create temp directory:', { error: (error as Error).message });
     }
   }
 
   // Ensure save directory exists
-  if (!fs.existsSync(DEFAULT_SAVE_DIR)) {
+  if (!fs.existsSync(saveDir)) {
     try {
-      fs.mkdirSync(DEFAULT_SAVE_DIR, { recursive: true });
+      fs.mkdirSync(saveDir, { recursive: true });
     } catch (error) {
       logger.error('Failed to create save directory:', { error: (error as Error).message });
     }

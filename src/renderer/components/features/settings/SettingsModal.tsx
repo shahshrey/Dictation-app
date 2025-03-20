@@ -20,7 +20,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { ScrollArea } from '../../ui/scroll-area';
 import { Separator } from '../../ui/separator';
 import { Alert, AlertDescription } from '../../ui/alert';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, Moon, Sun } from 'lucide-react';
+import { useTheme } from '../../../components/layout/ThemeProvider';
 
 // Available languages for transcription
 const SUPPORTED_LANGUAGES = [
@@ -48,6 +49,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onOpenChange }) => 
     setSelectedDevice,
     refreshAudioDevices,
   } = useAppContext();
+  const { theme, setTheme } = useTheme();
 
   // Form state
   const [formValues, setFormValues] = useState<AppSettings>(settings);
@@ -185,6 +187,41 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onOpenChange }) => 
         <ScrollArea className="max-h-[75vh]">
           <div className="px-6 py-6">
             <div className="space-y-8">
+              {/* Appearance Settings */}
+              <Card className="border border-border/40 shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Appearance</CardTitle>
+                  <CardDescription>Customize the look and feel of the application</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label htmlFor="theme-toggle">Theme</Label>
+                      <div className="text-sm text-muted-foreground">
+                        Toggle between light and dark mode
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Sun className="h-4 w-4 text-muted-foreground" />
+                      <Button
+                        id="theme-toggle"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-12 px-0"
+                        onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                      >
+                        <span
+                          className={`block h-4 w-4 rounded-full bg-primary transition-transform ${
+                            theme === 'dark' ? 'translate-x-3' : '-translate-x-3'
+                          }`}
+                        />
+                      </Button>
+                      <Moon className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Audio Device Settings */}
               <Card className="border border-border/40 shadow-sm">
                 <CardHeader className="pb-2">
@@ -373,6 +410,47 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onOpenChange }) => 
                         </p>
                       )}
                     </div>
+
+                    <div className="mt-4">
+                      <Label htmlFor="audio-save-path" className="text-sm font-medium">
+                        Audio Files Path
+                      </Label>
+                      <div className="flex space-x-2 mt-1">
+                        <Input
+                          id="audio-save-path"
+                          value={formValues.audioSavePath}
+                          onChange={e => handleInputChange('audioSavePath', e.target.value)}
+                          placeholder="Default path"
+                          className="flex-1"
+                        />
+                        <Button
+                          variant="outline"
+                          onClick={async () => {
+                            try {
+                              if (
+                                window.electronAPI &&
+                                typeof window.electronAPI.showDirectoryPicker === 'function'
+                              ) {
+                                const selectedPath = await window.electronAPI.showDirectoryPicker();
+                                if (selectedPath) {
+                                  handleInputChange('audioSavePath', selectedPath);
+                                }
+                              } else {
+                                logger.warn('Directory picker not available');
+                              }
+                            } catch (error) {
+                              logger.exception('Failed to open directory picker', error);
+                            }
+                          }}
+                          aria-label="Browse for audio save path"
+                        >
+                          Browse
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Path where temporary audio recordings will be stored
+                      </p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -429,7 +507,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ open, onOpenChange }) => 
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={isLoading} aria-label="Save settings">
+          <Button disabled={isLoading} onClick={handleSave}>
             {isLoading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

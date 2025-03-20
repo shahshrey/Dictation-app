@@ -11,16 +11,16 @@ const logger = require('../shared/logger').default;
 // Import services first
 const { GROQ_MODELS } = require('./services/groq');
 
-// Import other constants 
-const { TEMP_DIR, DEFAULT_SAVE_DIR } = require('./services/path-constants');
+// Import path helpers/functions
+const pathConstants = require('./services/path-constants');
 
-// Import the RecordingManager
-const { RecordingManager, AUDIO_FILE_PATH } = require('./services/audio/recording');
+// Import the RecordingManager which now exports the path functions
+const { RecordingManager, getAudioFilePath } = require('./services/audio/recording');
 
 // Define global variables first to ensure they're available to all modules
 // IMPORTANT: These globals must be set before importing modules that might use them
-global.AUDIO_FILE_PATH = AUDIO_FILE_PATH;
-global.DEFAULT_SAVE_DIR = DEFAULT_SAVE_DIR;
+global.AUDIO_FILE_PATH = getAudioFilePath();
+global.DEFAULT_SAVE_DIR = pathConstants.getSaveDir();
 global.logger = logger;
 global.GROQ_MODELS = GROQ_MODELS;
 global.isRecording = false;
@@ -30,8 +30,10 @@ global.mainWindowMinimized = false;
 global.popupWindowMinimized = false;
 global.isQuitting = false; // Track when we're intentionally quitting the app
 
-// Export TEMP_DIR so it can be imported by other modules
-exports.TEMP_DIR = TEMP_DIR;
+// Export path functions so they can be imported by other modules
+exports.getTempDir = pathConstants.getTempDir;
+exports.getSaveDir = pathConstants.getSaveDir;
+exports.getAudioFilePath = getAudioFilePath;
 
 // Only after setting up globals, import other components
 const { pasteTextAtCursor } = require('./services/clipboard/clipboard').default;

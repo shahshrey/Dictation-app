@@ -3,17 +3,17 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>Dictation App</string>
+	<string>Voice Vibe</string>
 	<key>CFBundleExecutable</key>
-	<string>Dictation App</string>
+	<string>Voice Vibe</string>
 	<key>CFBundleIconFile</key>
 	<string>logo.icns</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.dictation.app</string>
+	<string>com.voice.vibe.app</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Dictation App</string>
+	<string>Voice Vibe</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

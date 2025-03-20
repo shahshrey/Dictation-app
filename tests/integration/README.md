@@ -1,6 +1,6 @@
-# Integration Tests for Dictation App
+# Integration Tests for Voice Vibe
 
-This directory contains integration tests for the Dictation App, focusing on testing the actual functionality of the application rather than just mocking components.
+This directory contains integration tests for the Voice Vibe, focusing on testing the actual functionality of the application rather than just mocking components.
 
 ## Test Files
 

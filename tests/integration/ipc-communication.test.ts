@@ -383,7 +383,7 @@ describe.skip('Real IPC Communication with Spectron', () => {
 
     // Check the window title
     const title = await client.getTitle();
-    expect(title).toContain('Dictation App');
+    expect(title).toContain('Voice Vibe');
   });
 
   // Test IPC communication for settings
@@ -456,7 +456,7 @@ describe.skip('Real IPC Communication with Spectron', () => {
   // Test a complete workflow with actual file operations
   it('should perform a complete recording and transcription workflow', async () => {
     // Create a temporary directory for test files
-    const tempDir = path.join(os.tmpdir(), 'dictation-app-test-' + Date.now());
+    const tempDir = path.join(os.tmpdir(), 'voice-vibe-test-' + Date.now());
     fs.mkdirSync(tempDir, { recursive: true });
 
     try {
