@@ -42,8 +42,9 @@ export const getSaveDir = (): string => {
   return getSettingsPath().saveDir;
 };
 
-export const getAudioFilePath = (): string => {
-  return path.join(getTempDir(), `recording.${AUDIO_SETTINGS.FILE_FORMAT}`);
+export const getAudioFilePath = (fileId?: string): string => {
+  const fileName = fileId ? `${fileId}` : 'recording';
+  return path.join(getTempDir(), `${fileName}.${AUDIO_SETTINGS.FILE_FORMAT}`);
 };
 
 // For backward compatibility - should be used only in places that can't use the dynamic getters

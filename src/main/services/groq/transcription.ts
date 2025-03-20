@@ -10,7 +10,8 @@ import {
   TranscribeAudioResult,
   TranscribeOptions,
 } from './types';
-import { AUDIO_FILE_PATH } from '../path-constants';
+import { getAudioFilePath, getTempDir } from '../path-constants';
+import * as path from 'path';
 
 /**
  * Process transcription text with Groq LLM to improve clarity
@@ -69,39 +70,6 @@ const normalizeLanguage = (language: string): string => {
 };
 
 /**
- * Create transcription metadata
- */
-const createTranscriptionMetadata = (
-  rawText: string,
-  processedText: string,
-  language: string,
-  fileStats: fs.Stats
-): {
-  id: string;
-  timestamp: number;
-  duration: number;
-  transcriptionObject: TranscriptionObject;
-} => {
-  const id = `transcription-${Date.now()}`;
-  const timestamp = Date.now();
-  const duration = Math.floor((fileStats.mtime.getTime() - fileStats.birthtime.getTime()) / 1000);
-
-  const transcriptionObject: TranscriptionObject = {
-    id: `transcription_${new Date().toISOString().replace(/[:.]/g, '-')}`,
-    text: processedText,
-    rawText,
-    timestamp,
-    duration,
-    language,
-    wordCount: processedText.split(/\s+/).length,
-    source: 'recording',
-    confidence: 0.95, // Default confidence value
-  };
-
-  return { id, timestamp, duration, transcriptionObject };
-};
-
-/**
  * Transcribe a recording file using Groq API
  */
 export const transcribeRecording = async (
@@ -118,16 +86,37 @@ export const transcribeRecording = async (
       return { success: false, error: 'Failed to initialize Groq client' };
     }
 
-    if (!validateAudioFile(AUDIO_FILE_PATH)) {
+    // Get the temporary audio file path (the original recording)
+    const originalAudioFilePath = getAudioFilePath();
+
+    if (!validateAudioFile(originalAudioFilePath)) {
       return { success: false, error: 'Invalid audio file' };
     }
 
-    const fileStats = getFileStats(AUDIO_FILE_PATH);
+    const fileStats = getFileStats(originalAudioFilePath);
     if (!fileStats) {
       return { success: false, error: 'Failed to get file stats' };
     }
 
-    const audioFile = fs.createReadStream(AUDIO_FILE_PATH);
+    // Generate a unique ID for both transcript and audio files
+    const datePart = new Date()
+      .toISOString()
+      .replace(/[-:T.Z]/g, '')
+      .substring(0, 14); // YYYYMMDDHHMMSS
+    const randomPart = Math.floor(Math.random() * 1000)
+      .toString()
+      .padStart(3, '0');
+    const fileId = `transcript_${datePart}_${randomPart}`;
+
+    // Create the permanent audio file path with the same ID
+    const permanentAudioFilePath = getAudioFilePath(fileId);
+
+    // Copy the audio file from temporary location to permanent location with unique name
+    fs.copyFileSync(originalAudioFilePath, permanentAudioFilePath);
+    logger.debug('Audio file copied to permanent location:', { path: permanentAudioFilePath });
+
+    // Use the permanent file for transcription
+    const audioFile = fs.createReadStream(permanentAudioFilePath);
 
     // Prepare transcription parameters
     const normalizedLanguage = normalizeLanguage(language);
@@ -138,7 +127,7 @@ export const transcribeRecording = async (
       model,
       language: normalizedLanguage,
     };
-
+    console.log('transcriptionParams', JSON.stringify(transcriptionParams));
     const transcription = await client.audio.transcriptions.create(transcriptionParams);
     const rawText = transcription.text;
 
@@ -146,30 +135,45 @@ export const transcribeRecording = async (
     logger.debug('Raw transcription text:', { rawText });
     const processedText = await processTranscriptionText(rawText, apiKey);
     logger.debug('Processed transcription text:', { processedText });
-    // Create metadata and save transcription
-    const { id, timestamp, duration, transcriptionObject } = createTranscriptionMetadata(
-      rawText,
-      processedText,
-      normalizedLanguage,
-      fileStats
-    );
 
-    // Save to file
-    const filePath = saveTranscriptionToFile(transcriptionObject);
+    // Create metadata using our pre-generated ID
+    const timestamp = Date.now();
+    const duration = Math.floor((fileStats.mtime.getTime() - fileStats.birthtime.getTime()) / 1000);
+
+    const transcriptionObject: TranscriptionObject = {
+      id: fileId,
+      text: processedText,
+      rawText,
+      timestamp,
+      duration,
+      language: normalizedLanguage,
+      wordCount: processedText.split(/\s+/).length,
+      source: 'recording',
+      confidence: 0.95, // Default confidence value
+      audioFilePath: permanentAudioFilePath,
+      title: `Recording ${new Date(timestamp).toLocaleString()}`,
+      pastedAtCursor: false,
+    };
+
+    // Save to file with our consistent ID
+    const { filePath } = saveTranscriptionToFile(transcriptionObject);
 
     // Add a small delay to ensure file system operations are complete
     await new Promise(resolve => setTimeout(resolve, 500));
 
     return {
       success: true,
-      id,
+      id: fileId,
       text: processedText,
       rawText,
       timestamp,
       duration,
       language: normalizedLanguage,
       filePath,
+      audioFilePath: permanentAudioFilePath,
       pastedAtCursor: false,
+      title: transcriptionObject.title,
+      wordCount: transcriptionObject.wordCount,
     };
   } catch (error: unknown) {
     logger.error('Failed to transcribe recording', { error: (error as Error).message });
@@ -199,7 +203,25 @@ export const handleTranscribeAudio = async (
       return { success: false, error: 'Audio file not found' };
     }
 
-    const audioFile = fs.createReadStream(filePath);
+    // Generate a unique ID for both transcript and audio files
+    const datePart = new Date()
+      .toISOString()
+      .replace(/[-:T.Z]/g, '')
+      .substring(0, 14); // YYYYMMDDHHMMSS
+    const randomPart = Math.floor(Math.random() * 1000)
+      .toString()
+      .padStart(3, '0');
+    const fileId = `transcript_${datePart}_${randomPart}`;
+
+    const tempDir = getTempDir();
+    // Create new path with our consistent ID
+    const newFilePath = path.join(tempDir, `${fileId}.${path.extname(filePath).substring(1)}`);
+
+    // Create a copy of the file with the unique ID as filename
+    fs.copyFileSync(filePath, newFilePath);
+    logger.debug('Audio file copied with unique ID:', { path: newFilePath });
+
+    const audioFile = fs.createReadStream(newFilePath);
     const language = normalizeLanguage(options.language || 'auto');
     const model = options.model || selectTranscriptionModel(language);
 
@@ -211,12 +233,32 @@ export const handleTranscribeAudio = async (
 
     const processedText = await processTranscriptionText(transcription.text, apiKey);
 
+    // Create and save transcript with the same ID
+    const timestamp = Date.now();
+    const transcriptionObject: TranscriptionObject = {
+      id: fileId,
+      text: processedText,
+      rawText: transcription.text,
+      timestamp,
+      duration: 0, // We don't have duration info for uploaded files
+      language,
+      wordCount: processedText.split(/\s+/).length,
+      source: 'upload',
+      confidence: 0.95,
+      audioFilePath: newFilePath,
+    };
+
+    const { filePath: transcriptPath } = saveTranscriptionToFile(transcriptionObject);
+
     return {
       success: true,
       text: processedText,
       rawText: transcription.text,
       language,
       model,
+      audioFilePath: newFilePath,
+      transcriptFilePath: transcriptPath,
+      id: fileId,
     };
   } catch (error) {
     logger.error('Failed to transcribe audio:', { error: (error as Error).message });

@@ -216,6 +216,7 @@ export const useTranscriptions = (settings: AppSettings) => {
               source: 'recording',
               title: `Recording ${new Date(result.timestamp).toLocaleString()}`,
               confidence: result.confidence,
+              audioFilePath: result.audioFilePath,
             };
 
             setCurrentTranscription(transcription);
@@ -243,15 +244,8 @@ export const useTranscriptions = (settings: AppSettings) => {
               }
             }
 
-            // Save the transcription to JSON
-            if (window.electronAPI && typeof window.electronAPI.saveTranscription === 'function') {
-              try {
-                await window.electronAPI.saveTranscription(transcription);
-                logger.debug('Transcription saved to JSON database');
-              } catch (saveError) {
-                logger.exception('Failed to save transcription to JSON database', saveError);
-              }
-            }
+            // Note: The transcription is already saved by the main process in the Groq service,
+            // so we don't need to save it again here to avoid creating duplicate files.
 
             // Refresh the list of transcriptions immediately
             await refreshRecentTranscriptions();

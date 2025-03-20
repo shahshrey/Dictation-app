@@ -7,10 +7,13 @@ import { getSaveDir } from '../path-constants';
 /**
  * Save transcription to a file
  */
-export const saveTranscriptionToFile = (transcriptionObj: TranscriptionObject): string => {
+export const saveTranscriptionToFile = (
+  transcriptionObj: TranscriptionObject
+): { filePath: string; fileId: string } => {
   try {
-    const timestampStr = new Date().toISOString().replace(/[:.]/g, '-');
-    const fullFilename = `transcription_${timestampStr}.json`;
+    // Extract the ID from the transcription object
+    const fileId = transcriptionObj.id;
+    const fullFilename = `${fileId}.json`;
 
     // Use dynamic path getter to get the save directory from settings
     const saveDir = getSaveDir();
@@ -24,10 +27,10 @@ export const saveTranscriptionToFile = (transcriptionObj: TranscriptionObject): 
     // Write the file
     fs.writeFileSync(filePath, JSON.stringify(transcriptionObj, null, 2), { encoding: 'utf-8' });
 
-    return filePath;
+    return { filePath, fileId };
   } catch (error) {
     logger.error('Failed to save transcription to file', { error: (error as Error).message });
-    return '';
+    return { filePath: '', fileId: '' };
   }
 };
 

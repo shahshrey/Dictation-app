@@ -18,6 +18,7 @@ export interface Transcription {
   speakerCount?: number;
   speakers?: Speaker[];
   segments?: TranscriptionSegment[];
+  audioFilePath?: string;
 }
 
 export interface Speaker {

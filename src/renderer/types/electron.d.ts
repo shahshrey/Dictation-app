@@ -44,6 +44,7 @@ interface ElectronAPI {
     language?: string;
     model?: string;
     error?: string;
+    audioFilePath?: string;
   }>;
   translateAudio: (
     filePath: string,
@@ -63,6 +64,7 @@ interface ElectronAPI {
     wordCount?: number;
     confidence?: number;
     pastedAtCursor?: boolean;
+    audioFilePath?: string;
   }>;
 
   // API validation

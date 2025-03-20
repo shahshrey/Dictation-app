@@ -29,19 +29,43 @@ export const saveTranscription = async (
   options: SaveTranscriptionOptions = {}
 ): Promise<SaveTranscriptionResult> => {
   try {
+    // Check if a file with this ID already exists in the save directory
+    const saveDir = getSaveDir();
+
+    if (!fs.existsSync(saveDir)) {
+      fs.mkdirSync(saveDir, { recursive: true });
+    }
+
+    // Look for existing files with the same ID
+    if (transcription.id) {
+      const files = fs
+        .readdirSync(saveDir)
+        .filter(file => file.endsWith('.json') && file !== 'transcriptions.json');
+
+      for (const file of files) {
+        try {
+          const filePath = path.join(saveDir, file);
+          const content = fs.readFileSync(filePath, { encoding: 'utf-8' });
+          const existingTranscription = JSON.parse(content) as Transcription;
+
+          // If a file with this ID already exists, don't create a duplicate
+          if (existingTranscription.id === transcription.id) {
+            logger.debug(`Transcription with ID ${transcription.id} already exists, skipping save`);
+            return { success: true, filePath };
+          }
+        } catch (error) {
+          logger.error(`Error checking file ${file}:`, { error: (error as Error).message });
+        }
+      }
+    }
+
+    // If we get here, no duplicate was found, proceed with normal save operation
     const filename = options?.filename || 'transcription';
     const format = 'json';
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const fullFilename = `${filename}_${timestamp}.${format}`;
 
-    // Use dynamic path getter to get the save directory from settings
-    const saveDir = getSaveDir();
     const filePath = path.join(saveDir, fullFilename);
-
-    // Ensure the directory exists
-    if (!fs.existsSync(saveDir)) {
-      fs.mkdirSync(saveDir, { recursive: true });
-    }
 
     fs.writeFileSync(filePath, JSON.stringify(transcription, null, 2), { encoding: 'utf-8' });
 

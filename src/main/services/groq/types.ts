@@ -19,7 +19,10 @@ export interface TranscriptionResult {
   duration?: number;
   language?: string;
   filePath?: string;
+  audioFilePath?: string;
   pastedAtCursor?: boolean;
+  title?: string;
+  wordCount?: number;
   error?: string;
 }
 
@@ -33,6 +36,9 @@ export interface TranscriptionObject {
   wordCount: number;
   source: string;
   confidence: number;
+  audioFilePath: string;
+  title?: string;
+  pastedAtCursor?: boolean;
 }
 
 export interface TranscriptionParams {
@@ -47,6 +53,9 @@ export interface TranscribeAudioResult {
   rawText?: string;
   language?: string;
   model?: string;
+  audioFilePath?: string;
+  transcriptFilePath?: string;
+  id?: string;
   error?: string;
 }
 

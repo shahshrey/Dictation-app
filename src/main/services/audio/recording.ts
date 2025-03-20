@@ -4,6 +4,7 @@ import { AudioDevice, IPC_CHANNELS } from '../../../shared/types';
 import { getTempDir, getAudioFilePath } from '../path-constants';
 import logger from '../../../shared/logger';
 import { updateTrayMenu } from '../tray/trayManager';
+import * as path from 'path';
 
 // Ensure temp directory exists
 try {
@@ -225,6 +226,7 @@ export class RecordingManager {
 
       // Get the paths using the dynamic getters
       const tempDir = getTempDir();
+      // Always save initial recording to standard path for consistency
       const audioFilePath = getAudioFilePath();
 
       // Ensure the temp directory exists
@@ -240,6 +242,9 @@ export class RecordingManager {
         const stats = fs.statSync(audioFilePath);
         logger.debug(`Recording saved successfully: ${audioFilePath}, size: ${stats.size} bytes`);
 
+        // Clean up any old temporary recordings after successful save
+        this.cleanupTemporaryRecordings();
+
         if (stats.size === 0) {
           logger.error('Error: File was saved but is empty');
           return {
@@ -249,13 +254,17 @@ export class RecordingManager {
           };
         }
 
-        return { success: true, filePath: audioFilePath, size: stats.size };
+        return {
+          success: true,
+          filePath: audioFilePath,
+          size: stats.size,
+        };
       } else {
         logger.error('Error: File was not saved');
         return { success: false, error: 'File was not saved' };
       }
     } catch (error) {
-      logger.error('Failed to save recording:', { error: (error as Error).message });
+      logger.error('Error saving recording:', { error: (error as Error).message });
       return { success: false, error: String(error) };
     }
   }
@@ -264,7 +273,59 @@ export class RecordingManager {
    * Get the path to the saved recording
    */
   private getRecordingPath(): string {
+    // Return the standard audio file path
     return getAudioFilePath();
+  }
+
+  /**
+   * Clean up old temporary recording files
+   * This helps prevent accumulation of temporary files
+   */
+  private cleanupTemporaryRecordings(): void {
+    try {
+      const tempDir = getTempDir();
+      if (!fs.existsSync(tempDir)) {
+        return;
+      }
+
+      // Get list of files in temp directory
+      const files = fs.readdirSync(tempDir);
+
+      // Find recording files
+      const recordingPattern = /^recording\.(wav|mp3|ogg|m4a)$/;
+      const recordingFiles = files.filter(file => recordingPattern.test(file));
+
+      logger.debug(`Found ${recordingFiles.length} temporary recording files to clean up`);
+
+      // Remove temporary recording files if they are more than one
+      // We keep only the most recent recording file
+      if (recordingFiles.length > 1) {
+        // Sort files by modification time (newest first)
+        const sortedFiles = recordingFiles
+          .map(file => {
+            const filePath = path.join(tempDir, file);
+            const stats = fs.statSync(filePath);
+            return { file, path: filePath, mtime: stats.mtime };
+          })
+          .sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
+
+        // Keep the newest file, delete the rest
+        sortedFiles.slice(1).forEach(fileInfo => {
+          try {
+            fs.unlinkSync(fileInfo.path);
+            logger.debug(`Deleted old temporary recording: ${fileInfo.path}`);
+          } catch (unlinkError) {
+            logger.error(`Failed to delete temporary recording: ${fileInfo.path}`, {
+              error: (unlinkError as Error).message,
+            });
+          }
+        });
+      }
+    } catch (error) {
+      logger.error('Failed to clean up temporary recordings:', {
+        error: (error as Error).message,
+      });
+    }
   }
 
   /**
