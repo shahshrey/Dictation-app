@@ -1,4 +1,4 @@
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, ipcMain } from 'electron';
 import { setupPermissionHandlers } from './permissions/permissions';
 import { setupAudioHandlers } from './audio/audio';
 import { setupStorageHandlers } from './storage/storageIpc';
@@ -8,6 +8,7 @@ import { setupSettingsHandlers } from './storage/settings';
 import { setupWindowHandlers } from './window/window';
 import { setupTrayHandlers } from './tray/tray';
 import { setupClipboardHandlers } from './clipboard/clipboard';
+import { AudioPlayerManager } from './audio/audioPlayer';
 
 type Store = {
   set: (settings: Record<string, unknown>) => void;
@@ -41,6 +42,9 @@ const setupIpcHandlers = (
   setupWindowHandlers();
   setupTrayHandlers();
   setupClipboardHandlers();
+
+  // Initialize audio player
+  AudioPlayerManager.initialize(ipcMain, mainWindow);
 };
 
 export { setupIpcHandlers };

@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import { AudioDevice, IPC_CHANNELS, Transcription } from '../shared/types';
 import { STORAGE_CHANNELS } from '../shared/storage';
 import logger from '../shared/logger';
+import { AUDIO_PLAYER_CHANNELS } from '../main/services/audio/audioPlayer';
 
 logger.debug('Preload script starting...');
 logger.debug('ipcRenderer available:', { available: !!ipcRenderer });
@@ -31,6 +32,47 @@ try {
 
     sendAudioDevicesResult: (devices: AudioDevice[]) => {
       ipcRenderer.send(IPC_CHANNELS.AUDIO_DEVICES_RESULT, devices);
+    },
+
+    // Audio playback
+    getAudioFileStatus: (filePath: string) => {
+      logger.debug('Preload: getAudioFileStatus called for path:', { filePath });
+
+      // Log the file:// URL that would be created for this path
+      const fileUrl = `file://${filePath}`;
+      logger.debug('Preload: Constructed file URL would be:', {
+        fileUrl,
+        encodedUrl: encodeURI(fileUrl),
+      });
+
+      try {
+        const result = ipcRenderer.invoke(AUDIO_PLAYER_CHANNELS.GET_AUDIO_FILE_STATUS, filePath);
+
+        // Add debug logging for the promise
+        result
+          .then(status => {
+            logger.debug('Preload: getAudioFileStatus returned result:', {
+              status,
+              exists: status.exists,
+              filePath,
+            });
+          })
+          .catch(error => {
+            logger.error('Preload: getAudioFileStatus promise rejected:', {
+              error: error.message,
+              filePath,
+            });
+          });
+
+        return result;
+      } catch (error) {
+        logger.error('Preload: getAudioFileStatus threw an exception:', {
+          error: (error as Error).message,
+          stack: (error as Error).stack,
+          filePath,
+        });
+        throw error;
+      }
     },
 
     // Permissions

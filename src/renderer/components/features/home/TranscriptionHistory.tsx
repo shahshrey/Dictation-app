@@ -4,6 +4,7 @@ import { Card } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Separator } from '../../ui/separator';
 import { Search } from 'lucide-react';
+import AudioPlayer from '../audio/AudioPlayer';
 
 const TranscriptionHistory: React.FC = () => {
   const { recentTranscriptions, currentTranscription, setCurrentTranscription } = useAppContext();
@@ -162,6 +163,13 @@ const TranscriptionHistory: React.FC = () => {
                         {tag}
                       </Badge>
                     ))}
+                  </div>
+                )}
+
+                {/* Audio Player */}
+                {currentTranscription.audioFilePath && (
+                  <div className="mt-2">
+                    <AudioPlayer audioFilePath={currentTranscription.audioFilePath} />
                   </div>
                 )}
 

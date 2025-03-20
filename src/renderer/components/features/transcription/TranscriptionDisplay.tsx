@@ -3,6 +3,7 @@ import { useAppContext } from '../../../context/AppContext';
 import { Card } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Separator } from '../../ui/separator';
+import AudioPlayer from '../audio/AudioPlayer';
 
 const TranscriptionDisplay: React.FC = () => {
   const { currentTranscription } = useAppContext();
@@ -87,6 +88,13 @@ const TranscriptionDisplay: React.FC = () => {
                   {tag}
                 </Badge>
               ))}
+            </div>
+          )}
+
+          {/* Audio Player */}
+          {currentTranscription.audioFilePath && (
+            <div className="mt-2">
+              <AudioPlayer audioFilePath={currentTranscription.audioFilePath} />
             </div>
           )}
 

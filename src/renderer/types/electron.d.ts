@@ -5,6 +5,13 @@ export interface AudioDevice {
   isDefault: boolean;
 }
 
+// Audio file status interface
+export interface AudioFileStatus {
+  exists: boolean;
+  size?: number;
+  error?: string;
+}
+
 // Import the Transcription type from shared types
 import { Transcription } from '../../shared/types';
 import {
@@ -30,6 +37,9 @@ interface ElectronAPI {
   // Audio device detection
   onAudioDevicesRequest: (callback: () => void) => () => void;
   sendAudioDevicesResult: (devices: AudioDevice[]) => void;
+
+  // Audio playback
+  getAudioFileStatus: (filePath: string) => Promise<AudioFileStatus>;
 
   // Permissions
   notifyPermissionIssue: (permissionType: 'microphone' | 'accessibility') => void;

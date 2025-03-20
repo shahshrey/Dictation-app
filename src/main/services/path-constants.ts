@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { AUDIO_SETTINGS } from '../../shared/constants';
 import { storeService } from './StoreService';
+import logger from '../../shared/logger';
 
 // Default file paths and directories (used as fallbacks)
 export const DEFAULT_TEMP_DIR: string = path.join(os.tmpdir(), 'voice-vibe');
@@ -30,21 +31,36 @@ export const getSettingsPath = (): { tempDir: string; saveDir: string } => {
   // Use audioSavePath from settings or fall back to default temp dir
   const tempDir = typeof audioPath === 'string' && audioPath.trim() ? audioPath : DEFAULT_TEMP_DIR;
 
+  logger.debug('Path Constants: Got settings paths', { tempDir, saveDir });
   return { tempDir, saveDir };
 };
 
 // Dynamic path getters that read from settings
 export const getTempDir = (): string => {
-  return getSettingsPath().tempDir;
+  const tempDir = getSettingsPath().tempDir;
+  logger.debug('Path Constants: getTempDir() returned:', { tempDir });
+  return tempDir;
 };
 
 export const getSaveDir = (): string => {
-  return getSettingsPath().saveDir;
+  const saveDir = getSettingsPath().saveDir;
+  logger.debug('Path Constants: getSaveDir() returned:', { saveDir });
+  return saveDir;
 };
 
 export const getAudioFilePath = (fileId?: string): string => {
   const fileName = fileId ? `${fileId}` : 'recording';
-  return path.join(getTempDir(), `${fileName}.${AUDIO_SETTINGS.FILE_FORMAT}`);
+  const tempDir = getTempDir();
+  const filePath = path.join(tempDir, `${fileName}.${AUDIO_SETTINGS.FILE_FORMAT}`);
+
+  logger.debug('Path Constants: getAudioFilePath() generated path:', {
+    fileId,
+    tempDir,
+    filePath,
+    format: AUDIO_SETTINGS.FILE_FORMAT,
+  });
+
+  return filePath;
 };
 
 // For backward compatibility - should be used only in places that can't use the dynamic getters
