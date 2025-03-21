@@ -1,0 +1,71 @@
+appId: com.voicevibe.app
+productName: Voice Vibe
+copyright: Copyright © 2023
+
+# Compression settings for smaller package size
+compression: maximum
+asar: true
+asarUnpack: 
+  - "**/*.node"
+  - "**/node_modules/groq-sdk/**/*"
+
+directories:
+  output: release-builds
+  buildResources: src/assets
+
+files:
+  - dist/**/*
+  - node_modules/**/*
+  - package.json
+  - build/**/*
+  - src/assets/**/*
+  - "!**/*.map" # Exclude source maps in production
+  - "!**/*.ts" # Exclude TypeScript source files
+  - "!**/node_modules/**/*.d.ts" # Exclude TypeScript declaration files
+  - "!**/node_modules/**/*.ts" # Exclude TypeScript source files in node_modules
+  - "!**/node_modules/**/*.map" # Exclude source maps in node_modules
+
+extraResources:
+  - from: dist
+    to: dist
+  - from: src/assets
+    to: assets
+
+mac:
+  category: public.app-category.productivity
+  target: 
+    - dmg
+  icon: src/assets/logo/logo.icns
+  darkModeSupport: true
+  hardenedRuntime: true
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  gatekeeperAssess: false
+  extendInfo:
+    NSMicrophoneUsageDescription: This app requires microphone access for voice transcription functionality.
+    LSUIElement: false
+    NSHumanReadableCopyright: Copyright © 2023
+    CFBundleDocumentTypes: []
+    CFBundleTypeRole: Editor
+    LSApplicationCategoryType: public.app-category.productivity
+  type: development
+  identity: null
+
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+  window:
+    width: 540
+    height: 380
+
+# Optimize build settings
+npmRebuild: false
+buildDependenciesFromSource: false
+nodeGypRebuild: false
+
+publish: null 

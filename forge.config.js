@@ -3,6 +3,7 @@ const { MakerZIP } = require('@electron-forge/maker-zip');
 const { MakerDeb } = require('@electron-forge/maker-deb');
 const { MakerRpm } = require('@electron-forge/maker-rpm');
 const { WebpackPlugin } = require('@electron-forge/plugin-webpack');
+const path = require('path');
 
 const mainConfig = require('./webpack.main.config');
 const rendererConfig = require('./webpack.renderer.config');
@@ -10,12 +11,18 @@ const rendererConfig = require('./webpack.renderer.config');
 module.exports = {
   packagerConfig: {
     asar: true,
+    out: 'out',
+    dir: 'dist',
+    icon: path.resolve(__dirname, 'src/assets/logo/logo'),
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({}),
-    new MakerZIP({}, ['darwin']),
-    new MakerRpm({}),
+    new MakerSquirrel({
+      iconUrl: path.resolve(__dirname, 'src/assets/logo/logo.ico'),
+      setupIcon: path.resolve(__dirname, 'src/assets/logo/logo.ico'),
+    }), 
+    new MakerZIP({}, ['darwin']), 
+    new MakerRpm({}), 
     new MakerDeb({})
   ],
   plugins: [
@@ -32,8 +39,19 @@ module.exports = {
               js: './src/preload/preload.ts',
             },
           },
+          {
+            html: './src/renderer/popup.html',
+            js: './src/renderer/popup.tsx',
+            name: 'popup_window',
+            preload: {
+              js: './src/preload/preload.ts',
+            },
+          },
         ],
       },
+      output: {
+        path: 'dist'
+      }
     }),
   ],
-}; 
+};

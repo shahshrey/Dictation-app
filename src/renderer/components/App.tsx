@@ -1,110 +1,47 @@
-import React, { Suspense } from 'react';
-import { Box, Container, Paper, Typography, CircularProgress } from '@mui/material';
-import { THEME_COLORS } from '../../shared/theme';
-import Header from './Header';
-import RecordingControls from './RecordingControls';
-import TranscriptionDisplay from './TranscriptionDisplay';
-import RecentTranscriptions from './RecentTranscriptions';
-import SettingsPanel from './SettingsPanel';
-import DictationPopup from './DictationPopup';
+import React, { Suspense, useState } from 'react';
+import DictationPopup from './features/dictation/DictationPopup';
+import { ThemeProvider } from './layout/ThemeProvider';
+import { LoadingSpinner } from './ui/loading-spinner';
+import Layout from './layout/Layout';
+
+// Lazy load the pages for better performance
+const Home = React.lazy(() => import('./features/home/Home'));
+const Dictionary = React.lazy(() => import('./features/dictionary/Dictionary'));
+const History = React.lazy(() => import('./features/history/History'));
 
 const App: React.FC = () => {
+  const [currentPage, setCurrentPage] = useState<string>('home');
+
+  // Render the current page based on navigation state
+  const renderPage = () => {
+    switch (currentPage) {
+      case 'home':
+        return <Home />;
+      case 'dictionary':
+        return <Dictionary />;
+      case 'history':
+        return <History />;
+      default:
+        return <Home />;
+    }
+  };
+
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100vh',
-        bgcolor: THEME_COLORS.background,
-      }}
-    >
-      <Header />
-      
-      <Container maxWidth="lg" sx={{ flex: 1, py: 3, display: 'flex', flexDirection: 'column' }}>
-        <Paper
-          elevation={3}
-          sx={{
-            p: 3,
-            mb: 3,
-            display: 'flex',
-            flexDirection: 'column',
-            bgcolor: THEME_COLORS.paper,
-          }}
+    <ThemeProvider defaultTheme="system">
+      <Layout currentPage={currentPage} onNavigate={setCurrentPage}>
+        <Suspense
+          fallback={
+            <div className="flex justify-center items-center h-full">
+              <LoadingSpinner />
+            </div>
+          }
         >
-          <Typography variant="h5" component="h2" gutterBottom>
-            Dictation
-          </Typography>
-          
-          <Suspense fallback={<CircularProgress />}>
-            <RecordingControls />
-          </Suspense>
-        </Paper>
-        
-        <Paper
-          elevation={3}
-          sx={{
-            p: 3,
-            mb: 3,
-            display: 'flex',
-            flexDirection: 'column',
-            flex: 1,
-            overflow: 'hidden',
-            bgcolor: THEME_COLORS.paper,
-          }}
-        >
-          <Typography variant="h5" component="h2" gutterBottom>
-            Transcription
-          </Typography>
-          
-          <Suspense fallback={<CircularProgress />}>
-            <TranscriptionDisplay />
-          </Suspense>
-        </Paper>
-        
-        <Box sx={{ display: 'flex', gap: 3 }}>
-          <Paper
-            elevation={3}
-            sx={{
-              p: 3,
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              bgcolor: THEME_COLORS.paper,
-            }}
-          >
-            <Typography variant="h5" component="h2" gutterBottom>
-              Recent Transcriptions
-            </Typography>
-            
-            <Suspense fallback={<CircularProgress />}>
-              <RecentTranscriptions />
-            </Suspense>
-          </Paper>
-          
-          <Paper
-            elevation={3}
-            sx={{
-              p: 3,
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              bgcolor: THEME_COLORS.paper,
-            }}
-          >
-            <Typography variant="h5" component="h2" gutterBottom>
-              Settings
-            </Typography>
-            
-            <Suspense fallback={<CircularProgress />}>
-              <SettingsPanel />
-            </Suspense>
-          </Paper>
-        </Box>
-      </Container>
-      
+          {renderPage()}
+        </Suspense>
+      </Layout>
       <DictationPopup />
-    </Box>
+    </ThemeProvider>
   );
 };
 
-export default App; 
+export default App;
