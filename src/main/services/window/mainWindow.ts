@@ -9,6 +9,16 @@ import logger from '../../../shared/logger';
 export const createMainWindow = (): BrowserWindow | null => {
   logger.debug('createWindow called');
 
+  // Check if a main window already exists and is valid
+  if (
+    global.mainWindow &&
+    typeof global.mainWindow.isDestroyed === 'function' &&
+    !global.mainWindow.isDestroyed()
+  ) {
+    logger.debug('Main window already exists, returning existing instance');
+    return global.mainWindow;
+  }
+
   try {
     const mainWindowInstance = new BrowserWindow({
       width: 800,

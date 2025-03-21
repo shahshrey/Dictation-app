@@ -197,96 +197,62 @@ export const showPopupWindow = (): void => {
   logger.debug('showPopupWindow called');
 
   try {
-    if (!global.popupWindow) {
+    // Create a popup window if it doesn't exist or is destroyed
+    if (
+      !global.popupWindow ||
+      (typeof global.popupWindow.isDestroyed === 'function' && global.popupWindow.isDestroyed())
+    ) {
+      logger.debug('Popup window does not exist or is destroyed, creating a new one');
       global.popupWindow = createPopupWindow();
+      if (!global.popupWindow) {
+        logger.error('Failed to create popup window');
+        return;
+      }
     }
 
-    if (global.popupWindow) {
-      if (
-        typeof global.popupWindow.isDestroyed === 'function' &&
-        global.popupWindow.isDestroyed()
-      ) {
-        global.popupWindow = createPopupWindow();
+    // Restore from minimized state if needed
+    if (
+      global.popupWindowMinimized &&
+      global.popupWindow &&
+      typeof global.popupWindow.isMinimized === 'function' &&
+      global.popupWindow.isMinimized()
+    ) {
+      try {
+        global.popupWindow.restore();
+        global.popupWindowMinimized = false;
+      } catch (error) {
+        logger.error('Error restoring minimized popup window:', {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
+    }
 
-      if (
-        global.popupWindowMinimized &&
-        global.popupWindow &&
-        typeof global.popupWindow.isDestroyed === 'function' &&
-        !global.popupWindow.isDestroyed()
-      ) {
-        try {
-          global.popupWindow.restore();
-          global.popupWindowMinimized = false;
-        } catch (error) {
-          logger.error('Error restoring popup window:', {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-      }
+    // Show the window if it's not visible
+    if (
+      global.popupWindow &&
+      typeof global.popupWindow.isVisible === 'function' &&
+      !global.popupWindow.isVisible()
+    ) {
+      global.popupWindow.show();
 
-      if (
-        global.popupWindow &&
-        typeof global.popupWindow.isDestroyed === 'function' &&
-        !global.popupWindow.isDestroyed() &&
-        typeof global.popupWindow.isVisible === 'function' &&
-        !global.popupWindow.isVisible()
-      ) {
-        try {
-          global.popupWindow.show();
-
-          global.popupWindow.setAlwaysOnTop(true, 'screen-saver');
-
-          if (process.platform === 'darwin') {
-            const macOSWindow = global.popupWindow as MacOSBrowserWindow;
-            if (typeof macOSWindow.setVisibleOnAllWorkspaces === 'function') {
-              macOSWindow.setVisibleOnAllWorkspaces(true, {
-                visibleOnFullScreen: true,
-                skipTransformProcessType: true,
-              });
-            }
-
-            if (typeof macOSWindow.setWindowButtonVisibility === 'function') {
-              macOSWindow.setWindowButtonVisibility(false);
-            }
-          }
-
-          setTimeout(() => {
-            if (
-              global.popupWindow &&
-              typeof global.popupWindow.isDestroyed === 'function' &&
-              !global.popupWindow.isDestroyed() &&
-              typeof global.popupWindow.isVisible === 'function' &&
-              !global.popupWindow.isVisible()
-            ) {
-              global.popupWindow.show();
-            }
-          }, 100);
-        } catch (error) {
-          logger.error('Error showing popup window:', {
-            error: error instanceof Error ? error.message : String(error),
-          });
-          global.popupWindow = createPopupWindow();
-          if (
-            global.popupWindow &&
-            typeof global.popupWindow.isDestroyed === 'function' &&
-            !global.popupWindow.isDestroyed()
-          ) {
-            global.popupWindow.show();
-          }
-        }
-      } else if (
-        global.popupWindow &&
-        typeof global.popupWindow.isDestroyed === 'function' &&
-        !global.popupWindow.isDestroyed()
-      ) {
+      // Ensure it's on top
+      if (typeof global.popupWindow.setAlwaysOnTop === 'function') {
         global.popupWindow.setAlwaysOnTop(true, 'screen-saver');
       }
-    } else {
-      logger.error('Failed to create popup window');
+
+      // Apply macOS-specific settings
+      if (process.platform === 'darwin') {
+        const macOSWindow = global.popupWindow as MacOSBrowserWindow;
+        if (typeof macOSWindow.setVisibleOnAllWorkspaces === 'function') {
+          macOSWindow.setVisibleOnAllWorkspaces(true, {
+            visibleOnFullScreen: true,
+            skipTransformProcessType: true,
+          });
+        }
+      }
     }
   } catch (error) {
-    logger.error('Unexpected error in showPopupWindow:', {
+    logger.error('Error showing popup window:', {
       error: error instanceof Error ? error.message : String(error),
     });
   }
@@ -296,32 +262,41 @@ export const showPopupWindow = (): void => {
  * Hides the popup window
  */
 export const hidePopupWindow = (): void => {
+  logger.debug('hidePopupWindow called');
+
   if (
-    global.popupWindow &&
-    typeof global.popupWindow.isDestroyed === 'function' &&
-    !global.popupWindow.isDestroyed()
+    !global.popupWindow ||
+    (typeof global.popupWindow.isDestroyed === 'function' && global.popupWindow.isDestroyed())
   ) {
-    try {
-      global.popupWindow.setAlwaysOnTop(true, 'screen-saver');
+    return; // Nothing to hide
+  }
 
-      if (process.platform === 'darwin') {
-        const macOSWindow = global.popupWindow as MacOSBrowserWindow;
-        if (typeof macOSWindow.setVisibleOnAllWorkspaces === 'function') {
-          macOSWindow.setVisibleOnAllWorkspaces(true, {
-            visibleOnFullScreen: true,
-            skipTransformProcessType: true,
-          });
-        }
+  try {
+    // Set properties before hiding
+    global.popupWindow.setAlwaysOnTop(true, 'screen-saver');
 
-        if (typeof macOSWindow.setWindowButtonVisibility === 'function') {
-          macOSWindow.setWindowButtonVisibility(false);
-        }
+    if (process.platform === 'darwin') {
+      const macOSWindow = global.popupWindow as MacOSBrowserWindow;
+      if (typeof macOSWindow.setVisibleOnAllWorkspaces === 'function') {
+        macOSWindow.setVisibleOnAllWorkspaces(true, {
+          visibleOnFullScreen: true,
+          skipTransformProcessType: true,
+        });
       }
-    } catch (error) {
-      logger.error('Error updating popup window:', {
-        error: error instanceof Error ? error.message : String(error),
-      });
+
+      if (typeof macOSWindow.setWindowButtonVisibility === 'function') {
+        macOSWindow.setWindowButtonVisibility(false);
+      }
     }
+
+    // Hide the window
+    if (typeof global.popupWindow.isVisible === 'function' && global.popupWindow.isVisible()) {
+      global.popupWindow.hide();
+    }
+  } catch (error) {
+    logger.error('Error hiding popup window:', {
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 };
 

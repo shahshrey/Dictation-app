@@ -88,6 +88,11 @@ const loadPermissionUtils = () => {
   return { checkMacOSPermissions, recheckAccessibilityPermission };
 };
 
+// Add a debounce mechanism to prevent multiple activations in quick succession
+let activateInProgress = false;
+let lastActivateTime = 0;
+const ACTIVATE_DEBOUNCE_TIME = 1000; // ms - increased to 1 second for more safety
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 app.whenReady().then(async () => {
@@ -234,9 +239,24 @@ app.whenReady().then(async () => {
   app.on('activate', () => {
     logger.debug('App activate event triggered');
     
+    const now = Date.now();
+    
+    // More robust debounce/throttle mechanism:
+    // 1. Check if activation is already in progress
+    // 2. Check if we received an activate event too soon after the last one
+    if (activateInProgress || (now - lastActivateTime < ACTIVATE_DEBOUNCE_TIME)) {
+      logger.debug(`Activate event debounced (in progress: ${activateInProgress}, time since last: ${now - lastActivateTime}ms)`);
+      return;
+    }
+    
+    // Update the last activate time and set the in-progress flag
+    lastActivateTime = now;
+    activateInProgress = true;
+    
     // If we're in the process of quitting, don't recreate windows
     if (global.isQuitting) {
       logger.debug('App is quitting, ignoring activate event');
+      activateInProgress = false;
       return;
     }
     
@@ -244,76 +264,75 @@ app.whenReady().then(async () => {
     // dock icon is clicked and there are no other windows open.
     logger.debug('Number of open windows:', { count: BrowserWindow.getAllWindows().length });
 
-    // First check if we have minimized windows that need to be restored
-    if (global.mainWindowMinimized || global.popupWindowMinimized) {
-      logger.debug('Minimized windows detected, restoring them');
-      restoreMinimizedWindows();
-      return;
-    }
-
-    // If main window exists but is not visible, show it
-    // This is what we want to happen when the dock icon is clicked
-    if (global.mainWindow && !global.mainWindow.isDestroyed && typeof global.mainWindow.isDestroyed === 'function' && !global.mainWindow.isDestroyed()) {
-      if (!global.mainWindow.isVisible()) {
-        logger.debug('Main window exists but is not visible, showing it');
-        global.mainWindow.show();
-        global.mainWindow.focus();
+    // Implement a coordinated window management strategy
+    const handleActivation = () => {
+      // First check if we have minimized windows that need to be restored
+      if (global.mainWindowMinimized || global.popupWindowMinimized) {
+        logger.debug('Minimized windows detected, restoring them');
+        restoreMinimizedWindows();
+        return true; // Handled
       }
-    } else {
-      // If main window doesn't exist or is destroyed, create a new one
-      logger.debug('Main window does not exist or is destroyed, creating a new one');
-      global.mainWindow = createWindow();
-    }
 
-    // Recheck permissions when app is activated, but defer it
-    if (process.platform === 'darwin') {
-      setTimeout(() => {
-        logger.debug('Rechecking accessibility permissions on activate');
-        const { recheckAccessibilityPermission } = loadPermissionUtils();
-        recheckAccessibilityPermission();
-      }, 500);
-    }
-
-    if (BrowserWindow.getAllWindows().length === 0) {
-      logger.debug('No windows open, creating main window');
-      const mainWindow = createWindow();
+      // If main window exists but is not visible, show it
+      // This is what we want to happen when the dock icon is clicked
+      if (global.mainWindow && typeof global.mainWindow.isDestroyed === 'function' && !global.mainWindow.isDestroyed()) {
+        if (!global.mainWindow.isVisible()) {
+          logger.debug('Main window exists but is not visible, showing it');
+          global.mainWindow.show();
+          global.mainWindow.focus();
+          return true; // Handled
+        }
+        // Window exists and is visible, nothing to do
+        return true;
+      } else if (BrowserWindow.getAllWindows().length === 0) {
+        // If main window doesn't exist or is destroyed, and no windows are open, create a new one
+        logger.debug('Main window does not exist or is destroyed, creating a new one');
+        global.mainWindow = createWindow();
+        if (global.mainWindow) {
+          global.mainWindow.show();
+          global.mainWindow.focus();
+        }
+        return true; // Handled
+      }
       
-      // Show the main window since this was triggered by dock icon click
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.show();
-        mainWindow.focus();
-      }
-
-      // Defer popup window creation
-      setTimeout(() => {
-        logger.debug('Showing popup window');
-        showPopupWindow();
-      }, 300);
-    } else {
-      logger.debug('Windows already open, not creating new ones');
-    }
-
-    // Always ensure the popup window is visible, but defer it
-    setTimeout(() => {
-      logger.debug('Ensuring popup window is visible');
-      if (
-        !global.popupWindow ||
-        (typeof global.popupWindow.isDestroyed === 'function' && global.popupWindow.isDestroyed())
-      ) {
+      return false; // Not handled
+    };
+    
+    // Execute the main window management logic
+    handleActivation();
+    
+    // Ensure popup window is managed properly regardless of main window state
+    if (!global.isQuitting) {
+      // Check if popup window needs to be created/shown
+      if (!global.popupWindow || 
+          (typeof global.popupWindow.isDestroyed === 'function' && global.popupWindow.isDestroyed())) {
         logger.debug('Popup window does not exist or is destroyed, recreating it');
         global.popupWindow = createPopupWindow();
-        showPopupWindow();
+        if (global.popupWindow) {
+          showPopupWindow();
+        }
       } else if (global.popupWindow && !global.popupWindow.isDestroyed() && !global.popupWindow.isVisible()) {
         logger.debug('Popup window exists but is not visible, showing it');
         showPopupWindow();
-      } else {
-        logger.debug('Popup window is already visible');
       }
-
+    }
+    
+    // Recheck permissions when app is activated
+    if (process.platform === 'darwin') {
+      const { recheckAccessibilityPermission } = loadPermissionUtils();
+      recheckAccessibilityPermission();
+      
       // Ensure the app stays in the dock
-      logger.debug('Ensuring app stays in dock');
-      app.dock.show();
-    }, 300);
+      if (app.dock) {
+        app.dock.show();
+      }
+    }
+    
+    // Release the debounce lock after a delay
+    setTimeout(() => {
+      activateInProgress = false;
+      logger.debug('Activate event handler completed, released debounce lock');
+    }, ACTIVATE_DEBOUNCE_TIME);
   });
 
   logger.debug('App initialization complete');
