@@ -105,6 +105,7 @@ interface ElectronAPI {
   // Window management
   setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) => Promise<boolean>;
   minimizeMainWindow: () => Promise<boolean>;
+  resizePopupWindow: (isRecording: boolean) => Promise<boolean>;
 
   // Clipboard utilities
   pasteTextAtCursor: (text: string) => Promise<{ success: boolean; error?: string }>;

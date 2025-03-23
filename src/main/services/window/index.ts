@@ -6,6 +6,7 @@ import {
   hidePopupWindow,
   hidePopupFromDock,
   setIgnoreMouseEvents,
+  resizePopupWindow,
 } from './popupWindow';
 import { handleHotkeyToggle, registerGlobalHotkey } from './hotkeyManager';
 import { setupDockMenu } from './windowUtilities';
@@ -28,6 +29,11 @@ export const setupWindowHandlers = (): void => {
     return minimizeMainWindow();
   });
 
+  // Add handler for resizing the popup window
+  ipcMain.handle('resize-popup-window', (event, isRecording: boolean) => {
+    return resizePopupWindow(isRecording);
+  });
+
   // Add handler for registering hotkeys
   ipcMain.handle('register-global-hotkey', registerGlobalHotkey);
 };
@@ -46,6 +52,7 @@ export default {
   handleHotkeyToggle,
   registerGlobalHotkey,
   setupWindowHandlers,
+  resizePopupWindow,
 };
 
 // Re-export types

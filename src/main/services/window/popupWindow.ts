@@ -354,3 +354,51 @@ export const setIgnoreMouseEvents = (
   }
   return false;
 };
+
+/**
+ * Resizes the popup window based on recording status
+ * @param isRecording Whether recording is active
+ * @returns true if successful, false otherwise
+ */
+export const resizePopupWindow = (isRecording: boolean): boolean => {
+  logger.debug('resizePopupWindow called with isRecording:', { isRecording });
+
+  if (
+    !global.popupWindow ||
+    (typeof global.popupWindow.isDestroyed === 'function' && global.popupWindow.isDestroyed())
+  ) {
+    logger.error('Cannot resize popup window: window does not exist or is destroyed');
+    return false;
+  }
+
+  try {
+    // Get the current position to maintain horizontal center
+    const currentPosition = global.popupWindow.getPosition();
+
+    // Set new dimensions based on recording state
+    const newWidth = isRecording ? 200 : 180;
+    const newHeight = isRecording ? 40 : 30;
+
+    // Update the window size
+    global.popupWindow.setSize(newWidth, newHeight);
+
+    // Adjust position to keep centered horizontally while maintaining vertical position
+    const { width } = screen.getPrimaryDisplay().workAreaSize;
+    const popupX = Math.floor((width - newWidth) / 2);
+    global.popupWindow.setPosition(popupX, currentPosition[1]);
+
+    logger.debug('Popup window resized successfully', {
+      isRecording,
+      newWidth,
+      newHeight,
+      position: global.popupWindow.getPosition(),
+    });
+
+    return true;
+  } catch (error) {
+    logger.error('Error resizing popup window:', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
+};

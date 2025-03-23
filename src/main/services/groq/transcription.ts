@@ -189,6 +189,32 @@ export const transcribeRecording = async (
     // Save to file with our consistent ID
     const { filePath } = saveTranscriptionToFile(transcriptionObject);
 
+    // Ensure we release app focus to allow text to be pasted in the active application
+    try {
+      // Hide the popup window briefly to ensure it doesn't interfere with the paste operation
+      if (
+        global.popupWindow &&
+        !global.popupWindow.isDestroyed() &&
+        global.popupWindow.isVisible()
+      ) {
+        logger.debug('Temporarily hiding popup window to ensure focus is properly released');
+        global.popupWindow.setAlwaysOnTop(false);
+        // Blur the window to release focus to the previous application
+        global.popupWindow.blur();
+
+        // After paste completes, restore the popup window state
+        setTimeout(() => {
+          if (global.popupWindow && !global.popupWindow.isDestroyed()) {
+            global.popupWindow.setAlwaysOnTop(true, 'screen-saver');
+          }
+        }, 1000);
+      }
+    } catch (error) {
+      logger.error('Error releasing focus for paste operation:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
     return {
       success: true,
       id: fileId,

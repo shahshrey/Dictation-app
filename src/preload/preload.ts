@@ -189,6 +189,10 @@ try {
     // Add minimize window function
     minimizeMainWindow: () => ipcRenderer.invoke('minimize-main-window'),
 
+    // Add resize popup window function
+    resizePopupWindow: (isRecording: boolean) =>
+      ipcRenderer.invoke('resize-popup-window', isRecording),
+
     // Clipboard utilities
     pasteTextAtCursor: (text: string) => ipcRenderer.invoke('paste-text-at-cursor', text),
   };

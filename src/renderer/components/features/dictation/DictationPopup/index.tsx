@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../../../context/AppContext';
 import { cn } from '../../../../lib/utils';
 import logger from '../../../../../shared/logger';
+import AudioWaves from '../AudioWaves';
 
 const DictationPopup: React.FC = () => {
   const { isRecording, startRecording, stopRecording, refreshRecentTranscriptions } =
@@ -27,6 +28,30 @@ const DictationPopup: React.FC = () => {
     // Track recording state changes to refresh transcriptions when recording stops
     if (wasRecording && !isRecording) {
       logger.debug('Recording stopped, refreshing transcriptions after delay');
+
+      // Make sure the window loses focus when recording stops
+      // This is critical for ensuring the paste operation works correctly
+      try {
+        if (window.electronAPI && typeof window.electronAPI.setIgnoreMouseEvents === 'function') {
+          window.electronAPI
+            .setIgnoreMouseEvents(true, { forward: true })
+            .catch(error =>
+              logger.error('Error setting ignore mouse events after recording stopped:', {
+                error: error.message,
+              })
+            );
+        }
+
+        // Explicitly blur any active element to release focus
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+      } catch (error) {
+        logger.error('Error releasing focus after recording stopped:', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
       // Add a delay to ensure the transcription is saved before refreshing
       const timeoutId = setTimeout(() => {
         refreshRecentTranscriptions();
@@ -97,6 +122,25 @@ const DictationPopup: React.FC = () => {
       if (unsubscribeUpdateState) unsubscribeUpdateState();
     };
   }, [isRecording, startRecording, stopRecording]);
+
+  // Notify the main process about window size changes when recording state changes
+  useEffect(() => {
+    const resizeWindow = async () => {
+      try {
+        if (window.electronAPI && typeof window.electronAPI.resizePopupWindow === 'function') {
+          // Expand the window when recording, return to normal size when not
+          await window.electronAPI.resizePopupWindow(isRecording);
+          logger.debug(`Resized popup window for recording state: ${isRecording}`);
+        }
+      } catch (error) {
+        logger.error('Error resizing popup window:', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    };
+
+    resizeWindow();
+  }, [isRecording]);
 
   const handleToggleRecording = () => {
     logger.debug('Toggle recording clicked');
@@ -214,7 +258,7 @@ const DictationPopup: React.FC = () => {
 
   return (
     <div
-      className="w-full h-full flex items-center justify-center"
+      className="w-full h-full flex items-center justify-center overflow-hidden"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onMouseDown={handleMouseDown}
@@ -229,42 +273,63 @@ const DictationPopup: React.FC = () => {
       role="application"
       aria-label="Voice Vibe popup"
     >
-      {/* Simple pill container - make it draggable */}
-      <button
+      {/* Container that grows when recording */}
+      <div
         className={cn(
-          'rounded-full shadow-sm transition-all duration-200 hover:scale-105 w-12 h-4',
-          isRecording ? 'bg-black animate-pulse' : 'bg-black'
+          'relative flex items-center justify-center',
+          'transition-all duration-300 ease-in-out',
+          isRecording ? 'w-28 h-8' : 'w-12 h-4'
         )}
-        onClick={e => {
-          logger.debug('Pill clicked');
-          e.stopPropagation(); // Prevent event bubbling
-          handleToggleRecording();
-        }}
-        onKeyDown={e => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            handleToggleRecording();
-          }
-        }}
-        // Make only the non-interactive parts draggable
-        style={
-          {
-            WebkitAppRegion: isDragging ? 'drag' : 'no-drag',
-            opacity: 0.8,
-            borderRadius: '100px',
-          } as React.CSSProperties
-        }
-        aria-pressed={isRecording}
-        aria-label={isRecording ? 'Stop recording' : 'Start recording'}
-        tabIndex={0}
       >
-        {/* Drag handle area - hidden from screen readers */}
+        {/* Background pill */}
         <div
-          className="absolute inset-0 drag-handle"
-          style={{ pointerEvents: 'none' }}
-          aria-hidden="true"
+          className={cn(
+            'absolute inset-0 rounded-full shadow-sm bg-black opacity-80',
+            isRecording ? 'animate-pulse' : ''
+          )}
+          style={{ borderRadius: '100px' }}
         ></div>
-      </button>
+
+        {/* Audio waves that appear during recording */}
+        <AudioWaves isActive={isRecording} className="px-2 py-1 z-10" />
+
+        {/* Interactive button that sits on top */}
+        <button
+          className={cn(
+            'absolute inset-0 rounded-full transition-all duration-200 hover:scale-105',
+            'cursor-pointer'
+          )}
+          onClick={e => {
+            logger.debug('Pill clicked');
+            e.stopPropagation(); // Prevent event bubbling
+            handleToggleRecording();
+          }}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleToggleRecording();
+            }
+          }}
+          // Make only the non-interactive parts draggable
+          style={
+            {
+              WebkitAppRegion: isDragging ? 'drag' : 'no-drag',
+              opacity: 0,
+              borderRadius: '100px',
+            } as React.CSSProperties
+          }
+          aria-pressed={isRecording}
+          aria-label={isRecording ? 'Stop recording' : 'Start recording'}
+          tabIndex={0}
+        >
+          {/* Drag handle area - hidden from screen readers */}
+          <div
+            className="absolute inset-0 drag-handle"
+            style={{ pointerEvents: 'none' }}
+            aria-hidden="true"
+          ></div>
+        </button>
+      </div>
     </div>
   );
 };
