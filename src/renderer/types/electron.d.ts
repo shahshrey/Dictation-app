@@ -33,6 +33,9 @@ interface ElectronAPI {
   getRecordingPath: () => Promise<string>;
   startRecording: (sourceId: string) => Promise<{ success: boolean; error?: string }>;
   stopRecording: () => Promise<{ success: boolean; error?: string }>;
+  notifyRecordingStateChange: (
+    isRecording: boolean
+  ) => Promise<{ success: boolean; error?: string }>;
 
   // Audio device detection
   onAudioDevicesRequest: (callback: () => void) => () => void;
@@ -108,6 +111,9 @@ interface ElectronAPI {
 
   // Event listeners
   onToggleRecording: (callback: () => void) => () => void;
+  onRecordingToggleRequested: (callback: () => void) => () => void;
+  onUpdateRecordingState: (callback: (isRecording: boolean) => void) => () => void;
+  onRecordingSourceSelected: (callback: (sourceId: string) => void) => () => void;
 }
 
 declare global {

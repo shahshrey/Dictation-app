@@ -20,6 +20,8 @@ try {
     startRecording: (sourceId: string) => ipcRenderer.invoke('start-recording', sourceId),
     saveRecording: (arrayBuffer: ArrayBuffer) => ipcRenderer.invoke('save-recording', arrayBuffer),
     getRecordingPath: () => ipcRenderer.invoke('get-recording-path'),
+    notifyRecordingStateChange: (isRecording: boolean) =>
+      ipcRenderer.invoke('notify-recording-state-change', isRecording),
 
     // Audio device detection
     onAudioDevicesRequest: (callback: () => void) => {
@@ -146,6 +148,23 @@ try {
       ipcRenderer.on('toggle-recording', subscription);
       return () => {
         ipcRenderer.removeListener('toggle-recording', subscription);
+      };
+    },
+
+    onRecordingToggleRequested: (callback: () => void) => {
+      const subscription = (_event: Electron.IpcRendererEvent) => callback();
+      ipcRenderer.on('recording-toggle-requested', subscription);
+      return () => {
+        ipcRenderer.removeListener('recording-toggle-requested', subscription);
+      };
+    },
+
+    onUpdateRecordingState: (callback: (isRecording: boolean) => void) => {
+      const subscription = (_event: Electron.IpcRendererEvent, isRecording: boolean) =>
+        callback(isRecording);
+      ipcRenderer.on('update-recording-state', subscription);
+      return () => {
+        ipcRenderer.removeListener('update-recording-state', subscription);
       };
     },
 

@@ -7,6 +7,7 @@ const path = require('path');
 
 const mainConfig = require('./webpack.main.config');
 const rendererConfig = require('./webpack.renderer.config');
+const preloadConfig = require('./webpack.preload.config');
 
 module.exports = {
   packagerConfig: {
@@ -36,6 +37,7 @@ module.exports = {
             js: './src/renderer/index.tsx',
             name: 'main_window',
             preload: {
+              config: preloadConfig,
               js: './src/preload/preload.ts',
             },
           },
@@ -44,6 +46,7 @@ module.exports = {
             js: './src/renderer/popup.tsx',
             name: 'popup_window',
             preload: {
+              config: preloadConfig,
               js: './src/preload/preload.ts',
             },
           },
