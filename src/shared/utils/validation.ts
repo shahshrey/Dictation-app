@@ -122,15 +122,63 @@ export const normalizeTranscription = (transcription: Transcription): Transcript
 };
 /**
  * Filters and normalizes a collection of transcriptions
+ * Returns transcriptions that have been normalized and recovered where possible
  */
 export const sanitizeTranscriptions = (transcriptions: Transcription[]): Transcription[] => {
   if (!transcriptions) return [];
 
-  // Filter out invalid transcriptions
-  const validTranscriptions = transcriptions.filter(isValidTranscription);
+  // First attempt to normalize all transcriptions to recover as much data as possible
+  const normalizedTranscriptions = transcriptions
+    .map(t => {
+      // Skip null/undefined transcriptions
+      if (!t) return null;
 
-  // Normalize all remaining transcriptions and return them
-  return validTranscriptions.map(normalizeTranscription);
+      // Ensure basic required fields exist
+      if (!t.id || !t.timestamp) return null;
 
-  // Removed the outlier filtering step to keep all valid transcriptions
+      // Create a normalized copy
+      const normalized = normalizeTranscription(t);
+
+      // Calculate word count if missing
+      if (normalized.wordCount === undefined && normalized.text) {
+        normalized.wordCount = normalized.text.split(/\s+/).filter(Boolean).length;
+      }
+
+      // Set a minimum duration if missing or invalid
+      if (normalized.duration === undefined || normalized.duration <= 0) {
+        // If we have word count, estimate duration based on average speaking rate
+        if (normalized.wordCount && normalized.wordCount > 0) {
+          // Assume average speaking rate of 150 WPM
+          normalized.duration = Math.max(
+            VALIDATION_THRESHOLDS.MIN_DURATION,
+            Math.round((normalized.wordCount / 150) * 60)
+          );
+        } else {
+          // Default minimum duration
+          normalized.duration = VALIDATION_THRESHOLDS.MIN_DURATION;
+        }
+      }
+
+      return normalized;
+    })
+    .filter(Boolean) as Transcription[];
+
+  // Then filter out any transcriptions that are still invalid after normalization
+  // But use a more lenient validation that only checks essential fields
+  return normalizedTranscriptions.filter(t => {
+    // Must have id, timestamp, and text
+    if (!t.id || !t.timestamp || !t.text) return false;
+
+    // Timestamp should be somewhat reasonable
+    const now = Date.now();
+    if (
+      t.timestamp > now + VALIDATION_THRESHOLDS.MAX_FUTURE_TIMESTAMP ||
+      t.timestamp < now - VALIDATION_THRESHOLDS.MIN_PAST_TIMESTAMP
+    ) {
+      return false;
+    }
+
+    // All other fields are considered optional for statistics purposes
+    return true;
+  });
 };

@@ -99,9 +99,9 @@ export const createPopupWindow = (): BrowserWindow | null => {
 
     const { width, height } = screen.getPrimaryDisplay().workAreaSize;
     // Center horizontally at the bottom of the screen
-    const windowWidth = 80; // Match the width defined in windowOptions
+    const windowWidth = 150; // Match the width defined in windowOptions
     const popupX = Math.floor((width - windowWidth) / 2);
-    const popupY = height - 20; // Position from bottom with small margin
+    const popupY = height - 10; // Position from bottom with small margin
     popupWindowInstance.setPosition(popupX, popupY);
 
     if (process.platform === 'darwin') {
