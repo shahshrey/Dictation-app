@@ -53,6 +53,7 @@ export const themeAnimations = {
   'accordion-down': 'accordion-down 0.2s ease-out',
   'accordion-up': 'accordion-up 0.2s ease-out',
   'gradient-x': 'gradient-x 5s ease infinite',
+  'sound-wave': 'sound-wave 1.2s ease-in-out infinite',
 };
 
 export const themeKeyframes = {
@@ -67,5 +68,15 @@ export const themeKeyframes = {
   'gradient-x': {
     '0%, 100%': { backgroundPosition: '0% 50%' },
     '50%': { backgroundPosition: '100% 50%' },
+  },
+  'sound-wave': {
+    '0%, 100%': {
+      height: '15%',
+      opacity: 0.6,
+    },
+    '50%': {
+      height: '100%',
+      opacity: 1,
+    },
   },
 };

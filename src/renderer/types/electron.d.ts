@@ -33,6 +33,9 @@ interface ElectronAPI {
   getRecordingPath: () => Promise<string>;
   startRecording: (sourceId: string) => Promise<{ success: boolean; error?: string }>;
   stopRecording: () => Promise<{ success: boolean; error?: string }>;
+  notifyRecordingStateChange: (
+    isRecording: boolean
+  ) => Promise<{ success: boolean; error?: string }>;
 
   // Audio device detection
   onAudioDevicesRequest: (callback: () => void) => () => void;
@@ -102,12 +105,16 @@ interface ElectronAPI {
   // Window management
   setIgnoreMouseEvents: (ignore: boolean, options?: { forward: boolean }) => Promise<boolean>;
   minimizeMainWindow: () => Promise<boolean>;
+  resizePopupWindow: (isRecording: boolean) => Promise<boolean>;
 
   // Clipboard utilities
   pasteTextAtCursor: (text: string) => Promise<{ success: boolean; error?: string }>;
 
   // Event listeners
   onToggleRecording: (callback: () => void) => () => void;
+  onRecordingToggleRequested: (callback: () => void) => () => void;
+  onUpdateRecordingState: (callback: (isRecording: boolean) => void) => () => void;
+  onRecordingSourceSelected: (callback: (sourceId: string) => void) => () => void;
 }
 
 declare global {

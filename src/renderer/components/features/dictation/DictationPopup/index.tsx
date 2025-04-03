@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../../../context/AppContext';
 import { cn } from '../../../../lib/utils';
-import { Mic, MicOff } from 'lucide-react';
 import logger from '../../../../../shared/logger';
+import AudioWaves from '../AudioWaves';
 
 const DictationPopup: React.FC = () => {
   const { isRecording, startRecording, stopRecording, refreshRecentTranscriptions } =
@@ -10,6 +10,9 @@ const DictationPopup: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [, setIsHovering] = useState(false);
   const [wasRecording, setWasRecording] = useState(false);
+
+  // Ref to track if we're handling an external state change to prevent loops
+  const isHandlingExternalStateChangeRef = useRef(false);
 
   // Ensure the popup is always interactive when mounted
   useEffect(() => {
@@ -25,6 +28,30 @@ const DictationPopup: React.FC = () => {
     // Track recording state changes to refresh transcriptions when recording stops
     if (wasRecording && !isRecording) {
       logger.debug('Recording stopped, refreshing transcriptions after delay');
+
+      // Make sure the window loses focus when recording stops
+      // This is critical for ensuring the paste operation works correctly
+      try {
+        if (window.electronAPI && typeof window.electronAPI.setIgnoreMouseEvents === 'function') {
+          window.electronAPI
+            .setIgnoreMouseEvents(true, { forward: true })
+            .catch(error =>
+              logger.error('Error setting ignore mouse events after recording stopped:', {
+                error: error.message,
+              })
+            );
+        }
+
+        // Explicitly blur any active element to release focus
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+      } catch (error) {
+        logger.error('Error releasing focus after recording stopped:', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
       // Add a delay to ensure the transcription is saved before refreshing
       const timeoutId = setTimeout(() => {
         refreshRecentTranscriptions();
@@ -41,6 +68,80 @@ const DictationPopup: React.FC = () => {
     };
   }, [isRecording, wasRecording, refreshRecentTranscriptions]);
 
+  // Listen for events from main process
+  useEffect(() => {
+    let unsubscribeToggleRequested: (() => void) | undefined;
+    let unsubscribeUpdateState: (() => void) | undefined;
+
+    if (window.electronAPI) {
+      // Listen for recording-toggle-requested events (from hotkey)
+      if (typeof window.electronAPI.onRecordingToggleRequested === 'function') {
+        unsubscribeToggleRequested = window.electronAPI.onRecordingToggleRequested(() => {
+          logger.debug('Recording toggle requested via hotkey');
+          handleToggleRecording();
+        });
+      }
+
+      // Listen for update-recording-state events
+      if (typeof window.electronAPI.onUpdateRecordingState === 'function') {
+        unsubscribeUpdateState = window.electronAPI.onUpdateRecordingState((newState: boolean) => {
+          logger.debug('Recording state update received from main process:', { newState });
+
+          // Only update if the state actually differs to avoid loops
+          if (newState !== isRecording) {
+            // Set flag to prevent redundant notifications back to main process
+            isHandlingExternalStateChangeRef.current = true;
+
+            try {
+              if (newState) {
+                logger.debug('Starting recording from main process state update');
+                startRecording().finally(() => {
+                  // Reset flag after async operation completes
+                  isHandlingExternalStateChangeRef.current = false;
+                });
+              } else {
+                logger.debug('Stopping recording from main process state update');
+                stopRecording();
+                // Reset flag after sync operation
+                isHandlingExternalStateChangeRef.current = false;
+              }
+            } catch (error) {
+              logger.error('Error handling recording state update from main process:', {
+                error: (error as Error).message,
+              });
+              isHandlingExternalStateChangeRef.current = false;
+            }
+          }
+        });
+      }
+    }
+
+    return () => {
+      // Clean up event listeners
+      if (unsubscribeToggleRequested) unsubscribeToggleRequested();
+      if (unsubscribeUpdateState) unsubscribeUpdateState();
+    };
+  }, [isRecording, startRecording, stopRecording]);
+
+  // Notify the main process about window size changes when recording state changes
+  useEffect(() => {
+    const resizeWindow = async () => {
+      try {
+        if (window.electronAPI && typeof window.electronAPI.resizePopupWindow === 'function') {
+          // Expand the window when recording, return to normal size when not
+          await window.electronAPI.resizePopupWindow(isRecording);
+          logger.debug(`Resized popup window for recording state: ${isRecording}`);
+        }
+      } catch (error) {
+        logger.error('Error resizing popup window:', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    };
+
+    resizeWindow();
+  }, [isRecording]);
+
   const handleToggleRecording = () => {
     logger.debug('Toggle recording clicked');
     logger.debug('Current recording state:', { isRecording });
@@ -49,10 +150,43 @@ const DictationPopup: React.FC = () => {
       if (isRecording) {
         logger.debug('Stopping recording');
         stopRecording();
+
+        // Only notify main process if not already handling an external state change
+        if (
+          window.electronAPI &&
+          typeof window.electronAPI.notifyRecordingStateChange === 'function' &&
+          !isHandlingExternalStateChangeRef.current
+        ) {
+          logger.debug('Notifying main process of recording stopped');
+          window.electronAPI.notifyRecordingStateChange(false).catch(error =>
+            logger.error('Error notifying main process of recording state change:', {
+              error: error.message,
+            })
+          );
+        }
+
         // We'll refresh transcriptions after a delay in the useEffect
       } else {
         logger.debug('Starting recording');
-        startRecording();
+        startRecording()
+          .then(() => {
+            // Only notify main process if not already handling an external state change
+            if (
+              window.electronAPI &&
+              typeof window.electronAPI.notifyRecordingStateChange === 'function' &&
+              !isHandlingExternalStateChangeRef.current
+            ) {
+              logger.debug('Notifying main process of recording started');
+              window.electronAPI.notifyRecordingStateChange(true).catch(error =>
+                logger.error('Error notifying main process of recording state change:', {
+                  error: error.message,
+                })
+              );
+            }
+          })
+          .catch(error => {
+            logger.error('Failed to start recording:', { error: (error as Error).message });
+          });
       }
       logger.debug('Toggle recording action completed');
     } catch (error) {
@@ -124,7 +258,7 @@ const DictationPopup: React.FC = () => {
 
   return (
     <div
-      className="w-full h-full flex items-center justify-center"
+      className="w-full h-full flex items-center justify-center overflow-hidden"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onMouseDown={handleMouseDown}
@@ -139,66 +273,63 @@ const DictationPopup: React.FC = () => {
       role="application"
       aria-label="Voice Vibe popup"
     >
-      {/* Pill container - make it draggable */}
-      <button
+      {/* Container that grows when recording */}
+      <div
         className={cn(
-          'flex items-center gap-2 px-3 py-1.5 rounded-full shadow-lg transition-all duration-300 hover:scale-105',
-          isRecording
-            ? 'bg-primary/90 text-primary-foreground'
-            : 'bg-gradient-to-r from-primary/80 to-primary-foreground/20 text-primary-foreground hover:from-primary hover:to-primary/70'
+          'relative flex items-center justify-center',
+          'transition-all duration-300 ease-in-out',
+          isRecording ? 'w-28 h-8' : 'w-12 h-4'
         )}
-        onClick={e => {
-          logger.debug('Pill clicked');
-          e.stopPropagation(); // Prevent event bubbling
-          handleToggleRecording();
-        }}
-        onKeyDown={e => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            handleToggleRecording();
-          }
-        }}
-        // Make only the non-interactive parts draggable
-        style={{ WebkitAppRegion: isDragging ? 'drag' : 'no-drag' } as React.CSSProperties}
-        aria-pressed={isRecording}
-        aria-label={isRecording ? 'Stop recording' : 'Start recording'}
-        tabIndex={0}
       >
-        {/* Drag handle area - hidden from screen readers */}
-        <div
-          className="absolute inset-0 drag-handle"
-          style={{ pointerEvents: 'none' }}
-          aria-hidden="true"
-        ></div>
-
-        {/* Mic icon */}
+        {/* Background pill */}
         <div
           className={cn(
-            'flex items-center justify-center w-6 h-6 rounded-full',
+            'absolute inset-0 rounded-full shadow-sm bg-black opacity-80',
             isRecording ? 'animate-pulse' : ''
           )}
-        >
-          {isRecording ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-        </div>
+          style={{ borderRadius: '100px' }}
+        ></div>
 
-        {/* Status text */}
-        <span
+        {/* Audio waves that appear during recording */}
+        <AudioWaves isActive={isRecording} className="px-2 py-1 z-10" />
+
+        {/* Interactive button that sits on top */}
+        <button
           className={cn(
-            'font-medium text-xs whitespace-nowrap',
-            !isRecording ? 'font-bold tracking-tight animate-pulse' : ''
+            'absolute inset-0 rounded-full transition-all duration-200 hover:scale-105',
+            'cursor-pointer'
           )}
+          onClick={e => {
+            logger.debug('Pill clicked');
+            e.stopPropagation(); // Prevent event bubbling
+            handleToggleRecording();
+          }}
+          onKeyDown={e => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleToggleRecording();
+            }
+          }}
+          // Make only the non-interactive parts draggable
+          style={
+            {
+              WebkitAppRegion: isDragging ? 'drag' : 'no-drag',
+              opacity: 0,
+              borderRadius: '100px',
+            } as React.CSSProperties
+          }
+          aria-pressed={isRecording}
+          aria-label={isRecording ? 'Stop recording' : 'Start recording'}
+          tabIndex={0}
         >
-          {isRecording ? 'Recording...' : 'Voice Vibe'}
-        </span>
-
-        {/* Recording animation */}
-        {isRecording && (
-          <div className="relative w-3 h-3 ml-1">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-destructive animate-ping opacity-75"></div>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-destructive"></div>
-          </div>
-        )}
-      </button>
+          {/* Drag handle area - hidden from screen readers */}
+          <div
+            className="absolute inset-0 drag-handle"
+            style={{ pointerEvents: 'none' }}
+            aria-hidden="true"
+          ></div>
+        </button>
+      </div>
     </div>
   );
 };

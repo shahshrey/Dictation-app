@@ -65,6 +65,12 @@ export class RecordingManager {
 
     // Get the path to the saved recording
     this.ipcMain.handle('get-recording-path', this.getRecordingPath.bind(this));
+
+    // Handle recording state changes from renderer
+    this.ipcMain.handle(
+      'notify-recording-state-change',
+      this.handleRecordingStateChange.bind(this)
+    );
   }
 
   /**
@@ -325,6 +331,35 @@ export class RecordingManager {
       logger.error('Failed to clean up temporary recordings:', {
         error: (error as Error).message,
       });
+    }
+  }
+
+  /**
+   * Handle recording state change notifications from renderer
+   */
+  private async handleRecordingStateChange(
+    _: Electron.IpcMainInvokeEvent,
+    isRecording: boolean
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      logger.debug('Recording state changed in renderer:', { isRecording });
+
+      // Update recording state in RecordingManager
+      this.isRecording = isRecording;
+
+      // For backward compatibility with existing code
+      if (typeof global !== 'undefined') {
+        // Using type assertion to avoid TypeScript errors
+        (global as Record<string, unknown>).isRecording = isRecording;
+      }
+
+      // Update tray menu to reflect recording state
+      updateTrayMenu();
+
+      return { success: true };
+    } catch (error) {
+      logger.error('Failed to handle recording state change:', { error: (error as Error).message });
+      return { success: false, error: String(error) };
     }
   }
 

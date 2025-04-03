@@ -59,59 +59,7 @@ export const handleHotkeyToggle = (): void => {
     logger.debug('Current recording state:', { isRecording: global.isRecording });
   }
 
-  if (
-    global.mainWindow &&
-    typeof global.mainWindow.isDestroyed === 'function' &&
-    !global.mainWindow.isDestroyed()
-  ) {
-    try {
-      if (
-        typeof global.mainWindow.webContents.isLoading === 'function' &&
-        global.mainWindow.webContents.isLoading()
-      ) {
-        global.mainWindow.webContents.once('did-finish-load', () => {
-          global.mainWindowShowRequested = false;
-          if (global.mainWindow && typeof global.mainWindow.webContents?.send === 'function') {
-            global.mainWindow.webContents.send('toggle-recording');
-          }
-
-          setTimeout(() => {
-            if (
-              global.mainWindow &&
-              typeof global.mainWindow.isDestroyed === 'function' &&
-              !global.mainWindow.isDestroyed() &&
-              typeof global.mainWindow.isVisible === 'function' &&
-              global.mainWindow.isVisible()
-            ) {
-              global.mainWindow.hide();
-            }
-          }, 100);
-        });
-      } else {
-        global.mainWindowShowRequested = false;
-        if (global.mainWindow && typeof global.mainWindow.webContents?.send === 'function') {
-          global.mainWindow.webContents.send('toggle-recording');
-        }
-
-        setTimeout(() => {
-          if (
-            global.mainWindow &&
-            typeof global.mainWindow.isDestroyed === 'function' &&
-            !global.mainWindow.isDestroyed() &&
-            typeof global.mainWindow.isVisible === 'function' &&
-            global.mainWindow.isVisible()
-          ) {
-            global.mainWindow.hide();
-          }
-        }, 100);
-      }
-    } catch (error) {
-      logger.error('Error sending toggle-recording event:', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
+  // Only send the recording-toggle-requested event to the popup window
   if (
     global.popupWindow &&
     typeof global.popupWindow.isDestroyed === 'function' &&

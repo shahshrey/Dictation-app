@@ -15,7 +15,7 @@ export const createPopupWindow = (): BrowserWindow | null => {
     // Define base options for all platforms
     const windowOptions: Electron.BrowserWindowConstructorOptions = {
       width: 180,
-      height: 50,
+      height: 30,
       frame: false,
       transparent: true,
       alwaysOnTop: true,
@@ -25,7 +25,7 @@ export const createPopupWindow = (): BrowserWindow | null => {
       movable: true,
       hasShadow: false,
       type: process.platform === 'darwin' ? 'panel' : 'panel',
-      focusable: false,
+      focusable: true,
       icon: app.isPackaged
         ? path.join(process.resourcesPath, 'app.asar', 'src', 'assets', 'logo', 'logo.png')
         : path.join(app.getAppPath(), 'src/assets/logo/logo.png'),
@@ -36,6 +36,7 @@ export const createPopupWindow = (): BrowserWindow | null => {
         contextIsolation: true,
         nodeIntegration: false,
         webSecurity: false,
+        devTools: true,
       },
       backgroundColor: '#00000000',
     };
@@ -70,19 +71,44 @@ export const createPopupWindow = (): BrowserWindow | null => {
       popupWindowInstance.loadFile(path.join(app.getAppPath(), 'dist/popup.html'));
     }
 
+    // Add dev tools keyboard shortcut and open dev tools in development mode
+    if (process.env.NODE_ENV === 'development') {
+      // Register the shortcut for dev tools
+      popupWindowInstance.webContents.on('before-input-event', (event, input) => {
+        const isMac = process.platform === 'darwin';
+        const modifierKey = isMac ? input.meta : input.control;
+
+        // Command+Option+I (Mac) or Control+Shift+I (Windows/Linux)
+        if (modifierKey && input.shift && input.key.toLowerCase() === 'i') {
+          event.preventDefault();
+          if (!popupWindowInstance.webContents.isDevToolsOpened()) {
+            popupWindowInstance.webContents.openDevTools({ mode: 'detach' });
+          } else {
+            popupWindowInstance.webContents.closeDevTools();
+          }
+        }
+      });
+
+      // Automatically open dev tools in development mode
+      popupWindowInstance.webContents.openDevTools({ mode: 'detach' });
+    }
+
     popupWindowInstance.once('ready-to-show', () => {
       logger.debug('Popup window ready to show');
     });
 
     const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-    popupWindowInstance.setPosition(width - 200, height - 100);
+    // Center horizontally at the bottom of the screen
+    const windowWidth = 150; // Match the width defined in windowOptions
+    const popupX = Math.floor((width - windowWidth) / 2);
+    const popupY = height - 10; // Position from bottom with small margin
+    popupWindowInstance.setPosition(popupX, popupY);
 
     if (process.platform === 'darwin') {
       const macOSWindow = popupWindowInstance as MacOSBrowserWindow;
       if (typeof macOSWindow.setVisibleOnAllWorkspaces === 'function') {
         macOSWindow.setVisibleOnAllWorkspaces(true, {
           visibleOnFullScreen: true,
-          skipTransformProcessType: true,
         });
       }
 
@@ -327,4 +353,52 @@ export const setIgnoreMouseEvents = (
     }
   }
   return false;
+};
+
+/**
+ * Resizes the popup window based on recording status
+ * @param isRecording Whether recording is active
+ * @returns true if successful, false otherwise
+ */
+export const resizePopupWindow = (isRecording: boolean): boolean => {
+  logger.debug('resizePopupWindow called with isRecording:', { isRecording });
+
+  if (
+    !global.popupWindow ||
+    (typeof global.popupWindow.isDestroyed === 'function' && global.popupWindow.isDestroyed())
+  ) {
+    logger.error('Cannot resize popup window: window does not exist or is destroyed');
+    return false;
+  }
+
+  try {
+    // Get the current position to maintain horizontal center
+    const currentPosition = global.popupWindow.getPosition();
+
+    // Set new dimensions based on recording state
+    const newWidth = isRecording ? 200 : 180;
+    const newHeight = isRecording ? 40 : 30;
+
+    // Update the window size
+    global.popupWindow.setSize(newWidth, newHeight);
+
+    // Adjust position to keep centered horizontally while maintaining vertical position
+    const { width } = screen.getPrimaryDisplay().workAreaSize;
+    const popupX = Math.floor((width - newWidth) / 2);
+    global.popupWindow.setPosition(popupX, currentPosition[1]);
+
+    logger.debug('Popup window resized successfully', {
+      isRecording,
+      newWidth,
+      newHeight,
+      position: global.popupWindow.getPosition(),
+    });
+
+    return true;
+  } catch (error) {
+    logger.error('Error resizing popup window:', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
 };

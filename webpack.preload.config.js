@@ -1,9 +1,9 @@
 module.exports = {
-  /**
-   * This is the main entry point for your application, it's the first file
-   * that runs in the main process.
-   */
-  entry: './src/main/index.js',
+  entry: {
+    'popup_window/preload': './src/preload/preload.ts',
+    'main_window/preload': './src/preload/preload.ts',
+  },
+  target: 'electron-preload',
   module: {
     rules: [
       {
@@ -20,14 +20,22 @@ module.exports = {
   },
   resolve: {
     extensions: ['.js', '.ts', '.jsx', '.tsx', '.css', '.json'],
+    fallback: {
+      path: require.resolve('path-browserify'),
+      fs: false
+    }
+  },
+  externals: {
+    electron: 'commonjs electron',
+    fs: 'commonjs fs',
+    path: 'commonjs path'
   },
   output: {
-    filename: 'main.js',
+    filename: '[name].js',
     path: require('path').resolve(__dirname, 'dist'),
   },
-  target: 'electron-main',
   node: {
     __dirname: false,
     __filename: false
   }
-};
+}; 

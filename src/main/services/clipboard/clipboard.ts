@@ -27,47 +27,53 @@ export const pasteTextAtCursor = async (text: string): Promise<boolean> => {
       logger.debug('Using macOS paste command (Command+V)');
       // On macOS, use AppleScript to simulate Command+V
       return new Promise<boolean>(resolve => {
-        exec(
-          'osascript -e \'tell application "System Events" to keystroke "v" using command down\'',
-          error => {
-            if (error) {
-              logger.exception('Error executing AppleScript paste command', error);
-              resolve(false);
-            } else {
-              logger.debug('Successfully pasted text at cursor position');
-              resolve(true);
-            }
+        // Add a short delay to ensure focus has been returned to the target application
+        setTimeout(() => {
+          exec(
+            'osascript -e \'tell application "System Events" to keystroke "v" using command down\'',
+            error => {
+              if (error) {
+                logger.exception('Error executing AppleScript paste command', error);
+                resolve(false);
+              } else {
+                logger.debug('Successfully pasted text at cursor position');
+                resolve(true);
+              }
 
-            // Restore the original clipboard content after a short delay
-            setTimeout(() => {
-              clipboard.writeText(originalClipboardContent);
-              logger.debug('Restored original clipboard content');
-            }, 500);
-          }
-        );
+              // Restore the original clipboard content after a short delay
+              setTimeout(() => {
+                clipboard.writeText(originalClipboardContent);
+                logger.debug('Restored original clipboard content');
+              }, 500);
+            }
+          );
+        }, 500); // 500ms delay before executing paste command
       });
     } else if (process.platform === 'win32') {
       logger.debug('Using Windows paste command (Ctrl+V)');
       // On Windows, use PowerShell to simulate Ctrl+V
       return new Promise<boolean>(resolve => {
-        exec(
-          'powershell -command "$wshell = New-Object -ComObject wscript.shell; $wshell.SendKeys(\'^v\')"',
-          error => {
-            if (error) {
-              logger.exception('Error executing PowerShell paste command', error);
-              resolve(false);
-            } else {
-              logger.debug('Successfully pasted text at cursor position');
-              resolve(true);
-            }
+        // Add a short delay to ensure focus has been returned to the target application
+        setTimeout(() => {
+          exec(
+            'powershell -command "$wshell = New-Object -ComObject wscript.shell; $wshell.SendKeys(\'^v\')"',
+            error => {
+              if (error) {
+                logger.exception('Error executing PowerShell paste command', error);
+                resolve(false);
+              } else {
+                logger.debug('Successfully pasted text at cursor position');
+                resolve(true);
+              }
 
-            // Restore the original clipboard content after a short delay
-            setTimeout(() => {
-              clipboard.writeText(originalClipboardContent);
-              logger.debug('Restored original clipboard content');
-            }, 500);
-          }
-        );
+              // Restore the original clipboard content after a short delay
+              setTimeout(() => {
+                clipboard.writeText(originalClipboardContent);
+                logger.debug('Restored original clipboard content');
+              }, 500);
+            }
+          );
+        }, 500); // 500ms delay before executing paste command
       });
     } else {
       logger.error('Unsupported platform for paste operation', { platform: process.platform });

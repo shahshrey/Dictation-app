@@ -1,77 +1,67 @@
-import React, { Suspense, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
-import { LoadingSpinner } from '../../ui/loading-spinner';
-import StatsCard from '../../ui/stats-card';
+import React, { useMemo } from 'react';
+import { Card, CardContent } from '../../ui/card';
+import StatsSection from './StatsSection';
 import { useAppContext } from '../../../context/AppContext';
-import { Zap, Gauge, Flame } from 'lucide-react';
-import {
-  calculateWeeklyStreak,
-  calculateAverageWPM,
-  calculateTotalWords,
-  getWPMPercentile,
-} from '../../../utils/stats-utils';
+import { Keyboard } from 'lucide-react';
+import { StatsErrorBoundary } from './StatsErrorBoundary';
 
 const Home: React.FC = () => {
-  const { recentTranscriptions } = useAppContext();
+  const { settings } = useAppContext();
 
-  // Calculate stats with memoization to avoid unnecessary recalculations
-  const stats = useMemo(() => {
-    const weeklyStreak = calculateWeeklyStreak(recentTranscriptions);
-    const averageWPM = calculateAverageWPM(recentTranscriptions);
-    const totalWords = calculateTotalWords(recentTranscriptions);
-    const wpmPercentile = getWPMPercentile(averageWPM);
-
-    return {
-      weeklyStreak,
-      averageWPM,
-      totalWords,
-      wpmPercentile,
-    };
-  }, [recentTranscriptions]);
+  // Get greeting based on time of day
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  }, []);
 
   return (
-    <Card className="flex-1 overflow-hidden">
-      <CardHeader>
-        <CardTitle>Home</CardTitle>
-      </CardHeader>
-      <CardContent className="p-6">
-        <div className="space-y-6">
-          <h2 className="text-2xl font-bold">Good afternoon, Shrey</h2>
-          <p className="text-muted-foreground">
-            Hold down <kbd className="px-2 py-1 bg-muted rounded text-xs">fn</kbd> and speak into
-            any textbox
-          </p>
+    <Card className="flex-1 overflow-hidden border-none shadow-none bg-transparent">
+      <CardContent className="p-8">
+        <div className="space-y-8">
+          {/* Welcome section with gradient text */}
+          <div className="space-y-2">
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+              {greeting}, Shrey
+            </h1>
+            <p className="text-muted-foreground text-lg">
+              Ready to turn your thoughts into text? Let's get started.
+            </p>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-            <Suspense fallback={<LoadingSpinner />}>
-              <StatsCard
-                title="Weekly streak"
-                value={`${stats.weeklyStreak} weeks`}
-                icon={<Zap className="h-6 w-6" />}
-                description={`${stats.weeklyStreak > 0 ? 'Keep it up!' : 'Start dictating to build your streak'}`}
-                iconClassName="text-yellow-500 dark:text-yellow-400"
-              />
+          {/* Hotkey instruction card */}
+          <Card className="p-4 border border-primary/20 bg-primary/5 flex items-center space-x-4 rounded-lg shadow-sm">
+            <div className="bg-primary/10 p-3 rounded-full">
+              <Keyboard className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-medium">Quick Dictation</h3>
+              <p className="text-sm text-muted-foreground">
+                Press{' '}
+                <kbd className="px-2 py-1 bg-background rounded text-xs font-mono border">
+                  {settings.hotkey}
+                </kbd>{' '}
+                in any text field to start dictating
+              </p>
+            </div>
+            <div className="hidden md:flex items-center space-x-2 text-sm text-primary-foreground">
+              <div className="h-2 w-2 rounded-full bg-primary animate-pulse"></div>
+              <span>Always ready</span>
+            </div>
+          </Card>
 
-              <StatsCard
-                title="Average Flowing speed"
-                value={`${stats.averageWPM} WPM`}
-                icon={<Gauge className="h-6 w-6" />}
-                description={stats.wpmPercentile}
-                iconClassName="text-blue-500 dark:text-blue-400"
-              />
-
-              <StatsCard
-                title="Total words dictated"
-                value={stats.totalWords.toLocaleString()}
-                icon={<Flame className="h-6 w-6" />}
-                description={
-                  stats.totalWords > 0
-                    ? "You've written 1 instruction manual!"
-                    : 'Start dictating to see your total'
-                }
-                iconClassName="text-orange-500 dark:text-orange-400"
-              />
-            </Suspense>
+          {/* Stats section */}
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-2xl font-semibold">Your Dictation Stats</h2>
+              <div className="text-sm text-muted-foreground">
+                Last updated: {new Date().toLocaleDateString()}
+              </div>
+            </div>
+            <StatsErrorBoundary>
+              <StatsSection />
+            </StatsErrorBoundary>
           </div>
         </div>
       </CardContent>

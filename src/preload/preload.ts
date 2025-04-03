@@ -20,6 +20,8 @@ try {
     startRecording: (sourceId: string) => ipcRenderer.invoke('start-recording', sourceId),
     saveRecording: (arrayBuffer: ArrayBuffer) => ipcRenderer.invoke('save-recording', arrayBuffer),
     getRecordingPath: () => ipcRenderer.invoke('get-recording-path'),
+    notifyRecordingStateChange: (isRecording: boolean) =>
+      ipcRenderer.invoke('notify-recording-state-change', isRecording),
 
     // Audio device detection
     onAudioDevicesRequest: (callback: () => void) => {
@@ -149,6 +151,23 @@ try {
       };
     },
 
+    onRecordingToggleRequested: (callback: () => void) => {
+      const subscription = (_event: Electron.IpcRendererEvent) => callback();
+      ipcRenderer.on('recording-toggle-requested', subscription);
+      return () => {
+        ipcRenderer.removeListener('recording-toggle-requested', subscription);
+      };
+    },
+
+    onUpdateRecordingState: (callback: (isRecording: boolean) => void) => {
+      const subscription = (_event: Electron.IpcRendererEvent, isRecording: boolean) =>
+        callback(isRecording);
+      ipcRenderer.on('update-recording-state', subscription);
+      return () => {
+        ipcRenderer.removeListener('update-recording-state', subscription);
+      };
+    },
+
     onRecordingSourceSelected: (callback: (sourceId: string) => void) => {
       const subscription = (_event: Electron.IpcRendererEvent, sourceId: string) =>
         callback(sourceId);
@@ -169,6 +188,10 @@ try {
 
     // Add minimize window function
     minimizeMainWindow: () => ipcRenderer.invoke('minimize-main-window'),
+
+    // Add resize popup window function
+    resizePopupWindow: (isRecording: boolean) =>
+      ipcRenderer.invoke('resize-popup-window', isRecording),
 
     // Clipboard utilities
     pasteTextAtCursor: (text: string) => ipcRenderer.invoke('paste-text-at-cursor', text),
